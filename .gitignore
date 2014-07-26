@@ -1,0 +1,11 @@
+cabal-dev
+dist
+tags
+*.o
+*.swp
+*.a
+*.hi
+.cabal-sandbox
+cabal.sandobx.config
+*~
+#*
