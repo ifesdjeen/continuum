@@ -15,12 +15,14 @@ import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
                                         iterSeek, iterFirst, iterItems, withIter)
 import           Data.Default
 import           Data.ByteString              (ByteString)
-import           Control.Monad.Reader
+-- import           Control.Monad.Reader
+import           Control.Monad.State
 
 type RWOptions = (ReadOptions, WriteOptions)
 
 data DBContext = DBContext { ctxDb          :: DB
                              , ctxSchema    :: DbSchema
+                             , sequenceNumber :: Integer
                              -- , ctxKeyspace  :: ByteString
                              , ctxRwOptions :: RWOptions
                            }
@@ -36,53 +38,47 @@ makeContext db schema rwOptions = DBContext {ctxDb = db,
 -- open :: MonadResource m => FilePath -> Options -> m (ReleaseKey, DB)
 -- open path opts = allocate (Base.open path opts) Base.close
 
-db :: MonadReader DBContext m => m DB
-db = asks ctxDb
+db :: MonadState DBContext m => m DB
+db = gets ctxDb
 
--- keyspace :: MonadReader DBContext m => m ByteString
+incrementSequence :: MonadState DBContext m => m ()
+incrementSequence = modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
+
+getSequence :: MonadState DBContext m => m Integer
+getSequence = gets sequenceNumber
+
+
+-- keyspace :: MonadState DBContext m => m ByteString
 -- keyspace = asks ctxKeyspace
 
-schema :: MonadReader DBContext m => m DbSchema
-schema = asks ctxSchema
+schema :: MonadState DBContext m => m DbSchema
+schema = gets ctxSchema
 
-rwOptions :: MonadReader DBContext m => m RWOptions
-rwOptions = asks ctxRwOptions
+rwOptions :: MonadState DBContext m => m RWOptions
+rwOptions = gets ctxRwOptions
 
-ro :: MonadReader DBContext m => m ReadOptions
+ro :: MonadState DBContext m => m ReadOptions
 ro = liftM fst rwOptions
 
-wo :: MonadReader DBContext m => m WriteOptions
+wo :: MonadState DBContext m => m WriteOptions
 wo = liftM snd rwOptions
 
-putDbValue :: MonadReader DBContext IO => DbValue -> DbValue -> IO ()
+putDbValue :: DbValue -> DbValue -> StateT DBContext IO ()
 putDbValue k v = do
   db' <- db
   wo' <- wo
   Base.put db' wo' (encode k) (encode v)
 
-putDbValue' :: DbValue -> DbValue -> ReaderT DBContext IO ()
-putDbValue' k v = do
-  db' <- db
-  wo' <- wo
-  Base.put db' wo' (encode k) (encode v)
 
-
-
-getDbValue :: MonadReader DBContext IO => DbValue -> IO (Maybe ByteString)
+--- WTF is difference between that and the other one???
+getDbValue :: DbValue -> StateT DBContext IO (Maybe ByteString)
 getDbValue k = do
   db' <- db
   ro' <- ro
   Base.get db' ro' (encode k)
 
---- WTF is difference between that and the other one???
-getDbValue' :: DbValue -> ReaderT DBContext IO (Maybe ByteString)
-getDbValue' k = do
-  db' <- db
-  ro' <- ro
-  Base.get db' ro' (encode k)
 
-
-putRecord :: MonadReader DBContext IO => DbRecord -> IO ()
+putRecord :: DbRecord -> StateT DBContext IO ()
 putRecord (DbRecord timestamp sequenceId record) = do
   db' <- db
   wo' <- wo
@@ -90,25 +86,16 @@ putRecord (DbRecord timestamp sequenceId record) = do
   where key = encode (timestamp, sequenceId)
         value = encode $ fmap snd (Map.assocs record)
 
-putRecord' :: DbRecord -> ReaderT DBContext IO ()
-putRecord' (DbRecord timestamp sequenceId record) = do
-  db' <- db
-  wo' <- wo
-  Base.put db' wo' key value
-  where key = encode (timestamp, sequenceId)
-        value = encode $ fmap snd (Map.assocs record)
-
-
 findTs' :: DB -> ReadOptions -> Integer -> IO [(ByteString, ByteString)]
 findTs' db' ro' timestamp = do
   withIter db' ro' $ \iter -> do
     iterSeek iter (encode timestamp)
     iterItems iter
 
-findTs :: MonadReader DBContext IO => Integer -> IO [DbRecord]
+findTs :: Integer -> StateT DBContext IO [DbRecord]
 findTs timestamp = do
   db' <- db
   ro' <- ro
   schema' <- schema
-  records <- findTs' db' ro' timestamp
+  records <- liftIO $ findTs' db' ro' timestamp
   return $ makeDbRecords schema' records

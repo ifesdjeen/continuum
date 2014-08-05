@@ -3,7 +3,8 @@
 module Continuum.Tryout where
 
 import Database.LevelDB
-import Control.Monad.Reader
+-- import Control.Monad.Reader
+import Control.Monad.State
 import Continuum.Storage
 import Continuum.Serialization
 
@@ -23,9 +24,8 @@ main = do
     let ctx = makeContext db (makeSchema [("a", DbtInt), ("b", DbtString)]) (defaultReadOptions, defaultWriteOptions)
         -- a = (runReader dbOps) ctx
 
-    liftIO $ runReaderT (putDbValue' (DbString "asd") (DbString "bsd")) ctx
-    liftIO $ runReaderT (putDbValue' (DbString "bdd") (DbString "dsd")) ctx
-
-    liftIO $ runReaderT (getDbValue' (DbString "bdd")) ctx >>= print
+    liftIO $ runStateT (putDbValue (DbString "asd") (DbString "bsd")) ctx
+             >> runStateT (putDbValue (DbString "bdd") (DbString "dsd")) ctx
+             >> evalStateT (getDbValue (DbString "bdd")) ctx >>= print
 
     return ()
