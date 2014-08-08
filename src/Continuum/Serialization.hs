@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Continuum.Serialization where
 
@@ -10,23 +11,38 @@ import qualified Data.Map as Map
 -- import           Data.Serialize (Serialize, encode, decode)
 import           Data.Serialize as S
 import           GHC.Generics
-import           Data.Maybe
 import qualified Data.ByteString as B
 
 data Success = Success
 
 data DbType = DbtInt | DbtString
 
+-- data DbTimestamp = Integer
+--                  deriving (Show, Eq, Ord, Generic)
+
+-- type DbTimestamp = Integer
+-- type DbSequenceId = Maybe Integer
+-- newtype DbSequenceId = DbSequenceId (Maybe Integer)
+--                      deriving (Show, Eq, Ord, Generic)
+
+-- data DbSequenceId = DbSequenceId (Maybe Integer)
+--                   deriving (Show, Eq, Ord, Generic)
+
 data DbValue = DbInt Int
              | DbString String
              | DbTimestamp Integer
+             | DbSequenceId Integer
              | DbList [DbValue]
              | DbMap [(DbValue, DbValue)]
              deriving (Show, Eq, Ord, Generic)
 
+-- instance Serialize DbTimestamp
+-- instance Serialize DbSequenceId
 instance Serialize DbValue
 
-data DbRecord = DbRecord DbValue DbValue (Map.Map String DbValue)
+data DbRecord = DbRecord Integer (Map.Map String DbValue) |
+                DbPlaceholder Integer
+                deriving(Show)
 
 data DbSchema = DbSchema { fieldMappings :: (Map.Map String Int)
                            , fields :: [String]
@@ -34,6 +50,7 @@ data DbSchema = DbSchema { fieldMappings :: (Map.Map String Int)
                            , schemaMappings :: (Map.Map String DbType) }
 
 makeSchema :: [(String, DbType)] -> DbSchema
+
 makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
                                      , fields = fields'
                                      , schemaMappings = Map.fromList stringTypeList
@@ -48,24 +65,39 @@ makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
 validate :: DbSchema -> DbRecord -> Either String Success
 validate = error "Not Implemented"
 
--- makeDbRecord :: (B.ByteString, B.ByteString) -> DbRecord
+removePlaceholder :: DbRecord -> Bool
+removePlaceholder (DbRecord _ _) = True
+removePlaceholder (DbPlaceholder _) = False
+
+makeDbRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
+makeDbRecord' schema (timestamp, 0) _ =
+  DbPlaceholder timestamp
+
+makeDbRecord' schema (timestamp, _) v =
+  DbRecord timestamp (Map.fromList $ zip (fields schema) values) -- values
+  where values = decodeValue v
+
 makeDbRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> DbRecord
-makeDbRecord schema (k, v) = DbRecord timestamp sequenceId (Map.fromList $ zip (fields schema) values) -- values
-                          where (timestamp, sequenceId) = fromRightTuple $ decode k
-                                values = fromRightList $ decode v
+makeDbRecord schema (k, v) =
+  makeDbRecord' schema (decodeKey k) v
+  -- where (timestamp, _) =
+  -- DbRecord timestamp (Map.fromList $ zip (fields schema) values) -- values
+  -- where (timestamp, _) = decodeKey k
+  --       values = decodeValue v
 
 makeDbRecords :: DbSchema -> [(B.ByteString, B.ByteString)] -> [DbRecord]
-makeDbRecords schema items = fmap (makeDbRecord schema) items
+makeDbRecords schema items = filter removePlaceholder (fmap (makeDbRecord schema) items)
 -- makeDbRecords = error "asd"
 
--- throws an error if its argument take the form  @Left _@.
-fromRightTuple           :: Either String (DbValue, DbValue) -> (DbValue, DbValue)
-fromRightTuple (Left a)  = error a
-fromRightTuple (Right x) = x
+decodeKey :: B.ByteString -> (Integer, Integer)
+decodeKey k = case (decode k) of
+              (Left a)  -> error a
+              (Right x) -> x
 
-fromRightList           :: Either String [DbValue] -> [DbValue]
-fromRightList (Left a)  = error a
-fromRightList (Right x) = x
+decodeValue :: B.ByteString -> [DbValue]
+decodeValue k = case (decode k) of
+              (Left a)  -> error a
+              (Right x) -> x
 
 -- makeDbRecord schema k v = DbRecord timestamp sequenceId [] -- values
 --                           where (timestamp, sequenceId) = decode k :: Either String DbValue
