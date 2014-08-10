@@ -61,7 +61,7 @@ library
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 
-  exposed-modules:     Continuum.Storage, Continuum.Serialization, Continuum.Tryout
+  exposed-modules:     Continuum.Storage, Continuum.Serialization, Continuum.Tryout, Continuum.Options
 
   build-depends:        base >= 4 && < 5
                         , mtl >2.1
@@ -71,9 +71,9 @@ library
                         , leveldb-haskell-fork >= 0.3.1
                         , resourcet >= 1.1.2.2
                         , bytestring >= 0.10.4.0
-                        , cereal >= 0.4.0.1
+                        , cereal                    >= 0.4.0.1
                         , data-default
-
+                         , transformers-base        >= 0.4.1        && < 0.5
 test-suite tests
   ghc-options: -Wall
   main-is: tests.hs

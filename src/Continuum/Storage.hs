@@ -3,29 +3,31 @@
 {-# LANGUAGE DataKinds #-}
 
 module Continuum.Storage where
-
+import           Continuum.Options
 import           Continuum.Serialization
-import           Control.Applicative ((<$>), (<*>))
--- import           Control.Monad.Trans.Resource
+import           Control.Applicative ((<$>))
 
-import           Data.Serialize (Serialize, encode, decode)
+-- import           Data.Serialize (Serialize, encode, decode)
+import           Data.Serialize (encode)
 import qualified Data.Map as Map
 
 import qualified Database.LevelDB.Base  as Base
 import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
                                         iterSeek, iterFirst, iterItems, withIter,
-                                        iterNext, mapIter, iterEntry, iterValid)
+                                        iterNext, iterEntry, iterValid)
+
 import           Database.LevelDB.Iterator (Iterator)
-import           Data.Default
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as BS
--- import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Maybe
 import           Data.Maybe
 
 
-import           Database.LevelDB.C
+import           Control.Monad.Trans.Resource
+
+
+type AppState = StateT DBContext IO
+type AppResource = ResourceT AppState
 
 type RWOptions = (ReadOptions, WriteOptions)
 
@@ -37,16 +39,10 @@ data DBContext = DBContext { ctxDb          :: DB
                            }
 
 makeContext :: DB -> DbSchema -> RWOptions -> DBContext
-makeContext db schema rwOptions = DBContext {ctxDb = db,
-                                             sequenceNumber = 1,
-                                             ctxSchema = schema,
-                                             ctxRwOptions = rwOptions}
-
--- withDatabase :: MonadResource m => FilePath -> Options -> m DB
--- withDatabase path opts = snd <$> open path opts
-
--- open :: MonadResource m => FilePath -> Options -> m (ReleaseKey, DB)
--- open path opts = allocate (Base.open path opts) Base.close
+makeContext db' schema' rwOptions' = DBContext {ctxDb = db',
+                                                sequenceNumber = 1,
+                                                ctxSchema = schema',
+                                                ctxRwOptions = rwOptions'}
 
 db :: MonadState DBContext m => m DB
 db = gets ctxDb
@@ -58,14 +54,8 @@ getAndincrementSequence = do
   modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
   return $ sequenceNumber old
 
--- modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
-
 getSequence :: MonadState DBContext m => m Integer
 getSequence = gets sequenceNumber
-
-
--- keyspace :: MonadState DBContext m => m ByteString
--- keyspace = asks ctxKeyspace
 
 schema :: MonadState DBContext m => m DbSchema
 schema = gets ctxSchema
@@ -82,36 +72,34 @@ wo = liftM snd rwOptions
 tsPlaceholder :: ByteString
 tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
 
-putDbValue :: (Integer, Integer) -> DbValue -> StateT DBContext IO ()
+putDbValue :: (Integer, Integer) -> DbValue -> AppState ()
 putDbValue k v = do
   db' <- db
   wo' <- wo
   Base.put db' wo' (encode k) (encode v)
 
 
-getDbValue :: DbValue -> StateT DBContext IO (Maybe ByteString)
+getDbValue :: DbValue -> AppState (Maybe ByteString)
 getDbValue k = do
   db' <- db
   ro' <- ro
   Base.get db' ro' (encode k)
 
-getDbValue2 :: Integer -> StateT DBContext IO (Maybe ByteString)
+getDbValue2 :: Integer -> AppState (Maybe ByteString)
 getDbValue2 k = do
   db' <- db
   ro' <- ro
   Base.get db' ro' (encode (k, -1 :: Integer))
 
-storagePut :: ByteString -> ByteString -> StateT DBContext IO ()
+storagePut :: ByteString -> ByteString -> AppState ()
 storagePut key value = do
   db' <- db
   wo' <- wo
   Base.put db' wo' key value
 
-putRecord :: DbRecord -> StateT DBContext IO ()
+putRecord :: DbRecord -> AppState ()
 putRecord (DbRecord timestamp record) = do
   sid <- getAndincrementSequence -- :: StateT DBContext IO (Maybe Integer)
-
-  encoded <- return $ encode (timestamp, sid)
 
   -- Write empty timestamp to be used for iteration, overwrite if needed
   storagePut (encode (timestamp, 0 :: Integer)) tsPlaceholder
@@ -123,7 +111,7 @@ putRecord (DbRecord timestamp record) = do
 
   where value = encode $ fmap snd (Map.assocs record)
 
-findTs :: Integer -> StateT DBContext IO [DbRecord]
+findTs :: Integer -> AppState [DbRecord]
 findTs timestamp = do
   db' <- db
   ro' <- ro
@@ -145,7 +133,7 @@ reachedEnd end (key, _) = k < end
                           where (k, _) = (decodeKey key)
                                 -- (encode (end, 0 :: Integer)) /= key
 
-findRange :: Integer -> Integer -> StateT DBContext IO [DbRecord]
+findRange :: Integer -> Integer -> AppState [DbRecord]
 findRange begin end = do
   db' <- db
   ro' <- ro
@@ -179,10 +167,6 @@ iterWhile iter checker = catMaybes <$> go []
 iterUntil :: (Functor m, MonadIO m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
 iterUntil iter checker = iterWhile iter (not . checker)
 
-compareKeys :: ByteString -> ByteString -> Ordering
-compareKeys k1 k2 = compare k11 k21
-                    where (k11, k12) = decodeKey k1
-                          (k21, k22) = decodeKey k2
 
 findAll :: StateT DBContext IO [DbRecord]
 findAll = do
@@ -194,3 +178,20 @@ findAll = do
                iterItems iter
 
   return $ makeDbRecords schema' records
+
+runApp :: String -> AppState () -> IO ()
+runApp path actions = do
+  runResourceT $ do
+    db <- Base.open path opts
+    let schema' = makeSchema [("a", DbtInt), ("b", DbtString)]
+        ctx = makeContext db schema' (readOpts, writeOpts)
+    liftIO $ (flip runStateT) ctx actions
+    return ()
+
+
+-- compareKeys :: ByteString -> ByteString -> Ordering
+-- compareKeys k1 k2 = compare k11 k21
+--                     where (k11, k12) = decodeKey k1
+--                           (k21, k22) = decodeKey k2
+-- customComparator :: Comparator
+-- customComparator = Comparator compareKeys
