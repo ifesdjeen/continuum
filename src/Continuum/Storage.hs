@@ -5,7 +5,7 @@
 module Continuum.Storage where
 
 import           Continuum.Serialization
-import           Control.Applicative ((<$>))
+import           Control.Applicative ((<$>), (<*>))
 -- import           Control.Monad.Trans.Resource
 
 import           Data.Serialize (Serialize, encode, decode)
@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 import qualified Database.LevelDB.Base  as Base
 import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
                                         iterSeek, iterFirst, iterItems, withIter,
-                                        iterNext, mapIter, iterEntry)
+                                        iterNext, mapIter, iterEntry, iterValid)
 import           Database.LevelDB.Iterator (Iterator)
 import           Data.Default
 import           Data.ByteString        (ByteString)
@@ -35,9 +35,6 @@ data DBContext = DBContext { ctxDb          :: DB
                              -- , ctxKeyspace  :: ByteString
                              , ctxRwOptions :: RWOptions
                            }
-
-tsPlaceholder :: ByteString
-tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
 
 makeContext :: DB -> DbSchema -> RWOptions -> DBContext
 makeContext db schema rwOptions = DBContext {ctxDb = db,
@@ -82,6 +79,9 @@ ro = liftM fst rwOptions
 wo :: MonadState DBContext m => m WriteOptions
 wo = liftM snd rwOptions
 
+tsPlaceholder :: ByteString
+tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
+
 putDbValue :: (Integer, Integer) -> DbValue -> StateT DBContext IO ()
 putDbValue k v = do
   db' <- db
@@ -123,20 +123,6 @@ putRecord (DbRecord timestamp record) = do
 
   where value = encode $ fmap snd (Map.assocs record)
 
--- findTs' :: DB -> ReadOptions -> Integer -> IO [(ByteString, ByteString)]
--- findTs' db' ro' timestamp = do
---   withIter db' ro' $ \iter -> do
---     iterSeek iter (encode timestamp)
---     iterItems iter
-
--- findTs :: Integer -> StateT DBContext IO [DbRecord]
--- findTs timestamp = do
---   db' <- db
---   ro' <- ro
---   schema' <- schema
---   records <- liftIO $ findTs' db' ro' timestamp
---   return $ makeDbRecords schema' records
-
 findTs :: Integer -> StateT DBContext IO [DbRecord]
 findTs timestamp = do
   db' <- db
@@ -167,27 +153,36 @@ findRange begin end = do
   records <- withIter db' ro' $ \iter -> do
                iterSeek iter (encode (begin, 0 :: Integer))
                iterWhile iter (reachedEnd end)
-               -- untilM (reachedEnd end) (\x -> iterNext iter)
-               -- where reachedEnd (key _) = true
-               -- iterItems iter
-
-  -- liftIO $ putStrLn (show records)
 
   return $ makeDbRecords schema' records
 
 
-iterWhile :: (Functor m, MonadIO m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
-iterWhile iter checker = (takeWhile checker) <$> (catMaybes <$> mapIter iterEntry iter)
+iterWhile :: (Functor m, MonadIO m) =>
+             Iterator
+             -> ((ByteString, ByteString) -> Bool)
+             -> m [(ByteString, ByteString)]
+
+iterWhile iter checker = catMaybes <$> go []
+  where go acc = do
+          valid <- iterValid iter
+          next <- iterEntry iter -- liftIO ?
+
+          if not valid
+            then return acc
+            else if valid && (checker (fromJust next))
+                 then do
+                   ()  <- iterNext iter
+                   go (acc ++ [next])
+                 else return (acc ++ [next])
+
 
 iterUntil :: (Functor m, MonadIO m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
-iterUntil iter checker = (takeWhile (not . checker)) <$> (catMaybes <$> mapIter iterEntry iter)
-
+iterUntil iter checker = iterWhile iter (not . checker)
 
 compareKeys :: ByteString -> ByteString -> Ordering
 compareKeys k1 k2 = compare k11 k21
                     where (k11, k12) = decodeKey k1
                           (k21, k22) = decodeKey k2
-
 
 findAll :: StateT DBContext IO [DbRecord]
 findAll = do
@@ -198,14 +193,4 @@ findAll = do
                iterFirst iter
                iterItems iter
 
-  -- liftIO $ putStrLn (show records)
-
   return $ makeDbRecords schema' records
-
-
-a :: [Int] -> [Int]
-a l = go [] l
-      where
-        go acc (s:xs) = if null xs
-                           then (s:acc)
-                           else go (s:acc) xs
