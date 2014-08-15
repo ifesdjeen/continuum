@@ -2,7 +2,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
 
-module Continuum.Storage where
+module Continuum.Storage
+       (DB, DBContext,
+        runApp, putRecord, findTs, findRange, findAll)
+       where
 import           Continuum.Options
 import           Continuum.Serialization
 import           Control.Applicative ((<$>))
@@ -11,12 +14,21 @@ import           Control.Applicative ((<$>))
 import           Data.Serialize (encode)
 import qualified Data.Map as Map
 
-import qualified Database.LevelDB.Base  as Base
-import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
-                                        iterSeek, iterFirst, iterItems, withIter,
-                                        iterNext, iterEntry, iterValid)
+-- import qualified Database.LevelDB.Base  as Base
+-- import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
+--                                         iterSeek, iterFirst, iterItems, withIter,
+--                                         iterNext, iterEntry, iterValid)
+-- import           Database.LevelDB.Iterator (Iterator)
 
-import           Database.LevelDB.Iterator (Iterator)
+import qualified Database.LevelDB.MonadResource  as Base
+import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
+                                                 Iterator,
+                                                 iterSeek, iterFirst, iterItems,
+                                                 withIterator, iterNext, iterEntry,
+                                                 iterValid)
+---import           Database.LevelDB.Iterator (Iterator)
+
+
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as BS
 import           Control.Monad.State
@@ -26,8 +38,8 @@ import           Data.Maybe
 import           Control.Monad.Trans.Resource
 
 
-type AppState = StateT DBContext IO
-type AppResource = ResourceT AppState
+type AppState a = StateT DBContext (ResourceT IO) a
+-- type AppResource a = ResourceT AppState IO a
 
 type RWOptions = (ReadOptions, WriteOptions)
 
@@ -116,12 +128,12 @@ findTs timestamp = do
   db' <- db
   ro' <- ro
   schema' <- schema
-  records <- withIter db' ro' $ \iter -> do
+  records <- withIterator db' ro' $ \iter -> do
                iterSeek iter (encode (timestamp, 0 :: Integer))
                -- iterNext iter
                iterWhile iter (isSame timestamp)
 
-  return $ makeDbRecords schema' records
+  return $ decodeRecords schema' records
 
 
 isSame :: Integer -> (ByteString, ByteString) -> Bool
@@ -138,14 +150,14 @@ findRange begin end = do
   db' <- db
   ro' <- ro
   schema' <- schema
-  records <- withIter db' ro' $ \iter -> do
+  records <- withIterator db' ro' $ \iter -> do
                iterSeek iter (encode (begin, 0 :: Integer))
                iterWhile iter (reachedEnd end)
 
-  return $ makeDbRecords schema' records
+  return $ decodeRecords schema' records
 
 
-iterWhile :: (Functor m, MonadIO m) =>
+iterWhile :: (MonadResource m) =>
              Iterator
              -> ((ByteString, ByteString) -> Bool)
              -> m [(ByteString, ByteString)]
@@ -164,30 +176,30 @@ iterWhile iter checker = catMaybes <$> go []
                  else return (acc ++ [next])
 
 
-iterUntil :: (Functor m, MonadIO m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
+iterUntil :: (MonadResource m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
 iterUntil iter checker = iterWhile iter (not . checker)
 
 
-findAll :: StateT DBContext IO [DbRecord]
+findAll :: AppState [DbRecord]
 findAll = do
   db' <- db
   ro' <- ro
   schema' <- schema
-  records <- withIter db' ro' $ \iter -> do
+  records <- withIterator db' ro' $ \iter -> do
                iterFirst iter
                iterItems iter
 
-  return $ makeDbRecords schema' records
+  return $ decodeRecords schema' records
 
-runApp :: String -> AppState () -> IO ()
+runApp :: String -> AppState a -> IO (a)
 runApp path actions = do
   runResourceT $ do
     db <- Base.open path opts
     let schema' = makeSchema [("a", DbtInt), ("b", DbtString)]
         ctx = makeContext db schema' (readOpts, writeOpts)
-    liftIO $ (flip runStateT) ctx actions
-    return ()
-
+    -- liftResourceT $ (flip evalStateT) ctx actions
+    res <- (flip evalStateT) ctx actions
+    return $ res
 
 -- compareKeys :: ByteString -> ByteString -> Ordering
 -- compareKeys k1 k2 = compare k11 k21

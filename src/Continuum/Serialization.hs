@@ -61,6 +61,8 @@ makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
         iterateFrom0 = (iterate (1+) 0)
 
 
+makeRecord :: Integer -> [(String, DbValue)] -> DbRecord
+makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 validate :: DbSchema -> DbRecord -> Either String Success
 validate = error "Not Implemented"
@@ -69,25 +71,21 @@ removePlaceholder :: DbRecord -> Bool
 removePlaceholder (DbRecord _ _) = True
 removePlaceholder (DbPlaceholder _) = False
 
-makeDbRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
-makeDbRecord' schema (timestamp, 0) _ =
+decodeRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
+decodeRecord' schema (timestamp, 0) _ =
   DbPlaceholder timestamp
 
-makeDbRecord' schema (timestamp, _) v =
+decodeRecord' schema (timestamp, _) v =
   DbRecord timestamp (Map.fromList $ zip (fields schema) values) -- values
   where values = decodeValue v
 
-makeDbRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> DbRecord
-makeDbRecord schema (k, v) =
-  makeDbRecord' schema (decodeKey k) v
-  -- where (timestamp, _) =
-  -- DbRecord timestamp (Map.fromList $ zip (fields schema) values) -- values
-  -- where (timestamp, _) = decodeKey k
-  --       values = decodeValue v
+decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> DbRecord
+decodeRecord schema (k, v) =
+  decodeRecord' schema (decodeKey k) v
 
-makeDbRecords :: DbSchema -> [(B.ByteString, B.ByteString)] -> [DbRecord]
-makeDbRecords schema items = filter removePlaceholder (fmap (makeDbRecord schema) items)
--- makeDbRecords = error "asd"
+decodeRecords :: DbSchema -> [(B.ByteString, B.ByteString)] -> [DbRecord]
+decodeRecords schema items = filter removePlaceholder (fmap (decodeRecord schema) items)
+-- decodeRecords = error "asd"
 
 decodeKey :: B.ByteString -> (Integer, Integer)
 decodeKey k = case (decode k) of
@@ -99,7 +97,7 @@ decodeValue k = case (decode k) of
               (Left a)  -> error a
               (Right x) -> x
 
--- makeDbRecord schema k v = DbRecord timestamp sequenceId [] -- values
+-- decodeRecord schema k v = DbRecord timestamp sequenceId [] -- values
 --                           where (timestamp, sequenceId) = decode k :: Either String DbValue
 --                                 values = decode v :: Either String DbValue
 -- decode (encode $ DbString "asdasdasdasdasdasdasdasdasdasdasdasd") :: Either String DbValue
