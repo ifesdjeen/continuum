@@ -4,11 +4,11 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findTs, findRange, findAll)
+        runApp, putRecord, findByTimestamp, findRange, findAll)
        where
 import           Continuum.Options
 import           Continuum.Serialization
-import           Control.Applicative ((<$>))
+-- import           Control.Applicative ((<$>))
 
 -- import           Data.Serialize (Serialize, encode, decode)
 import           Data.Serialize (encode)
@@ -30,9 +30,9 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
 
 
 import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as BS
+-- import qualified Data.ByteString        as BS
 import           Control.Monad.State
-import           Data.Maybe
+-- import           Data.Maybe
 
 
 import           Control.Monad.Trans.Resource
@@ -84,25 +84,6 @@ wo = liftM snd rwOptions
 tsPlaceholder :: ByteString
 tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
 
-putDbValue :: (Integer, Integer) -> DbValue -> AppState ()
-putDbValue k v = do
-  db' <- db
-  wo' <- wo
-  Base.put db' wo' (encode k) (encode v)
-
-
-getDbValue :: DbValue -> AppState (Maybe ByteString)
-getDbValue k = do
-  db' <- db
-  ro' <- ro
-  Base.get db' ro' (encode k)
-
-getDbValue2 :: Integer -> AppState (Maybe ByteString)
-getDbValue2 k = do
-  db' <- db
-  ro' <- ro
-  Base.get db' ro' (encode (k, -1 :: Integer))
-
 storagePut :: ByteString -> ByteString -> AppState ()
 storagePut key value = do
   db' <- db
@@ -123,62 +104,57 @@ putRecord (DbRecord timestamp record) = do
 
   where value = encode $ fmap snd (Map.assocs record)
 
-findTs :: Integer -> AppState [DbRecord]
-findTs timestamp = do
-  db' <- db
-  ro' <- ro
-  schema' <- schema
-  records <- withIterator db' ro' $ \iter -> do
-               iterSeek iter (encode (timestamp, 0 :: Integer))
-               -- iterNext iter
-               iterWhile iter (isSame timestamp)
-
-  return $ decodeRecords schema' records
-
-
-isSame :: Integer -> (ByteString, ByteString) -> Bool
-isSame end (key, _) = k == end
-                      where (k, _) = (decodeKey key)
-
-reachedEnd :: Integer -> (ByteString, ByteString) -> Bool
-reachedEnd end (key, _) = k < end
-                          where (k, _) = (decodeKey key)
-                                -- (encode (end, 0 :: Integer)) /= key
+findByTimestamp :: Integer -> AppState [DbRecord]
+findByTimestamp timestamp = scan begin id checker append []
+                            where begin = encodeBeginTimestamp timestamp
+                                  checker = compareTimestamps (==) timestamp
 
 findRange :: Integer -> Integer -> AppState [DbRecord]
-findRange begin end = do
+findRange beginTs end = scan begin id checker append []
+                      where begin = encodeBeginTimestamp beginTs
+                            checker = compareTimestamps (<=) end
+
+scan :: ByteString
+        -> (DbRecord -> i)
+        -> (i -> acc -> Bool)
+        -> (i -> acc -> acc)
+        -> acc
+        -> AppState acc
+
+scan begin mapFn checker reduceFn accInit = do
   db' <- db
   ro' <- ro
   schema' <- schema
   records <- withIterator db' ro' $ \iter -> do
-               iterSeek iter (encode (begin, 0 :: Integer))
-               iterWhile iter (reachedEnd end)
+               iterSeek iter begin
+               scanIntern iter (mapFn . (decodeRecord schema')) checker reduceFn accInit
+  return $ records
 
-  return $ decodeRecords schema' records
+scanIntern :: (MonadResource m)
+        => Iterator
+        -> ((ByteString, ByteString) -> i)
+        -> (i -> acc -> Bool)
+        -> (i -> acc -> acc)
+        -> acc
+        -> m acc
 
-
-iterWhile :: (MonadResource m) =>
-             Iterator
-             -> ((ByteString, ByteString) -> Bool)
-             -> m [(ByteString, ByteString)]
-
-iterWhile iter checker = catMaybes <$> go []
-  where go acc = do
+scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
+  where scanIntern acc = do
           valid <- iterValid iter
-          next <- iterEntry iter -- liftIO ?
+          next <- iterEntry iter
 
-          if not valid
-            then return acc
-            else if valid && (checker (fromJust next))
-                 then do
-                   ()  <- iterNext iter
-                   go (acc ++ [next])
-                 else return (acc ++ [next])
+          case (valid, next) of
+            (true, Just (k, v)) -> do
+              let mapped = mapFn (k, v)
 
+              -- liftIO $ putStrLn (show v)
 
-iterUntil :: (MonadResource m) => Iterator -> ((ByteString, ByteString) -> Bool)-> m [(ByteString, ByteString)]
-iterUntil iter checker = iterWhile iter (not . checker)
-
+              if checker mapped acc
+              then do
+                () <- iterNext iter
+                scanIntern $ reduceFn mapped acc
+              else return acc
+            _ -> return acc
 
 findAll :: AppState [DbRecord]
 findAll = do

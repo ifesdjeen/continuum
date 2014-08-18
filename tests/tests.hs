@@ -3,6 +3,9 @@
 
 module Main where
 
+import Continuum.Serialization
+import Continuum.Storage
+
 import System.Process(system)
 import Test.Hspec
 import Test.Hspec.Expectations
@@ -11,36 +14,61 @@ import Test.QuickCheck
 
 import Control.Monad (liftM, void)
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Data.Default
-import Database.LevelDB
+-- import Data.Default
+-- import Database.LevelDB
 
 
 import Control.Monad.Reader
 
-initializeDB :: MonadResource m => m DB
-initializeDB =
-  open "/tmp/leveltest" defaultOptions{ createIfMissing = True
-                                      , cacheSize= 2048
-                                      }
-
 main :: IO ()
 main =  hspec $ do
-  liftIO $ cleanup
+
 
   describe "Basic DB Functionality" $ do
+    it "setup" $ cleanup >>= shouldReturn (return())
     it "should put items into the database and retrieve them" $  do
-      db <- open testDBPath
-            defaultOptions{ createIfMissing = True
-                          , cacheSize= 2048
-                                       -- , comparator = Just customComparator
-                          }
-      let ctx = makeContext db (makeSchema [("a", DbtInt), ("b", DbtString)]) (defaultReadOptions, defaultWriteOptions)
+      let res = runApp testDBPath $ do
+            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            findByTimestamp 123
+      res `shouldReturn` [(makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])]
 
+    it "setup" $ cleanup >>= shouldReturn (return())
+    it "should retrieve items by given timestamp" $  do
+      let res = runApp testDBPath $ do
+            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))]
 
-      liftIO $ (flip runStateT) ctx $ do
-        putRecord (DbRecord
-                   123
-                   (Map.fromList [("a", (DbInt 1)), ("b", (DbString "1"))]))
+            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            findByTimestamp 123
+
+      res `shouldReturn` [ (makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])
+                          ,(makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))])
+                          ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])]
+
+    it "setup" $ cleanup >>= shouldReturn (return())
+    it "should return inclusive range of timestamps" $  do
+      let res = runApp testDBPath $ do
+            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            findRange 123 456
+
+      res `shouldReturn` [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+                          ,makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
+                          ,makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+                          ,makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+                          ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+                          ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+                          ]
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"

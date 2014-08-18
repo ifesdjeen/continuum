@@ -40,9 +40,11 @@ data DbValue = DbInt Int
 -- instance Serialize DbSequenceId
 instance Serialize DbValue
 
+-- change String to ByteString
+-- overloadedstrings
 data DbRecord = DbRecord Integer (Map.Map String DbValue) |
                 DbPlaceholder Integer
-                deriving(Show)
+                deriving(Show, Eq)
 
 data DbSchema = DbSchema { fieldMappings :: (Map.Map String Int)
                            , fields :: [String]
@@ -139,3 +141,29 @@ decodeValue k = case (decode k) of
 
 
 -- Map.fromList [("key1", (DbInt 1)), ("key2", (DbString "asd"))]
+
+
+-- Chec
+
+encodeBeginTimestamp :: Integer -> B.ByteString
+encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
+
+-- isSameTimestamp :: Integer -> DbRecord -> a -> Bool
+-- isSameTimestamp begin (DbRecord current _) _ = begin == current
+-- isSameTimestamp begin (DbPlaceholder current) _ = begin == current
+-- isSameTimestamp begin _ _ = False
+
+
+compareTimestamps :: (Integer -> Integer -> Bool)
+                     -> Integer
+                     -> DbRecord
+                     -> a
+                     -> Bool
+
+compareTimestamps op begin (DbRecord current _) _ = current `op` begin
+compareTimestamps op begin (DbPlaceholder current) _ = current `op` begin
+compareTimestamps op begin _ _ = False
+
+append :: DbRecord -> [DbRecord] -> [DbRecord]
+append val@(DbRecord _ _) acc = acc ++ [val]
+append (DbPlaceholder _) acc = acc

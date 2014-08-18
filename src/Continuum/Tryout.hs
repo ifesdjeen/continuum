@@ -30,17 +30,17 @@ main = runApp testDBPath $ do
   putRecord $ makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))]
   putRecord $ makeRecord 789 [("a", (DbInt 4)), ("b", (DbString "4"))]
 
-  a <- findTs 123
+  a <- findByTimestamp 123
   liftIO $ putStrLn "===== 123 ===== "
   liftIO $ putStrLn (show a)
 
-  range <- findRange 123 789
-  liftIO $ putStrLn "===== RANGE ===== "
-  liftIO $ putStrLn (show range)
-  liftIO $ putStrLn "===== RANGE ===== "
+  -- range <- findRange 123 789
+  -- liftIO $ putStrLn "===== RANGE ===== "
+  -- liftIO $ putStrLn (show range)
+  -- liftIO $ putStrLn "===== RANGE ===== "
 
-  c <- findAll
-  liftIO $ putStrLn "===== ALL ===== "
-  liftIO $ putStrLn (show c)
+  -- c <- findAll
+  -- liftIO $ putStrLn "===== ALL ===== "
+  -- liftIO $ putStrLn (show c)
 
   -- return a
