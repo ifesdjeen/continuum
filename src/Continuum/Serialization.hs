@@ -28,13 +28,33 @@ data DbType = DbtInt | DbtString
 -- data DbSequenceId = DbSequenceId (Maybe Integer)
 --                   deriving (Show, Eq, Ord, Generic)
 
-data DbValue = DbInt Int
+data DbValue = DbInt Integer
+             | DbFloat Float
+             | DbDouble Double
              | DbString String
              | DbTimestamp Integer
              | DbSequenceId Integer
              | DbList [DbValue]
              | DbMap [(DbValue, DbValue)]
              deriving (Show, Eq, Ord, Generic)
+
+
+unpackString :: DbValue -> String
+unpackString (DbString i) = i
+unpackString _ = error "Can't unpack Int"
+
+
+unpackInt :: DbValue -> Integer
+unpackInt (DbInt i) = i
+unpackInt _ = error "Can't unpack Int"
+
+unpackFloat :: DbValue -> Float
+unpackFloat (DbFloat i) = i
+unpackFloat _ = error "Can't unpack Float"
+
+unpackDouble :: DbValue -> Double
+unpackDouble (DbDouble i) = i
+unpackDouble _ = error "Can't unpack Double"
 
 -- instance Serialize DbTimestamp
 -- instance Serialize DbSequenceId
