@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 import           Data.Serialize as S
 import           GHC.Generics
 import qualified Data.ByteString as B
+import           Data.Foldable
 
 data Success = Success
 
@@ -37,7 +38,6 @@ data DbValue = DbInt Integer
              | DbList [DbValue]
              | DbMap [(DbValue, DbValue)]
              deriving (Show, Eq, Ord, Generic)
-
 
 unpackString :: DbValue -> String
 unpackString (DbString i) = i
@@ -65,6 +65,11 @@ instance Serialize DbValue
 data DbRecord = DbRecord Integer (Map.Map String DbValue) |
                 DbPlaceholder Integer
                 deriving(Show, Eq)
+
+-- (Ord key, Eq val) =>
+data Group key val = Group [(key, [val])]
+                   | GroupAggregate [(key, val)]
+                   deriving (Show, Eq, Ord)
 
 data DbSchema = DbSchema { fieldMappings :: (Map.Map String Int)
                            , fields :: [String]
@@ -187,3 +192,23 @@ compareTimestamps op begin _ _ = False
 append :: DbRecord -> [DbRecord] -> [DbRecord]
 append val@(DbRecord _ _) acc = acc ++ [val]
 append (DbPlaceholder _) acc = acc
+
+instance (Ord a) => Functor (Group a) where
+  fmap f (Group vals) = Group $ fmap mapEntries vals
+    where mapEntries (k, v) = (k, (fmap f v))
+
+-- (b -> c) -> [(a, [b])] -> [(a, [c])]
+-- (a -> b -> b) -> b -> [a] -> b
+
+foldGroup :: (b -> c -> c) -> c -> Group a b -> Group a c
+foldGroup f acc (Group vals) = GroupAggregate $ fmap foldEntries vals
+                             where foldEntries (k, v) = (k, Prelude.foldr f acc v)
+
+foldGroup1 :: (val -> val -> val) -> Group key val -> Group key val
+foldGroup1 f (Group vals) = GroupAggregate $ fmap foldEntries vals
+                            where foldEntries (k, v) = (k, Prelude.foldr1 f v)
+
+foldTuple :: (b -> c -> c) -> c -> (a, [b]) -> (a, c)
+foldTuple f acc (k, coll) = (k, Prelude.foldr f acc coll)
+
+-- sortAndGroup assocs = fromListWith (++) [(k, [v]) | (k, v) <- assocs]
