@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import           Data.Serialize as S
 import           GHC.Generics
 import qualified Data.ByteString as B
-import           Data.Foldable
+import           Data.Maybe (fromJust, catMaybes)
 
 data Success = Success
 
@@ -42,7 +42,6 @@ data DbValue = DbInt Integer
 unpackString :: DbValue -> String
 unpackString (DbString i) = i
 unpackString _ = error "Can't unpack Int"
-
 
 unpackInt :: DbValue -> Integer
 unpackInt (DbInt i) = i
@@ -97,6 +96,11 @@ validate = error "Not Implemented"
 removePlaceholder :: DbRecord -> Bool
 removePlaceholder (DbRecord _ _) = True
 removePlaceholder (DbPlaceholder _) = False
+
+encodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
+encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
+  where encodeKey = encode (timestamp, sid)
+        encodeValue = encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
 decodeRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
 decodeRecord' schema (timestamp, 0) _ =
@@ -212,3 +216,14 @@ foldTuple :: (b -> c -> c) -> c -> (a, [b]) -> (a, c)
 foldTuple f acc (k, coll) = (k, Prelude.foldr f acc coll)
 
 -- sortAndGroup assocs = fromListWith (++) [(k, [v]) | (k, v) <- assocs]
+
+byField :: String -> DbRecord -> DbValue
+byField f (DbRecord _ m) = fromJust $ Map.lookup f m
+byField _ _ = DbInt 1 -- WTF
+
+byFieldMaybe :: String -> DbRecord -> Maybe DbValue
+byFieldMaybe f (DbRecord _ m) = Map.lookup f m
+byFieldMaybe _ _ = Just $ DbInt 1 -- WTF
+
+byTime :: Integer -> DbRecord -> Integer
+byTime interval (DbRecord t _) = interval * (t `quot` interval)
