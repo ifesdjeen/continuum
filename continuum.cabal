@@ -61,9 +61,10 @@ library
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
 
-  exposed-modules:     Continuum.Storage, Continuum.Serialization, Continuum.Tryout, Continuum.Options, Continuum.Actions
+  exposed-modules:     Continuum.Storage, Continuum.Serialization, Continuum.Tryout, Continuum.Options, Continuum.Actions, Continuum.JsonLoader
 
   build-depends:        base >= 4 && < 5
+                        , aeson >= 0.8.0.0
                         , mtl >2.1
                         , transformers
                         , process >= 1.1.0.2

@@ -4,7 +4,7 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findByTimestamp, findRange, findAll)
+        runApp, putRecord, findByTimestamp, findRange, scanAll)
        where
 import           Continuum.Options
 import           Continuum.Serialization
@@ -32,7 +32,7 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
 import           Data.ByteString        (ByteString)
 -- import qualified Data.ByteString        as BS
 import           Control.Monad.State
--- import           Data.Maybe
+import           Data.Maybe (isJust, fromJust)
 
 
 import           Control.Monad.Trans.Resource
