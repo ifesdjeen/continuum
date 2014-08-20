@@ -156,22 +156,18 @@ scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
               else return acc
             _ -> return acc
 
-findAll :: AppState [DbRecord]
-findAll = do
-  db' <- db
-  ro' <- ro
-  schema' <- schema
-  records <- withIterator db' ro' $ \iter -> do
-               iterFirst iter
-               iterItems iter
-
-  return $ decodeRecords schema' records
+scanAll :: (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState acc
+scanAll mapFn reduceFn acc = scan Nothing mapFn alwaysTrue reduceFn acc
+                             where alwaysTrue = \_ _ -> True
 
 runApp :: String -> AppState a -> IO (a)
 runApp path actions = do
   runResourceT $ do
     db <- Base.open path opts
-    let schema' = makeSchema [("a", DbtInt), ("b", DbtString)]
+    let schema' = makeSchema [ ("request_ip", DbtString)
+                             , ("host", DbtString)
+                             , ("uri", DbtString)
+                             , ("status", DbtString)]
         ctx = makeContext db schema' (readOpts, writeOpts)
     -- liftResourceT $ (flip evalStateT) ctx actions
     res <- (flip evalStateT) ctx actions
