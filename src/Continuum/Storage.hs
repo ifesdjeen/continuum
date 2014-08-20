@@ -91,30 +91,34 @@ storagePut key value = do
   Base.put db' wo' key value
 
 putRecord :: DbRecord -> AppState ()
-putRecord (DbRecord timestamp record) = do
+putRecord record@(DbRecord timestamp _) = do
   sid <- getAndincrementSequence -- :: StateT DBContext IO (Maybe Integer)
+  schema' <- schema
 
   -- Write empty timestamp to be used for iteration, overwrite if needed
   storagePut (encode (timestamp, 0 :: Integer)) tsPlaceholder
   -- Write an actual value to the database
 
-  liftIO $ putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
+  liftIO $ when (sid `mod` 1000 == 0) $ do putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
 
-  storagePut (encode (timestamp, sid)) value
+  let (k,v) = encodeRecord schema' record sid
+  -- storagePut (encode (timestamp, sid)) value
+  storagePut k v
 
-  where value = encode $ fmap snd (Map.assocs record)
+  -- add default `empty` values (for Maybe)
+  -- where value = encode $ fmap snd (Map.assocs record)
 
 findByTimestamp :: Integer -> AppState [DbRecord]
-findByTimestamp timestamp = scan begin id checker append []
+findByTimestamp timestamp = scan (Just begin) id checker append []
                             where begin = encodeBeginTimestamp timestamp
                                   checker = compareTimestamps (==) timestamp
 
 findRange :: Integer -> Integer -> AppState [DbRecord]
-findRange beginTs end = scan begin id checker append []
+findRange beginTs end = scan (Just begin) id checker append []
                       where begin = encodeBeginTimestamp beginTs
                             checker = compareTimestamps (<=) end
 
-scan :: ByteString
+scan :: Maybe ByteString
         -> (DbRecord -> i)
         -> (i -> acc -> Bool)
         -> (i -> acc -> acc)
@@ -126,7 +130,9 @@ scan begin mapFn checker reduceFn accInit = do
   ro' <- ro
   schema' <- schema
   records <- withIterator db' ro' $ \iter -> do
-               iterSeek iter begin
+               if (isJust begin)
+                 then iterSeek iter (fromJust begin)
+                 else iterFirst iter
                scanIntern iter (mapFn . (decodeRecord schema')) checker reduceFn accInit
   return $ records
 
