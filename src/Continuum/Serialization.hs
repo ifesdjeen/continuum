@@ -227,3 +227,49 @@ byFieldMaybe _ _ = Just $ DbInt 1 -- WTF
 
 byTime :: Integer -> DbRecord -> Integer
 byTime interval (DbRecord t _) = interval * (t `quot` interval)
+
+-- Add multi-groups for grouping via multiple fields / preds
+
+
+indexingEncodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
+indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
+  where encodeKey = encode (timestamp, sid)
+        -- encodedVals = fmap encode $ catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
+        encodedParts = fmap encode $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
+        lengths = B.length <$> encodedParts
+        encodeValue = runPut $ do
+          forM_ lengths (putWord8 . fromIntegral)
+          forM_ encodedParts putByteString
+          -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
+
+decodeIndexes :: DbSchema -> B.ByteString -> Either String [Word8]
+decodeIndexes schema = runGet $ forM (fields schema) (\_ -> getWord8)
+--- AHHAAAAA, they leave out the last argument so we could leave it out!!! SMART
+
+decodeFrom :: Int -> B.ByteString -> Either String DbValue
+decodeFrom from bs = case read bs of
+                          (Left a)  -> error a
+                          (Right x) -> decode x
+  where read = runGet $ do uncheckedSkip from
+                           rem <- remaining
+                           getBytes rem
+
+
+tryIndexEncode = do
+  print encoded
+  print $ decodeIndexes sch (snd encoded)
+  -- let (Right [idx1, idx2, idx3]) = decodeIndexes sch (snd encoded)
+  -- forM_ [0..20] (\i -> putStrLn $ show $ decodeFrom (6 + 17 + i) (snd encoded))
+  print $ decodeFrom (6 + 17 + 3) (snd encoded)
+  -- 3 is just a number of Words i've put before that thing :) lol
+
+  -- decodeIndexes sch (snd encoded)
+  -- B.length (snd encoded)
+  -- decodeFrom 5 (snd encoded)
+  where encoded = indexingEncodeRecord sch record 1
+        sch = makeSchema [ ("a", DbtInt)
+                         , ("b", DbtString)
+                         , ("c", DbtString)]
+        record  = makeRecord 123 [("a", (DbInt 1))
+                                 , ("b", (DbString "STRINGIE"))
+                                 , ("c", (DbString "STRINGO"))]
