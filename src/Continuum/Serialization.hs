@@ -5,7 +5,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Continuum.Serialization where
-
+import           Control.Applicative ((<$>))
+import           Control.Monad (forM_, forM)
+import           GHC.Word (Word8)
 -- import           Control.Monad (liftM)
 import qualified Data.Map as Map
 -- import           Data.Serialize (Serialize, encode, decode)
@@ -13,7 +15,9 @@ import           Data.Serialize as S
 import           GHC.Generics
 import qualified Data.ByteString as B
 import           Data.Maybe (fromJust, catMaybes)
-
+import           Data.Serialize.Get (Get)
+import           Data.Serialize.Put (Put)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 data Success = Success
 
 data DbType = DbtInt | DbtString
@@ -70,10 +74,10 @@ data Group key val = Group [(key, [val])]
                    | GroupAggregate [(key, val)]
                    deriving (Show, Eq, Ord)
 
-data DbSchema = DbSchema { fieldMappings :: (Map.Map String Int)
-                           , fields :: [String]
-                           , indexMappings :: (Map.Map Int String)
-                           , schemaMappings :: (Map.Map String DbType) }
+data DbSchema = DbSchema { fieldMappings    :: Map.Map String Int
+                           , fields         :: [String]
+                           , indexMappings  :: Map.Map Int String
+                           , schemaMappings :: Map.Map String DbType }
 
 makeSchema :: [(String, DbType)] -> DbSchema
 
@@ -103,7 +107,7 @@ encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
         encodeValue = encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
 decodeRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
-decodeRecord' schema (timestamp, 0) _ =
+decodeRecord' _ (timestamp, 0) _ =
   DbPlaceholder timestamp
 
 decodeRecord' schema (timestamp, _) v =
@@ -119,12 +123,12 @@ decodeRecords schema items = filter removePlaceholder (fmap (decodeRecord schema
 -- decodeRecords = error "asd"
 
 decodeKey :: B.ByteString -> (Integer, Integer)
-decodeKey k = case (decode k) of
+decodeKey k = case decode k of
               (Left a)  -> error a
               (Right x) -> x
 
 decodeValue :: B.ByteString -> [DbValue]
-decodeValue k = case (decode k) of
+decodeValue k = case decode k of
               (Left a)  -> error a
               (Right x) -> x
 
@@ -191,7 +195,7 @@ compareTimestamps :: (Integer -> Integer -> Bool)
 
 compareTimestamps op begin (DbRecord current _) _ = current `op` begin
 compareTimestamps op begin (DbPlaceholder current) _ = current `op` begin
-compareTimestamps op begin _ _ = False
+compareTimestamps _  _ _ _ = False
 
 append :: DbRecord -> [DbRecord] -> [DbRecord]
 append val@(DbRecord _ _) acc = acc ++ [val]
@@ -199,7 +203,7 @@ append (DbPlaceholder _) acc = acc
 
 instance (Ord a) => Functor (Group a) where
   fmap f (Group vals) = Group $ fmap mapEntries vals
-    where mapEntries (k, v) = (k, (fmap f v))
+    where mapEntries (k, v) = (k, fmap f v)
 
 -- (b -> c) -> [(a, [b])] -> [(a, [c])]
 -- (a -> b -> b) -> b -> [a] -> b
