@@ -6,7 +6,7 @@ tags
 *.a
 *.hi
 .cabal-sandbox
-cabal.sandobx.config
+cabal.sandbox.config
 *~
 #*
 *.json
