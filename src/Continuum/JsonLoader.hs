@@ -21,6 +21,10 @@ data Entry = Entry { request_ip :: String
                    , date :: Integer }
              deriving (Show)
 
+prodSchema = makeSchema [ ("request_ip", DbtString)
+                        , ("host", DbtString)
+                        , ("uri", DbtString)
+                        , ("status", DbtString)]
 
 instance FromJSON Entry where
     parseJSON (Object v) = Entry <$>
@@ -46,7 +50,7 @@ main = do
 
   -- putStrLn $ show decoded
 
-  runApp testDBPath $ do
+  runApp testDBPath prodSchema $ do
     forM_ decoded $ \x ->
 
       putRecord (makeRecord (date x)
@@ -65,7 +69,7 @@ main = do
     -- let reply = Coord 123.4 20
     -- BL.putStrLn (encode reply)
 
-showAll = runApp testDBPath $ do
+showAll = runApp testDBPath prodSchema $ do
   records <- scanAll id
                (:)
                []

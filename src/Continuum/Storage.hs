@@ -166,15 +166,11 @@ scanAll :: (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState acc
 scanAll mapFn reduceFn acc = scan Nothing mapFn alwaysTrue reduceFn acc
                              where alwaysTrue = \_ _ -> True
 
-runApp :: String -> AppState a -> IO (a)
-runApp path actions = do
+runApp :: String -> DbSchema -> AppState a -> IO (a)
+runApp path schema' actions = do
   runResourceT $ do
     db <- Base.open path opts
-    let schema' = makeSchema [ ("request_ip", DbtString)
-                             , ("host", DbtString)
-                             , ("uri", DbtString)
-                             , ("status", DbtString)]
-        ctx = makeContext db schema' (readOpts, writeOpts)
+    let ctx = makeContext db schema' (readOpts, writeOpts)
     -- liftResourceT $ (flip evalStateT) ctx actions
     res <- (flip evalStateT) ctx actions
     return $ res

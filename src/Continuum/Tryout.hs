@@ -19,8 +19,11 @@ testDBPath = "/tmp/haskell-leveldb-tests"
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDBPath) >> return ()
 
+testSchema = makeSchema [ ("a", DbtInt)
+                        , ("b", DbtString)]
+
 main :: IO ()
-main = runApp testDBPath $ do
+main = runApp testDBPath testSchema $ do
 
   liftIO $ cleanup
 
