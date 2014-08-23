@@ -3,3 +3,5 @@ ghc:
   - 7.6
   - 7.4
 script: cabal configure --enable-tests && cabal build && cabal test
+before_install:
+  - sudo apt-get install libleveldb-dev
