@@ -5,7 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Continuum.Serialization where
-import           Control.Applicative ((<$>))
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (forM_, forM)
 import           GHC.Word (Word8)
 -- import           Control.Monad (liftM)
@@ -14,10 +14,14 @@ import qualified Data.Map as Map
 import           Data.Serialize as S
 import           GHC.Generics
 import qualified Data.ByteString as B
-import           Data.Maybe (fromJust, catMaybes)
+import           Data.Maybe (fromMaybe, fromJust, catMaybes)
 import           Data.Serialize.Get (Get)
 import           Data.Serialize.Put (Put)
 import Control.Monad.IO.Class (MonadIO (liftIO))
+
+import Debug.Trace
+
+
 data Success = Success
 
 data DbType = DbtInt | DbtString
@@ -246,9 +250,14 @@ indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeVa
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeIndexes :: DbSchema -> B.ByteString -> Either String [Word8]
-decodeIndexes schema = runGet $ forM (fields schema) (\_ -> getWord8)
---- AHHAAAAA, they leave out the last argument so we could leave it out!!! SMART
+decodeIndexes' :: DbSchema -> B.ByteString -> Either String [Word8]
+decodeIndexes' schema = runGet $ forM (fields schema) (\_ -> getWord8)
+
+decodeIndexes :: DbSchema -> B.ByteString -> [Int]
+decodeIndexes schema bs = case decodeIndexes' schema bs of
+                               (Left a) -> error a
+                               (Right x) -> map fromIntegral x
+
 
 decodeFrom :: Int -> B.ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
@@ -259,12 +268,37 @@ decodeFrom from bs = case read bs of
                            getBytes rem
 
 
+decodeFieldByIndex :: [Int] -> Int -> B.ByteString -> Either String DbValue
+decodeFieldByIndex indices idx bs =
+  case read bs of
+    (Left a)  -> error a
+    (Right x) -> decode x
+  where read = runGet $ do uncheckedSkip (beginIdx + length indices)
+                           rem' <- remaining
+                           getBytes $ fromMaybe rem' toTake
+        beginIdx = sum $ take idx indices
+        toTake = if idx + 1 > length indices
+                    then Nothing
+                    else Just $ sum (take (idx+1) indices) - beginIdx
+
+maybeFind :: [a] -> Int -> Maybe a
+maybeFind _ n    | n < 0            = Nothing
+maybeFind coll n | n >= length coll = Nothing
+maybeFind coll n                    = Just $ coll !! n
+
+
 tryIndexEncode = do
-  print encoded
+  -- print encoded
   print $ decodeIndexes sch (snd encoded)
+
+  let indices = decodeIndexes sch (snd encoded)
+  print $ decodeFieldByIndex indices 0 (snd encoded)
+  print $ decodeFieldByIndex indices 1 (snd encoded)
+  print $ decodeFieldByIndex indices 2 (snd encoded)
+
   -- let (Right [idx1, idx2, idx3]) = decodeIndexes sch (snd encoded)
   -- forM_ [0..20] (\i -> putStrLn $ show $ decodeFrom (6 + 17 + i) (snd encoded))
-  print $ decodeFrom (6 + 17 + 3) (snd encoded)
+  -- print $ decodeFrom (6 + 17 + 3) (snd encoded)
   -- 3 is just a number of Words i've put before that thing :) lol
 
   -- decodeIndexes sch (snd encoded)
@@ -274,6 +308,6 @@ tryIndexEncode = do
         sch = makeSchema [ ("a", DbtInt)
                          , ("b", DbtString)
                          , ("c", DbtString)]
-        record  = makeRecord 123 [("a", (DbInt 1))
+        record  = makeRecord 123 [("a", (DbInt 123))
                                  , ("b", (DbString "STRINGIE"))
                                  , ("c", (DbString "STRINGO"))]
