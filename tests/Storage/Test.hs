@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Main where
+module Storage.Test where
 
 import Continuum.Serialization
 import Continuum.Storage
