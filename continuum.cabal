@@ -77,9 +77,10 @@ library
                          , transformers-base        >= 0.4.1        && < 0.5
 test-suite tests
   ghc-options: -Wall
-  main-is: tests.hs
+  main-is: Main.hs
   type: exitcode-stdio-1.0
   hs-source-dirs: tests
+  other-modules: Serialization.Test, Storage.Test
   build-depends:       base >= 3 && < 5
                        , continuum
                        , hspec >= 1.8

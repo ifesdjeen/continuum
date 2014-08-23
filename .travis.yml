@@ -1,0 +1,5 @@
+language: haskell
+ghc: 
+  - 7.6
+  - 7.4
+script: cabal configure --enable-tests && cabal build && cabal test
