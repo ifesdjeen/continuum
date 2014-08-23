@@ -17,10 +17,17 @@ import qualified Data.ByteString as B
 import           Data.Maybe (fromMaybe, fromJust, catMaybes)
 import           Data.Serialize.Get (Get)
 import           Data.Serialize.Put (Put)
+import           Control.Monad.Error
+
 import Control.Monad.IO.Class (MonadIO (liftIO))
 
 import Debug.Trace
 
+data DbError = IndexesDecodeError String |
+               FieldDecodeError String B.ByteString |
+               DecodeFieldByIndexError String [Int] |
+               OtherError
+             deriving (Show, Eq, Ord, Generic)
 
 data Success = Success
 
@@ -66,6 +73,7 @@ unpackDouble _ = error "Can't unpack Double"
 -- instance Serialize DbTimestamp
 -- instance Serialize DbSequenceId
 instance Serialize DbValue
+instance Serialize DbError
 
 -- change String to ByteString
 -- overloadedstrings
@@ -250,14 +258,11 @@ indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeVa
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeIndexes' :: DbSchema -> B.ByteString -> Either String [Word8]
-decodeIndexes' schema = runGet $ forM (fields schema) (\_ -> getWord8)
-
-decodeIndexes :: DbSchema -> B.ByteString -> [Int]
-decodeIndexes schema bs = case decodeIndexes' schema bs of
-                               (Left a) -> error a
-                               (Right x) -> map fromIntegral x
-
+decodeIndexes :: DbSchema -> B.ByteString -> Either DbError [Int]
+decodeIndexes schema bs = case decodeIndexes' bs of
+                            (Left a) -> throwError $ IndexesDecodeError a
+                            (Right x) -> Right $ map fromIntegral x
+                       where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
 
 decodeFrom :: Int -> B.ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
@@ -267,31 +272,41 @@ decodeFrom from bs = case read bs of
                            rem <- remaining
                            getBytes rem
 
+wrapDecode :: B.ByteString -> Either DbError DbValue
+wrapDecode a =
+  case decode a of
+    (Left err)  -> throwError $ FieldDecodeError err a
+    (Right x) -> return x
 
-decodeFieldByIndex :: [Int] -> Int -> B.ByteString -> Either String DbValue
-decodeFieldByIndex indices idx bs =
-  case read bs of
-    (Left a)  -> error a
-    (Right x) -> decode x
-  where read = runGet $ do uncheckedSkip (beginIdx + length indices)
-                           rem' <- remaining
-                           getBytes $ fromMaybe rem' toTake
-        beginIdx = sum $ take idx indices
-        toTake = if idx + 1 > length indices
-                    then Nothing
-                    else Just $ sum (take (idx+1) indices) - beginIdx
+decodeFieldByIndex :: Either DbError [Int] -> Int -> B.ByteString -> Either DbError DbValue
+decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
+  where read' indices = case read indices bs of
+          (Left a)  -> throwError $ DecodeFieldByIndexError a indices
+          (Right x) -> wrapDecode x
+        read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
+                                   rem' <- remaining
 
-maybeFind :: [a] -> Int -> Maybe a
-maybeFind _ n    | n < 0            = Nothing
-maybeFind coll n | n >= length coll = Nothing
-maybeFind coll n                    = Just $ coll !! n
+                                   a <- trace ((show bs) ++ "  " ++
+                                               (show indices) ++ "  " ++
+                                               (show $ (beginIdx + length indices)) ++ "  " ++
+                                               (show $ fromMaybe rem' toTake) ++ "  "
 
+                                               -- (show $ bs) ++
+                                               ) (return $ fromMaybe rem' toTake)
+
+                                   getBytes $ a
+                       where beginIdx = sum $ take idx indices
+                             toTake = if idx + 1 > length indices
+                                      then Nothing
+                                      -- OH MY THATS JUST SAME AS IF WE TOOK THAT INDEX WITH !!
+                                      else Just $ sum (take (idx+1) indices) - beginIdx
 
 tryIndexEncode = do
-  -- print encoded
+  print $ snd encoded
   print $ decodeIndexes sch (snd encoded)
 
   let indices = decodeIndexes sch (snd encoded)
+
   print $ decodeFieldByIndex indices 0 (snd encoded)
   print $ decodeFieldByIndex indices 1 (snd encoded)
   print $ decodeFieldByIndex indices 2 (snd encoded)
