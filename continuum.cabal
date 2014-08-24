@@ -51,7 +51,7 @@ library
   Default-Language:     Haskell2010
   GHC-Options:          -Wall
   hs-source-dirs:      src
-
+  extra-libraries:  leveldb
   -- .hs or .lhs file containing the Main module.
   -- main-is:
 
