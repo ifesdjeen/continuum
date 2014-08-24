@@ -4,4 +4,4 @@ ghc:
   - 7.4
 before_install:
   - make travis
-script: LD_LIBRARY_PATH="/usr/local/lib" cabal configure --enable-tests && cabal build && cabal test
+script: export LD_LIBRARY_PATH="/usr/local/lib" && cabal configure --enable-tests && cabal build && cabal test
