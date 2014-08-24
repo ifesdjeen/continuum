@@ -3,5 +3,5 @@ ghc:
   - 7.6
   - 7.4
 before_install:
-  - cabal travis
+  - make travis
 script: cabal configure --enable-tests && cabal build && cabal test
