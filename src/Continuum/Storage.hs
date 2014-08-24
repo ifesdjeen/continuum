@@ -12,18 +12,12 @@ import           Continuum.Serialization
 
 -- import           Data.Serialize (Serialize, encode, decode)
 import           Data.Serialize (encode)
-import qualified Data.Map as Map
-
--- import qualified Database.LevelDB.Base  as Base
--- import           Database.LevelDB.Base (DB, WriteOptions, ReadOptions,
---                                         iterSeek, iterFirst, iterItems, withIter,
---                                         iterNext, iterEntry, iterValid)
--- import           Database.LevelDB.Iterator (Iterator)
+-- import qualified Data.Map as Map
 
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
-                                                 iterSeek, iterFirst, iterItems,
+                                                 iterSeek, iterFirst, -- iterItems,
                                                  withIterator, iterNext, iterEntry,
                                                  iterValid)
 ---import           Database.LevelDB.Iterator (Iterator)
@@ -126,14 +120,23 @@ scan :: Maybe ByteString
         -> AppState acc
 
 scan begin mapFn checker reduceFn accInit = do
+  schema' <- schema
+  scanRaw begin (mapFn . (decodeRecord schema')) checker reduceFn accInit
+
+scanRaw :: Maybe ByteString
+           -> ((ByteString, ByteString) -> i)
+           -> (i -> acc -> Bool)
+           -> (i -> acc -> acc)
+           -> acc
+           -> AppState acc
+scanRaw begin mapFn checker reduceFn accInit = do
   db' <- db
   ro' <- ro
-  schema' <- schema
   records <- withIterator db' ro' $ \iter -> do
                if (isJust begin)
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
-               scanIntern iter (mapFn . (decodeRecord schema')) checker reduceFn accInit
+               scanIntern iter mapFn checker reduceFn accInit
   return $ records
 
 scanIntern :: (MonadResource m)
@@ -150,7 +153,7 @@ scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
           next <- iterEntry iter
 
           case (valid, next) of
-            (true, Just (k, v)) -> do
+            (True, Just (k, v)) -> do
               let mapped = mapFn (k, v)
 
               -- liftIO $ putStrLn (show v)
@@ -169,8 +172,8 @@ scanAll mapFn reduceFn acc = scan Nothing mapFn alwaysTrue reduceFn acc
 runApp :: String -> DbSchema -> AppState a -> IO (a)
 runApp path schema' actions = do
   runResourceT $ do
-    db <- Base.open path opts
-    let ctx = makeContext db schema' (readOpts, writeOpts)
+    db' <- Base.open path opts
+    let ctx = makeContext db' schema' (readOpts, writeOpts)
     -- liftResourceT $ (flip evalStateT) ctx actions
     res <- (flip evalStateT) ctx actions
     return $ res

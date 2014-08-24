@@ -5,23 +5,25 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Continuum.Serialization where
-import           Control.Applicative ((<$>), (<*>))
-import           Control.Monad (forM_, forM)
-import           GHC.Word (Word8)
--- import           Control.Monad (liftM)
+import           Control.Applicative ((<$>))
+-- import           Control.Monad(forM_, forM)
+-- import           GHC.Word (Word8)
+
 import qualified Data.Map as Map
--- import           Data.Serialize (Serialize, encode, decode)
+
+import           GHC.Generics(Generic)
+
 import           Data.Serialize as S
-import           GHC.Generics
 import qualified Data.ByteString as B
+
 import           Data.Maybe (fromMaybe, fromJust, catMaybes)
-import           Data.Serialize.Get (Get)
-import           Data.Serialize.Put (Put)
-import           Control.Monad.Error
+-- import           Data.Serialize.Get (Get)
+-- import           Data.Serialize.Put (Put)
+import           Control.Monad.Except(forM_, forM, throwError)
 
-import Control.Monad.IO.Class (MonadIO (liftIO))
+-- import Control.Monad.IO.Class (MonadIO (liftIO))
 
-import Debug.Trace
+-- import Debug.Trace
 
 data DbError = IndexesDecodeError String |
                FieldDecodeError String B.ByteString |
@@ -156,7 +158,6 @@ decodeValue k = case decode k of
 
 
 
-
 -- instance Serialize [(String, DbValue)] where
 --   encode [] = B.empty
 --   encode [(_, v):xs] = (encode v) ++ (encode xs)
@@ -285,44 +286,9 @@ decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
           (Right x) -> wrapDecode x
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
                                    rem' <- remaining
-
-                                   a <- trace ((show bs) ++ "  " ++
-                                               (show indices) ++ "  " ++
-                                               (show $ (beginIdx + length indices)) ++ "  " ++
-                                               (show $ fromMaybe rem' toTake) ++ "  "
-
-                                               -- (show $ bs) ++
-                                               ) (return $ fromMaybe rem' toTake)
-
-                                   getBytes $ a
+                                   getBytes $ fromMaybe rem' toTake
                        where beginIdx = sum $ take idx indices
                              toTake = if idx + 1 > length indices
                                       then Nothing
                                       -- OH MY THATS JUST SAME AS IF WE TOOK THAT INDEX WITH !!
                                       else Just $ sum (take (idx+1) indices) - beginIdx
-
-tryIndexEncode = do
-  print $ snd encoded
-  print $ decodeIndexes sch (snd encoded)
-
-  let indices = decodeIndexes sch (snd encoded)
-
-  print $ decodeFieldByIndex indices 0 (snd encoded)
-  print $ decodeFieldByIndex indices 1 (snd encoded)
-  print $ decodeFieldByIndex indices 2 (snd encoded)
-
-  -- let (Right [idx1, idx2, idx3]) = decodeIndexes sch (snd encoded)
-  -- forM_ [0..20] (\i -> putStrLn $ show $ decodeFrom (6 + 17 + i) (snd encoded))
-  -- print $ decodeFrom (6 + 17 + 3) (snd encoded)
-  -- 3 is just a number of Words i've put before that thing :) lol
-
-  -- decodeIndexes sch (snd encoded)
-  -- B.length (snd encoded)
-  -- decodeFrom 5 (snd encoded)
-  where encoded = indexingEncodeRecord sch record 1
-        sch = makeSchema [ ("a", DbtInt)
-                         , ("b", DbtString)
-                         , ("c", DbtString)]
-        record  = makeRecord 123 [("a", (DbInt 123))
-                                 , ("b", (DbString "STRINGIE"))
-                                 , ("c", (DbString "STRINGO"))]

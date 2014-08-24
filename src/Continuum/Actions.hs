@@ -24,8 +24,6 @@ test = let records = [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))],
        in
    foldGroup1 (+) $ unpackInt <$> (extractField "a") <$> groupBy records (byField "b")
 
-
-
 -- foldl1 (+) (fmap unpackInt [DbInt 1, DbInt 1])
 -- foldl1 min [DbInt 1, DbInt 1]
 -- foldl1 max [DbInt 1, DbInt 1]

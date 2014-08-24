@@ -7,8 +7,6 @@ import Continuum.Serialization
 
 import Test.Hspec
 import Test.Hspec.Expectations
-import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck
 
 import Control.Monad (liftM, void)
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -21,13 +19,18 @@ testSchema = makeSchema [ ("a", DbtInt)
 main :: IO ()
 main =  hspec $ do
 
-  describe "Basic DB Functionality" $ do
+  describe "Serialization" $ do
 
-    it "should put items into the database and retrieve them" $  do
-      let encoded = indexingEncodeRecord testSchema record 1
-          indices = decodeIndexes testSchema (snd encoded)
-          record  = makeRecord 123 [("a", (DbInt 123))
-                                   , ("b", (DbString "STRINGIE"))
-                                   , ("c", (DbString "STRINGO"))]
+    let encoded = snd $ indexingEncodeRecord testSchema record 1
+        record  = makeRecord 123 [ ("a", (DbInt 123))
+                                 , ("b", (DbString "STRINGIE"))
+                                 , ("c", (DbString "STRINGO"))]
+        indices = decodeIndexes testSchema encoded
+    it "reads out indexes from serialized items" $
+      indices `shouldBe` (Right [6,17,16])
 
-      (return $ indices) `shouldReturn` (Right [6,17,16])
+    it "reads out indexes from serialized items" $ do
+      let decodeFn = \x -> decodeFieldByIndex indices x encoded
+      decodeFn 0 `shouldBe` (Right $ DbInt    123)
+      decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
+      decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")

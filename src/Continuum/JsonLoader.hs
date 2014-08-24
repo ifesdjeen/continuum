@@ -39,13 +39,13 @@ decodeStr :: String -> Entry
 decodeStr = (fromJust . decode . BL.pack)
 
 testDBPath :: String
-testDBPath = "/tmp/haskell-leveldb-tests"
+testDBPath = "/tmp/production-data"
 
 
 main :: IO ()
 main = do
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
-  line <- return $ lines content
+  line <- return $ take 100000 $ lines content
   decoded <- return $ (map decodeStr line)
 
   -- putStrLn $ show decoded

@@ -9,8 +9,8 @@ import Continuum.Storage
 import System.Process(system)
 import Test.Hspec
 import Test.Hspec.Expectations
-import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck
+-- import Test.Hspec.QuickCheck (prop)
+-- import Test.QuickCheck
 
 import Control.Monad (liftM, void)
 import Control.Monad.IO.Class (MonadIO (liftIO))
