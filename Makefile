@@ -10,6 +10,6 @@ $(LIBLEVELDB) :
 			git clone https://code.google.com/p/leveldb/;         \
 			cd leveldb;                                           \
 			make;                                                 \
-			sudo cp --preserve=links libleveldb.* /usr/local/lib; \
-			sudo cp -r include/leveldb /usr/local/include/        \
+			sudo cp -P ./libleveldb.* /usr/local/lib;             \
+			sudo cp -r include/leveldb /usr/local/include/;       \
 			ls -lah /usr/local/lib/ )
