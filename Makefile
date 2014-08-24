@@ -6,9 +6,10 @@ LD_LIBRARY_PATH="/usr/local/lib"
 travis : $(LIBLEVELDB)
 
 $(LIBLEVELDB) :
-		(cd /tmp;                                       \
-			git clone https://code.google.com/p/leveldb/; \
-			cd leveldb;                                   \
-			make;                                         \
-			sudo mv ./libleveldb* /usr/local/lib;         \
-			sudo cp -a ./include/leveldb /usr/local/include)
+		(cd /tmp;                                               \
+			git clone https://code.google.com/p/leveldb/;         \
+			cd leveldb;                                           \
+			make;                                                 \
+			sudo cp --preserve=links libleveldb.* /usr/local/lib; \
+			ls -lah /usr/loca/include/ | grep libleveldb  \
+			sudo cp -r include/leveldb /usr/local/include/)
