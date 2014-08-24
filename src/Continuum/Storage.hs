@@ -112,6 +112,9 @@ findRange beginTs end = scan (Just begin) id checker append []
                       where begin = encodeBeginTimestamp beginTs
                             checker = compareTimestamps (<=) end
 
+a :: (DbRecord -> i)
+a = undefined
+
 scan :: Maybe ByteString
         -> (DbRecord -> i)
         -> (i -> acc -> Bool)
@@ -121,10 +124,12 @@ scan :: Maybe ByteString
 
 scan begin mapFn checker reduceFn accInit = do
   schema' <- schema
-  scanRaw begin (mapFn . (decodeRecord schema')) checker reduceFn accInit
+  scanRaw begin (\x y -> mapFn $ decodeRecord x y) checker reduceFn accInit
+  -- scanRaw begin (mapFn . decodeRecord) checker reduceFn accInit
+
 
 scanRaw :: Maybe ByteString
-           -> ((ByteString, ByteString) -> i)
+           -> (DbSchema -> (ByteString, ByteString) -> i)
            -> (i -> acc -> Bool)
            -> (i -> acc -> acc)
            -> acc
@@ -132,11 +137,12 @@ scanRaw :: Maybe ByteString
 scanRaw begin mapFn checker reduceFn accInit = do
   db' <- db
   ro' <- ro
+  schema' <- schema
   records <- withIterator db' ro' $ \iter -> do
                if (isJust begin)
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
-               scanIntern iter mapFn checker reduceFn accInit
+               scanIntern iter (mapFn schema') checker reduceFn accInit
   return $ records
 
 scanIntern :: (MonadResource m)
