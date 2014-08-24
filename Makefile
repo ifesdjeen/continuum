@@ -1,7 +1,7 @@
 LIBHSLEVELDB = dist/build/*.a
 LIBLEVELDB   = /usr/local/lib/libleveldb*
 
-export LD_LIBRARY_PATH="/usr/local/lib"
+LD_LIBRARY_PATH="/usr/local/lib"
 
 travis : $(LIBLEVELDB)
 
