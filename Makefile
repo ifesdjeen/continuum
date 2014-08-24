@@ -1,6 +1,8 @@
-LIBHSLEVELDB = dist/build/*.a
+LIBLEVELDB   = /usr/local/lib/libleveldb*
 
-travis :
+travis : $(LIBLEVELDB)
+
+$(LIBLEVELDB) :
 		(cd /tmp; \
 			git clone https://code.google.com/p/leveldb/; \
 			cd leveldb; \
