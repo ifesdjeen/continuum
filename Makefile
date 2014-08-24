@@ -12,5 +12,4 @@ $(LIBLEVELDB) :
 			make;                                                 \
 			sudo cp --preserve=links libleveldb.* /usr/local/lib; \
 			sudo cp -r include/leveldb /usr/local/include/        \
-			ls -lah /usr/local/lib/
-			)
+			ls -lah /usr/local/lib/ )
