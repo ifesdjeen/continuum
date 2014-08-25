@@ -115,6 +115,9 @@ findRange beginTs end = scan (Just begin) id checker append []
 a :: (DbRecord -> i)
 a = undefined
 
+b :: DbSchema -> (ByteString, ByteString) -> DbRecord -> i
+b = undefined
+
 scan :: Maybe ByteString
         -> (DbRecord -> i)
         -> (i -> acc -> Bool)
@@ -122,9 +125,10 @@ scan :: Maybe ByteString
         -> acc
         -> AppState acc
 
+(|>) = flip (.)
+
 scan begin mapFn checker reduceFn accInit = do
-  schema' <- schema
-  scanRaw begin (\x y -> mapFn $ decodeRecord x y) checker reduceFn accInit
+  scanRaw begin (\x -> (decodeRecord x) |> mapFn) checker reduceFn accInit
   -- scanRaw begin (mapFn . decodeRecord) checker reduceFn accInit
 
 

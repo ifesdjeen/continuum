@@ -23,10 +23,11 @@ import           Control.Monad.Except(forM_, forM, throwError)
 
 -- import Control.Monad.IO.Class (MonadIO (liftIO))
 
--- import Debug.Trace
+import Debug.Trace
 
 data DbError = IndexesDecodeError String |
                FieldDecodeError String B.ByteString |
+               ArrayOverflow |
                DecodeFieldByIndexError String [Int] |
                OtherError
              deriving (Show, Eq, Ord, Generic)
@@ -285,10 +286,5 @@ decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
           (Left a)  -> throwError $ DecodeFieldByIndexError a indices
           (Right x) -> wrapDecode x
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
-                                   rem' <- remaining
-                                   getBytes $ fromMaybe rem' toTake
+                                   getBytes $ indices !! idx
                        where beginIdx = sum $ take idx indices
-                             toTake = if idx + 1 > length indices
-                                      then Nothing
-                                      -- OH MY THATS JUST SAME AS IF WE TOOK THAT INDEX WITH !!
-                                      else Just $ sum (take (idx+1) indices) - beginIdx
