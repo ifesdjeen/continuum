@@ -21,7 +21,8 @@ main =  hspec $ do
 
   describe "Serialization" $ do
 
-    let encoded = snd $ indexingEncodeRecord testSchema record 1
+    let full    = indexingEncodeRecord testSchema record 1
+        encoded = snd $ full
         record  = makeRecord 123 [ ("a", (DbInt 123))
                                  , ("b", (DbString "STRINGIE"))
                                  , ("c", (DbString "STRINGO"))]
@@ -34,3 +35,10 @@ main =  hspec $ do
       decodeFn 0 `shouldBe` (Right $ DbInt    123)
       decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
+
+
+    it "reads out indexes from serialized items" $ do
+      let decodeFn = \x -> decodeFieldByName x testSchema full
+      decodeFn "a" `shouldBe` (Right $ DbInt    123)
+      decodeFn "b" `shouldBe` (Right $ DbString "STRINGIE")
+      decodeFn "c" `shouldBe` (Right $ DbString "STRINGO")
