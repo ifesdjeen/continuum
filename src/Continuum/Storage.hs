@@ -4,7 +4,8 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findByTimestamp, findRange, scanAll)
+        runApp, putRecord, findByTimestamp, findRange, scanAll,
+        scanRaw, alwaysTrue)
        where
 import           Continuum.Options
 import           Continuum.Serialization
@@ -24,7 +25,7 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
 
 
 import           Data.ByteString        (ByteString)
--- import qualified Data.ByteString        as BS
+import qualified Data.ByteString        as BS
 import           Control.Monad.State
 import           Data.Maybe (isJust, fromJust)
 
@@ -95,7 +96,8 @@ putRecord record@(DbRecord timestamp _) = do
 
   liftIO $ when (sid `mod` 1000 == 0) $ do putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
 
-  let (k,v) = encodeRecord schema' record sid
+  -- let (k,v) = encodeRecord schema' record sid
+  let (k,v) = indexingEncodeRecord schema' record sid
   -- storagePut (encode (timestamp, sid)) value
   storagePut k v
 
@@ -163,11 +165,15 @@ scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
           next <- iterEntry iter
 
           case (valid, next) of
+            -- (True, Just (k, v)) | v == tsPlaceholder -> (iterNext iter) >> (scanIntern acc)
+            (True, Just (k, v)) | v == tsPlaceholder -> do
+              () <- iterNext iter
+              -- liftIO $ print "asdasdaaa"
+              scanIntern acc
+
             (True, Just (k, v)) -> do
               let mapped = mapFn (k, v)
-
               -- liftIO $ putStrLn (show v)
-
               if checker mapped acc
               then do
                 () <- iterNext iter
@@ -177,7 +183,10 @@ scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
 
 scanAll :: (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState acc
 scanAll mapFn reduceFn acc = scan Nothing mapFn alwaysTrue reduceFn acc
-                             where alwaysTrue = \_ _ -> True
+  --where alwaysTrue = \_ _ -> True
+
+alwaysTrue :: a -> b -> Bool
+alwaysTrue = \_ _ -> True
 
 runApp :: String -> DbSchema -> AppState a -> IO (a)
 runApp path schema' actions = do

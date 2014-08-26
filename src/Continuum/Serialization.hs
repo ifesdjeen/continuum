@@ -11,12 +11,14 @@ import           Control.Applicative ((<$>))
 
 import qualified Data.Map as Map
 
+import           Data.List (elemIndex)
 import           GHC.Generics(Generic)
 
 import           Data.Serialize as S
 import qualified Data.ByteString as B
 
-import           Data.Maybe (fromMaybe, fromJust, catMaybes)
+import           Data.Maybe (fromMaybe, isJust, fromJust, catMaybes)
+import           Data.Either (rights)
 -- import           Data.Serialize.Get (Get)
 -- import           Data.Serialize.Put (Put)
 import           Control.Monad.Except(forM_, forM, throwError)
@@ -27,7 +29,7 @@ import Debug.Trace
 
 data DbError = IndexesDecodeError String |
                FieldDecodeError String B.ByteString |
-               ArrayOverflow |
+               FieldNotFoundError |
                DecodeFieldByIndexError String [Int] |
                OtherError
              deriving (Show, Eq, Ord, Generic)
@@ -126,8 +128,7 @@ decodeRecord' _ (timestamp, 0) _ =
   DbPlaceholder timestamp
 
 decodeRecord' schema (timestamp, _) v =
-  DbRecord timestamp (Map.fromList $ zip (fields schema) values) -- values
-  where values = decodeValue v
+  DbRecord timestamp (Map.fromList $ zip (fields schema) (decodeValues schema v))
 
 decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> DbRecord
 decodeRecord schema (k, v) =
@@ -144,53 +145,16 @@ decodeKey k = case decode k of
 
 decodeValue :: B.ByteString -> [DbValue]
 decodeValue k = case decode k of
-              (Left a)  -> error a
+              (Left a)  -> error (a ++ "  " ++ (show k))
               (Right x) -> x
 
--- decodeRecord schema k v = DbRecord timestamp sequenceId [] -- values
---                           where (timestamp, sequenceId) = decode k :: Either String DbValue
---                                 values = decode v :: Either String DbValue
--- decode (encode $ DbString "asdasdasdasdasdasdasdasdasdasdasdasd") :: Either String DbValue
-
-
--- decode (encode $ [DbString "abc", DbString "cde", DbInt 1]) :: Either String DbValue
-
--- serializeDbRecord :: Schema
-
-
-
--- instance Serialize [(String, DbValue)] where
---   encode [] = B.empty
---   encode [(_, v):xs] = (encode v) ++ (encode xs)
-
--- instance Serialize DbValue where
---   put (DbString s) = put ((B.length bs), bs)
---     where bs = (encode s)
-
-
-
---- We have a map, but problem with maps is random key order
---- how do we fix that?
---- We need to take a hashmap and record order?
---- Basically, everything should be done through the lists??
---- decode (encode $ [(DbString "asd"), (DbInt 1)]) :: Either String [DbValue]
---- How to construct these lists though? We take schema, schema has index mappings
-
-
--- instance Serialize [(String, DbValue)] where
---   encode [] = B.empty
---   encode [(_, v):xs] = (encode v) ++ (encode xs)
-
--- encodeValues :: DbRecord -> ByteString
--- encodeValues record = foldl serializeOne B.empty
-
--- encoding values takes schema and returns a serialized value
+decodeValue2 :: B.ByteString -> DbValue
+decodeValue2 k = case decode k of
+              (Left a)  -> error (a ++ "  " ++ (show k))
+              (Right x) -> x
 
 
 -- Map.fromList [("key1", (DbInt 1)), ("key2", (DbString "asd"))]
-
-
--- Chec
 
 encodeBeginTimestamp :: Integer -> B.ByteString
 encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
@@ -266,6 +230,15 @@ decodeIndexes schema bs = case decodeIndexes' bs of
                             (Right x) -> Right $ map fromIntegral x
                        where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
 
+
+decodeValues :: DbSchema -> B.ByteString -> [DbValue]
+decodeValues schema bs = case decodeAll bs of
+                            (Left a) -> error a -- throwError $ IndexesDecodeError a
+                            (Right x) -> map decodeValue2 x
+                       where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
+                                                     forM idx (\c -> getBytes (fromIntegral c))
+
+
 decodeFrom :: Int -> B.ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
                           (Left a)  -> error a
@@ -286,5 +259,15 @@ decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
           (Left a)  -> throwError $ DecodeFieldByIndexError a indices
           (Right x) -> wrapDecode x
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
+
+                                   -- let a = trace (show $ indices) (indices !! idx)
+
                                    getBytes $ indices !! idx
                        where beginIdx = sum $ take idx indices
+
+decodeFieldByName :: String -> DbSchema -> (B.ByteString, B.ByteString) -> Either DbError DbValue
+decodeFieldByName field schema (_, bs) = if isJust idx
+                                            then decodeFieldByIndex indices (fromJust idx) bs
+                                            else throwError FieldNotFoundError
+  where idx = elemIndex field (fields schema)
+        indices = decodeIndexes schema bs
