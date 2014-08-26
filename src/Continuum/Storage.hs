@@ -106,19 +106,13 @@ putRecord record@(DbRecord timestamp _) = do
 
 findByTimestamp :: Integer -> AppState [DbRecord]
 findByTimestamp timestamp = scan (Just begin) id checker append []
-                            where begin = encodeBeginTimestamp timestamp
+                            where begin   = encodeBeginTimestamp timestamp
                                   checker = compareTimestamps (==) timestamp
 
 findRange :: Integer -> Integer -> AppState [DbRecord]
 findRange beginTs end = scan (Just begin) id checker append []
                       where begin = encodeBeginTimestamp beginTs
                             checker = compareTimestamps (<=) end
-
-a :: (DbRecord -> i)
-a = undefined
-
-b :: DbSchema -> (ByteString, ByteString) -> DbRecord -> i
-b = undefined
 
 scan :: Maybe ByteString
         -> (DbRecord -> i)
@@ -130,7 +124,7 @@ scan :: Maybe ByteString
 (|>) = flip (.)
 
 scan begin mapFn checker reduceFn accInit = do
-  scanRaw begin (\x -> (decodeRecord x) |> mapFn) checker reduceFn accInit
+  scanRaw begin (\x -> mapFn . (unwrapRecord . decodeRecord x)) checker reduceFn accInit
   -- scanRaw begin (mapFn . decodeRecord) checker reduceFn accInit
 
 

@@ -6,7 +6,6 @@
 
 module Continuum.Serialization where
 import           Control.Applicative ((<$>))
--- import           Control.Monad(forM_, forM)
 -- import           GHC.Word (Word8)
 
 import qualified Data.Map as Map
@@ -21,7 +20,7 @@ import           Data.Maybe (fromMaybe, isJust, fromJust, catMaybes)
 import           Data.Either (rights)
 -- import           Data.Serialize.Get (Get)
 -- import           Data.Serialize.Put (Put)
-import           Control.Monad.Except(forM_, forM, throwError)
+import           Control.Monad.Except(forM_, forM, throwError, sequence)
 
 -- import Control.Monad.IO.Class (MonadIO (liftIO))
 
@@ -123,38 +122,14 @@ encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
   where encodeKey = encode (timestamp, sid)
         encodeValue = encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeRecord' :: DbSchema -> (Integer, Integer) -> B.ByteString -> DbRecord
-decodeRecord' _ (timestamp, 0) _ =
-  DbPlaceholder timestamp
+decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> Either String DbRecord
+decodeRecord schema (k, v) = do
+  (timestamp, _) <- decode k :: Either String (Integer, Integer)
+  decodedValue   <- decodeValues schema v
+  return $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedValue)
 
-decodeRecord' schema (timestamp, _) v =
-  DbRecord timestamp (Map.fromList $ zip (fields schema) (decodeValues schema v))
-
-decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> DbRecord
-decodeRecord schema (k, v) =
-  decodeRecord' schema (decodeKey k) v
-
-decodeRecords :: DbSchema -> [(B.ByteString, B.ByteString)] -> [DbRecord]
-decodeRecords schema items = filter removePlaceholder (fmap (decodeRecord schema) items)
--- decodeRecords = error "asd"
-
-decodeKey :: B.ByteString -> (Integer, Integer)
-decodeKey k = case decode k of
-              (Left a)  -> error a
-              (Right x) -> x
-
-decodeValue :: B.ByteString -> [DbValue]
-decodeValue k = case decode k of
-              (Left a)  -> error (a ++ "  " ++ (show k))
-              (Right x) -> x
-
-decodeValue2 :: B.ByteString -> DbValue
-decodeValue2 k = case decode k of
-              (Left a)  -> error (a ++ "  " ++ (show k))
-              (Right x) -> x
-
-
--- Map.fromList [("key1", (DbInt 1)), ("key2", (DbString "asd"))]
+unwrapRecord :: Either String DbRecord -> DbRecord
+unwrapRecord (Right x) = x
 
 encodeBeginTimestamp :: Integer -> B.ByteString
 encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
@@ -175,16 +150,12 @@ compareTimestamps op begin (DbRecord current _) _ = current `op` begin
 compareTimestamps op begin (DbPlaceholder current) _ = current `op` begin
 compareTimestamps _  _ _ _ = False
 
-append :: DbRecord -> [DbRecord] -> [DbRecord]
-append val@(DbRecord _ _) acc = acc ++ [val]
-append (DbPlaceholder _) acc = acc
+append :: a -> [a] -> [a]
+append val acc = acc ++ [val]
 
 instance (Ord a) => Functor (Group a) where
   fmap f (Group vals) = Group $ fmap mapEntries vals
     where mapEntries (k, v) = (k, fmap f v)
-
--- (b -> c) -> [(a, [b])] -> [(a, [c])]
--- (a -> b -> b) -> b -> [a] -> b
 
 foldGroup :: (b -> c -> c) -> c -> Group a b -> Group a c
 foldGroup f acc (Group vals) = GroupAggregate $ fmap foldEntries vals
@@ -196,8 +167,6 @@ foldGroup1 f (Group vals) = GroupAggregate $ fmap foldEntries vals
 
 foldTuple :: (b -> c -> c) -> c -> (a, [b]) -> (a, c)
 foldTuple f acc (k, coll) = (k, Prelude.foldr f acc coll)
-
--- sortAndGroup assocs = fromListWith (++) [(k, [v]) | (k, v) <- assocs]
 
 byField :: String -> DbRecord -> DbValue
 byField f (DbRecord _ m) = fromJust $ Map.lookup f m
@@ -211,7 +180,6 @@ byTime :: Integer -> DbRecord -> Integer
 byTime interval (DbRecord t _) = interval * (t `quot` interval)
 
 -- Add multi-groups for grouping via multiple fields / preds
-
 
 indexingEncodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
 indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
@@ -231,13 +199,11 @@ decodeIndexes schema bs = case decodeIndexes' bs of
                        where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
 
 
-decodeValues :: DbSchema -> B.ByteString -> [DbValue]
-decodeValues schema bs = case decodeAll bs of
-                            (Left a) -> error a -- throwError $ IndexesDecodeError a
-                            (Right x) -> map decodeValue2 x
-                       where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
-                                                     forM idx (\c -> getBytes (fromIntegral c))
-
+decodeValues :: DbSchema -> B.ByteString -> Either String [DbValue]
+decodeValues schema bs = do x <- decodeAll bs
+                            sequence $ (map decode x)
+                          where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
+                                                        forM idx (\c -> getBytes (fromIntegral c))
 
 decodeFrom :: Int -> B.ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
