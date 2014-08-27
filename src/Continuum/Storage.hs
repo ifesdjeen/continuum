@@ -10,6 +10,7 @@ module Continuum.Storage
 
 import Debug.Trace
 
+import           Control.Monad.Trans.Maybe
 import           Continuum.Options
 import           Continuum.Serialization
 import           Control.Monad.Error
@@ -204,52 +205,39 @@ runApp path schema' actions = do
 -- type ScanOp a = ResourceT (Either String) a
 
 scanIntern2 :: (Eq acc, Show acc, MonadResource m) =>
-               DbSchema
-            -> Iterator
-            -> (DbRecord -> i)
-            -> (i -> acc -> Bool)
-            -> (i -> acc -> acc)
+               Iterator
+            -> ((ByteString, ByteString) -> acc -> (Either String acc))
             -> acc
             -> m (Either String acc)
 
-scanIntern2 schema iter mapFn checker reduceFn accInit = internal accInit
-  where internal acc = do
+scanIntern2 iter op acc = do
           -- valid <- iterValid iter
           next <- iterEntry iter
 
           case next of
             Just (k, v) | v == tsPlaceholder ->
-              iterNext iter >> internal acc
+              iterNext iter >> scanIntern2 iter op acc
 
             Just (k, v) ->
-              -- (asd (k, v) schema mapFn checker reduceFn acc)  >>=
-              -- (\res -> iterNext iter >> if res == acc
-              --                              then return $ res
-              --                              else internal res)
-
-              case asd (k, v) schema mapFn checker reduceFn acc of
+              case op (k, v) acc of
                 (Right res) -> do
                                iterNext iter
                                if res == acc
                                  then return $ Right res
-                                 else internal res
+                                 else scanIntern2 iter op res
                 val@(Left a) -> return val
-
-              -- if a == acc
-              --    then return $ acc
-              --    else internal acc
-
             _ -> return $ Right acc
 
-asd :: (ByteString, ByteString)
-       -> DbSchema
-       -> (DbRecord -> i)
+withFullRecord ::
+          (DbRecord -> i)
        -> (i -> acc -> Bool)
        -> (i -> acc -> acc)
+       -> DbSchema
+       -> (ByteString, ByteString)
        -> acc
        -> Either String acc
 
-asd (k, v) schema mapFn checker reduceFn acc = do
+withFullRecord mapFn checker reduceFn schema (k, v) acc = do
   a <- decodeRecord schema (k, v)
   let mapped = mapFn a
   if checker mapped acc
@@ -258,13 +246,11 @@ asd (k, v) schema mapFn checker reduceFn acc = do
 
 
 scan2 :: (Eq acc, Show acc) =>
-            Maybe ByteString
-            -> (DbRecord -> i)
-            -> (i -> acc -> Bool)
-            -> (i -> acc -> acc)
-            -> acc
-            -> AppState (Either String acc)
-scan2 begin mapFn checker reduceFn accInit = do
+         Maybe ByteString
+         -> (DbSchema -> (ByteString, ByteString) -> acc -> (Either String acc))
+         -> acc
+         -> AppState (Either String acc)
+scan2 begin op acc = do
   db' <- db
   ro' <- ro
   schema' <- schema
@@ -272,10 +258,30 @@ scan2 begin mapFn checker reduceFn accInit = do
                if (isJust begin)
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
-               scanIntern2 schema' iter mapFn checker reduceFn accInit
+               scanIntern2 iter (op schema') acc
   return $ records
-
 
 scanAll2 :: (Eq acc, Show acc) =>
             (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState (Either String acc)
-scanAll2 mapFn reduceFn acc = scan2 Nothing mapFn alwaysTrue reduceFn acc
+scanAll2 mapFn reduceFn acc = scan2 Nothing (withFullRecord mapFn alwaysTrue reduceFn) acc
+
+
+
+
+
+
+
+getNextItem :: (MonadResource m) =>
+               Iterator
+            -> m (Maybe (ByteString, ByteString))
+
+getNextItem iter = do
+  next <- iterEntry iter
+
+  case next of
+    Just (k, v) | v == tsPlaceholder ->
+      iterNext iter >> getNextItem iter
+
+    val@(Just (k, v)) -> return $ val
+
+    _ -> return $ Nothing
