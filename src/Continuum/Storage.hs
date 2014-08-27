@@ -214,24 +214,27 @@ scanIntern2 :: (Eq acc, Show acc, MonadResource m) =>
 
 scanIntern2 schema iter mapFn checker reduceFn accInit = internal accInit
   where internal acc = do
-          valid <- iterValid iter
+          -- valid <- iterValid iter
           next <- iterEntry iter
 
-          case (valid, next) of
-            (True, Just (k, v)) | v == tsPlaceholder -> do
-              () <- iterNext iter
-              internal acc
+          case next of
+            Just (k, v) | v == tsPlaceholder ->
+              iterNext iter >> internal acc
 
-            (True, Just (k, v)) -> do
-              let a = asd (k, v) schema mapFn checker reduceFn acc
-                  -- b = trace (show a) a
-              case a of
+            Just (k, v) ->
+              -- (asd (k, v) schema mapFn checker reduceFn acc)  >>=
+              -- (\res -> iterNext iter >> if res == acc
+              --                              then return $ res
+              --                              else internal res)
+
+              case asd (k, v) schema mapFn checker reduceFn acc of
                 (Right res) -> do
-                               () <- iterNext iter
+                               iterNext iter
                                if res == acc
                                  then return $ Right res
                                  else internal res
                 val@(Left a) -> return val
+
               -- if a == acc
               --    then return $ acc
               --    else internal acc
