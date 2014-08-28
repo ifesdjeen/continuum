@@ -25,17 +25,38 @@ testSchema = makeSchema [ ("a", DbtInt)
 main :: IO ()
 main = runApp testDBPath testSchema $ do
 
+  -- putRecord $ makeRecord 123 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  -- putRecord $ makeRecord 124 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  -- putRecord $ makeRecord 125 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  -- putRecord $ makeRecord 126 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+
+  -- a <- scanAll2 id (:) []
+
+  liftIO $ print "asd"
+
+      -- full = indexingEncodeRecord testSchema record 1
+      -- encoded = snd $ full
+      -- record  = makeRecord 123 [ ("a", (DbInt 123))
+      --                          , ("b", (DbString "STRINGIE"))
+      --                          , ("c", (DbString "STRINGO"))]
+      -- record = encode $ DbPlaceholder 1
+      -- indices = decodeIndexes testSchema encoded
+
+  -- liftIO $ print indices
+
   liftIO $ cleanup
 
-  putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-  putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-  putRecord $ makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))]
-  putRecord $ makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))]
-  putRecord $ makeRecord 789 [("a", (DbInt 4)), ("b", (DbString "4"))]
+  -- putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+  -- putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+  -- putRecord $ makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))]
+  -- putRecord $ makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))]
+  -- putRecord $ makeRecord 789 [("a", (DbInt 4)), ("b", (DbString "4"))]
 
-  a <- findByTimestamp 123
-  liftIO $ putStrLn "===== 123 ===== "
-  liftIO $ putStrLn (show a)
+  -- a <- findByTimestamp 123
+  -- liftIO $ putStrLn "===== 123 ===== "
+  -- liftIO $ putStrLn (show a)
+
+
 
   -- range <- findRange 123 789
   -- liftIO $ putStrLn "===== RANGE ===== "

@@ -4,12 +4,12 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findByTimestamp, findRange, scanAll, scanAll2,
-        scanRaw, alwaysTrue)
+        runApp, putRecord, findByTimestamp, findRange, scanAll,
+        alwaysTrue)
        where
 
 import Debug.Trace
-
+import Continuum.Types
 import           Control.Monad.Trans.Maybe
 import           Continuum.Options
 import           Continuum.Serialization
@@ -109,77 +109,15 @@ putRecord record@(DbRecord timestamp _) = do
   -- add default `empty` values (for Maybe)
   -- where value = encode $ fmap snd (Map.assocs record)
 
-findByTimestamp :: Integer -> AppState [DbRecord]
-findByTimestamp timestamp = scan (Just begin) id checker append []
+findByTimestamp :: Integer -> AppState (Either String [DbRecord])
+findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = compareTimestamps (==) timestamp
 
-findRange :: Integer -> Integer -> AppState [DbRecord]
-findRange beginTs end = scan (Just begin) id checker append []
+findRange :: Integer -> Integer -> AppState (Either String [DbRecord])
+findRange beginTs end = scan (Just begin) (withFullRecord id checker append) []
                       where begin = encodeBeginTimestamp beginTs
                             checker = compareTimestamps (<=) end
-
-scan :: Maybe ByteString
-        -> (DbRecord -> i)
-        -> (i -> acc -> Bool)
-        -> (i -> acc -> acc)
-        -> acc
-        -> AppState acc
-
-scan begin mapFn checker reduceFn accInit =
-  scanRaw begin (\x -> mapFn . (unwrapRecord . decodeRecord x)) checker reduceFn accInit
-  -- scanRaw begin (mapFn . decodeRecord) checker reduceFn accInit
-
-scanRaw :: Maybe ByteString
-           -> (DbSchema -> (ByteString, ByteString) -> i)
-           -> (i -> acc -> Bool)
-           -> (i -> acc -> acc)
-           -> acc
-           -> AppState acc
-scanRaw begin mapFn checker reduceFn accInit = do
-  db' <- db
-  ro' <- ro
-  schema' <- schema
-  records <- withIterator db' ro' $ \iter -> do
-               if (isJust begin)
-                 then iterSeek iter (fromJust begin)
-                 else iterFirst iter
-               scanIntern iter (mapFn schema') checker reduceFn accInit
-  return $ records
-
-scanIntern :: (MonadResource m)
-        => Iterator
-        -> ((ByteString, ByteString) -> i)
-        -> (i -> acc -> Bool)
-        -> (i -> acc -> acc)
-        -> acc
-        -> m acc
-
-scanIntern iter mapFn checker reduceFn accInit = scanIntern accInit
-  where scanIntern acc = do
-          valid <- iterValid iter
-          next <- iterEntry iter
-
-          case (valid, next) of
-            -- (True, Just (k, v)) | v == tsPlaceholder -> (iterNext iter) >> (scanIntern acc)
-            (True, Just (k, v)) | v == tsPlaceholder -> do
-              () <- iterNext iter
-              -- liftIO $ print "asdasdaaa"
-              scanIntern acc
-
-            (True, Just (k, v)) -> do
-              let mapped = mapFn (k, v)
-              -- liftIO $ putStrLn (show v)
-              if checker mapped acc
-              then do
-                () <- iterNext iter
-                scanIntern $ reduceFn mapped acc
-              else return acc
-            _ -> return acc
-
-scanAll :: (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState acc
-scanAll mapFn reduceFn acc = scan Nothing mapFn alwaysTrue reduceFn acc
-  --where alwaysTrue = \_ _ -> True
 
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
@@ -204,38 +142,15 @@ runApp path schema' actions = do
 -- StateT DBContext (ResourceT IO) a
 -- type ScanOp a = ResourceT (Either String) a
 
-scanIntern2 :: (Eq acc, Show acc, MonadResource m) =>
-               Iterator
-            -> ((ByteString, ByteString) -> acc -> (Either String acc))
-            -> acc
-            -> m (Either String acc)
-
-scanIntern2 iter op acc = do
-          -- valid <- iterValid iter
-          next <- iterEntry iter
-
-          case next of
-            Just (k, v) | v == tsPlaceholder ->
-              iterNext iter >> scanIntern2 iter op acc
-
-            Just (k, v) ->
-              case op (k, v) acc of
-                (Right res) -> do
-                               iterNext iter
-                               if res == acc
-                                 then return $ Right res
-                                 else scanIntern2 iter op res
-                val@(Left a) -> return val
-            _ -> return $ Right acc
-
+-- Full record aggregation Pipeline,
+-- Receives a decoded record, passes it through mapper, puts into
+-- accumulator until `checker` returns true.
 withFullRecord ::
           (DbRecord -> i)
        -> (i -> acc -> Bool)
        -> (i -> acc -> acc)
        -> DbSchema
-       -> (ByteString, ByteString)
-       -> acc
-       -> Either String acc
+       -> AggregationFn acc
 
 withFullRecord mapFn checker reduceFn schema (k, v) acc = do
   a <- decodeRecord schema (k, v)
@@ -245,31 +160,12 @@ withFullRecord mapFn checker reduceFn schema (k, v) acc = do
     else return $ acc
 
 
-scan2 :: (Eq acc, Show acc) =>
-         Maybe ByteString
-         -> (DbSchema -> (ByteString, ByteString) -> acc -> (Either String acc))
-         -> acc
-         -> AppState (Either String acc)
-scan2 begin op acc = do
-  db' <- db
-  ro' <- ro
-  schema' <- schema
-  records <- withIterator db' ro' $ \iter -> do
-               if (isJust begin)
-                 then iterSeek iter (fromJust begin)
-                 else iterFirst iter
-               scanIntern2 iter (op schema') acc
-  return $ records
-
-scanAll2 :: (Eq acc, Show acc) =>
-            (DbRecord -> i) -> (i -> acc -> acc) -> acc -> AppState (Either String acc)
-scanAll2 mapFn reduceFn acc = scan2 Nothing (withFullRecord mapFn alwaysTrue reduceFn) acc
-
-
-
-
-
-
+scanAll :: (Eq acc, Show acc) =>
+              (DbRecord -> i)
+           -> (i -> acc -> acc)
+           -> acc
+           -> AppState (Either String acc)
+scanAll mapFn reduceFn = scan Nothing (withFullRecord mapFn alwaysTrue reduceFn)
 
 getNextItem :: (MonadResource m) =>
                Iterator
@@ -285,3 +181,46 @@ getNextItem iter = do
     val@(Just (k, v)) -> return $ val
 
     _ -> return $ Nothing
+
+
+
+scan :: (Eq acc, Show acc) =>
+         Maybe ByteString
+         -> (DbSchema -> AggregationFn acc)
+         -> acc
+         -> AppState (Either String acc)
+scan begin op acc = do
+  db' <- db
+  ro' <- ro
+  schema' <- schema
+  records <- withIterator db' ro' $ \iter -> do
+               if (isJust begin)
+                 then iterSeek iter (fromJust begin)
+                 else iterFirst iter
+               scanIntern iter (op schema') acc
+  return $ records
+
+
+
+scanIntern :: (Eq acc, Show acc, MonadResource m) =>
+               Iterator
+            -> AggregationFn acc
+            -> acc
+            -> m (Either String acc)
+
+scanIntern iter op acc = do
+          next <- iterEntry iter
+
+          case next of
+            Just (k, v) | v == tsPlaceholder ->
+              iterNext iter >> scanIntern iter op acc
+
+            Just (k, v) ->
+              case op (k, v) acc of
+                (Right res) -> do
+                               iterNext iter
+                               if res == acc
+                                 then return $ Right res
+                                 else scanIntern iter op res
+                val@(Left a) -> return val
+            _ -> return $ Right acc

@@ -2,12 +2,15 @@
 
 module Continuum.JsonLoader where
 
+import           Data.List (elemIndex)
 import Control.Applicative ((<$>), (<*>), empty)
 import Data.Aeson
 import Data.Maybe
 import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Control.Monad.IO.Class
+
+import qualified Data.Map as Map
 
 import qualified Data.Set as Set
 import Continuum.Storage
@@ -54,11 +57,11 @@ main = do
     forM_ decoded $ \x ->
 
       putRecord (makeRecord (date x)
-                          [("request_ip", DbString (request_ip x)),
-                           ("host",       DbString (host x)),
-                           ("uri",        DbString (uri x)),
-                           ("status",     DbString (status x))
-                          ])
+                 [("request_ip", DbString (request_ip x)),
+                  ("host",       DbString (host x)),
+                  ("uri",        DbString (uri x)),
+                  ("status",     DbString (status x))
+                 ])
 
   return ()
   -- print decoded
@@ -70,17 +73,21 @@ main = do
     -- BL.putStrLn (encode reply)
 
 showAll = runApp testDBPath prodSchema $ do
-  records <- scanAll id
-               (:)
-               []
+  -- records <- scanAll id
+  --              (:)
+  --              []
                -- Set.empty
 
   -- liftIO $ putStrLn "===== ALL ===== "
   -- liftIO $ putStrLn (show $ take 5 records)
 
-  let count _ acc = acc + 1
-      a = foldGroup count 0 $ groupBy records (byFieldMaybe "status")
-  liftIO $ putStrLn (show $ a)
+  -- let count _ acc = acc + 1
+  --     a = foldGroup count 0 $ groupBy records (byFieldMaybe "status")
+  -- liftIO $ putStrLn (show $ a)
+
+  --a <- scanRaw Nothing (decodeFieldByName "status") alwaysTrue gradualGroupBy (Map.empty)
+  --liftIO $ putStrLn (show $ a)
+
   return ()
 
   -- liftIO $ putStrLn (show $ foldl Set.insert Set.empty (extractField "status") <$> c)

@@ -3,6 +3,7 @@
 
 module Storage.Test where
 
+import Data.Either
 import Continuum.Serialization
 import Continuum.Storage
 
@@ -32,7 +33,7 @@ main =  hspec $ do
       let res = runApp testDBPath testSchema $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
             findByTimestamp 123
-      res `shouldReturn` [(makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])]
+      res `shouldReturn` (Right [(makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])])
 
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should retrieve items by given timestamp" $  do
@@ -47,9 +48,9 @@ main =  hspec $ do
 
             findByTimestamp 123
 
-      res `shouldReturn` [ (makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])
-                          ,(makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))])
-                          ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])]
+      res `shouldReturn` (Right [ (makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])
+                                ,(makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))])
+                                ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])])
 
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should return inclusive range of timestamps" $  do
@@ -64,13 +65,13 @@ main =  hspec $ do
 
             findRange 123 456
 
-      res `shouldReturn` [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-                          ,makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
-                          ,makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
-                          ,makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-                          ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-                          ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
-                          ]
+      res `shouldReturn` (Right [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+                                ,makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
+                                ,makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+                                ,makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+                                ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+                                ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+                                ])
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
