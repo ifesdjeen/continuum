@@ -16,15 +16,10 @@ import           GHC.Generics(Generic)
 import           Data.Serialize as S
 import qualified Data.ByteString as B
 
-import           Data.Maybe (fromMaybe, isJust, fromJust, catMaybes)
-import           Data.Either (rights)
--- import           Data.Serialize.Get (Get)
--- import           Data.Serialize.Put (Put)
-import           Control.Monad.Except(forM_, forM, throwError, sequence)
+import           Data.Maybe (isJust, fromJust, catMaybes)
+import           Control.Monad.Except(forM_, forM, throwError)
 
--- import Control.Monad.IO.Class (MonadIO (liftIO))
-
-import Debug.Trace
+-- import Debug.Trace
 
 data DbError = IndexesDecodeError String |
                FieldDecodeError String B.ByteString |
@@ -225,9 +220,6 @@ decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
           (Left a)  -> throwError $ DecodeFieldByIndexError a indices
           (Right x) -> wrapDecode x
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
-
-                                   -- let a = trace (show $ indices) (indices !! idx)
-
                                    getBytes $ indices !! idx
                        where beginIdx = sum $ take idx indices
 

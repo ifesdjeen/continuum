@@ -8,12 +8,10 @@ module Continuum.Storage
         alwaysTrue)
        where
 
-import Debug.Trace
-import Continuum.Types
-import           Control.Monad.Trans.Maybe
+--  import Debug.Trace
+import           Continuum.Types
 import           Continuum.Options
 import           Continuum.Serialization
-import           Control.Monad.Error
 -- import           Control.Applicative ((<$>))
 
 -- import           Data.Serialize (Serialize, encode, decode)
@@ -25,12 +23,11 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
                                                  iterSeek, iterFirst, -- iterItems,
                                                  withIterator, iterNext, iterEntry,
-                                                 iterValid)
+                                                 )
 ---import           Database.LevelDB.Iterator (Iterator)
 
 
 import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as BS
 import           Control.Monad.State
 import           Data.Maybe (isJust, fromJust)
 
@@ -66,8 +63,8 @@ getAndincrementSequence = do
   modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
   return $ sequenceNumber old
 
-getSequence :: MonadState DBContext m => m Integer
-getSequence = gets sequenceNumber
+-- getSequence :: MonadState DBContext m => m Integer
+-- getSequence = gets sequenceNumber
 
 schema :: MonadState DBContext m => m DbSchema
 schema = gets ctxSchema
@@ -84,8 +81,8 @@ wo = liftM snd rwOptions
 tsPlaceholder :: ByteString
 tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
 
-storagePut :: ByteString -> ByteString -> AppState ()
-storagePut key value = do
+storagePut :: (ByteString, ByteString) -> AppState ()
+storagePut (key, value) = do
   db' <- db
   wo' <- wo
   Base.put db' wo' key value
@@ -96,18 +93,13 @@ putRecord record@(DbRecord timestamp _) = do
   schema' <- schema
 
   -- Write empty timestamp to be used for iteration, overwrite if needed
-  storagePut (encode (timestamp, 0 :: Integer)) tsPlaceholder
+  storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
   -- Write an actual value to the database
 
-  liftIO $ when (sid `mod` 1000 == 0) $ do putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
+  -- liftIO $ when (sid `mod` 1000 == 0) $ do putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
 
-  -- let (k,v) = encodeRecord schema' record sid
-  let (k,v) = indexingEncodeRecord schema' record sid
-  -- storagePut (encode (timestamp, sid)) value
-  storagePut k v
+  storagePut $ indexingEncodeRecord schema' record sid
 
-  -- add default `empty` values (for Maybe)
-  -- where value = encode $ fmap snd (Map.assocs record)
 
 findByTimestamp :: Integer -> AppState (Either String [DbRecord])
 findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
@@ -152,8 +144,8 @@ withFullRecord ::
        -> DbSchema
        -> AggregationFn acc
 
-withFullRecord mapFn checker reduceFn schema (k, v) acc = do
-  a <- decodeRecord schema (k, v)
+withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
+  a <- decodeRecord schema' (k, v)
   let mapped = mapFn a
   if checker mapped acc
     then return $ reduceFn mapped acc
@@ -166,23 +158,6 @@ scanAll :: (Eq acc, Show acc) =>
            -> acc
            -> AppState (Either String acc)
 scanAll mapFn reduceFn = scan Nothing (withFullRecord mapFn alwaysTrue reduceFn)
-
-getNextItem :: (MonadResource m) =>
-               Iterator
-            -> m (Maybe (ByteString, ByteString))
-
-getNextItem iter = do
-  next <- iterEntry iter
-
-  case next of
-    Just (k, v) | v == tsPlaceholder ->
-      iterNext iter >> getNextItem iter
-
-    val@(Just (k, v)) -> return $ val
-
-    _ -> return $ Nothing
-
-
 
 scan :: (Eq acc, Show acc) =>
          Maybe ByteString
@@ -212,7 +187,7 @@ scanIntern iter op acc = do
           next <- iterEntry iter
 
           case next of
-            Just (k, v) | v == tsPlaceholder ->
+            Just (_, v) | v == tsPlaceholder ->
               iterNext iter >> scanIntern iter op acc
 
             Just (k, v) ->
