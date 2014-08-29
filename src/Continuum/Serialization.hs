@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
@@ -40,14 +41,14 @@ data Success = Success
 data DbValue = DbInt Integer
              | DbFloat Float
              | DbDouble Double
-             | DbString String
+             | DbString ByteString
              | DbTimestamp Integer
              | DbSequenceId Integer
-             | DbList [DbValue]
-             | DbMap [(DbValue, DbValue)]
+             -- | DbList [DbValue]
+             -- | DbMap [(DbValue, DbValue)]
              deriving (Show, Eq, Ord, Generic)
 
-unpackString :: DbValue -> String
+unpackString :: DbValue -> ByteString
 unpackString (DbString i) = i
 unpackString _ = error "Can't unpack Int"
 
@@ -208,7 +209,6 @@ decodeValues schema bs = do x <- left ValuesDecodeError $ decodeAll bs
                           where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
                                                         forM idx (\c -> getBytes (fromIntegral c))
 
-
 decodeFrom :: Int -> ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
                           (Left a)  -> error a
@@ -217,17 +217,11 @@ decodeFrom from bs = case read bs of
                            rem <- remaining
                            getBytes rem
 
-wrapDecode :: ByteString -> Either DbError DbValue
-wrapDecode a =
-  case decode a of
-    (Left err)  -> throwError $ FieldDecodeError err a
-    (Right x) -> return x
-
 decodeFieldByIndex :: Either DbError [Int] -> Int -> ByteString -> Either DbError DbValue
 decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
   where read' indices = case read indices bs of
           (Left a)  -> throwError $ DecodeFieldByIndexError a indices
-          (Right x) -> wrapDecode x
+          (Right x) -> decodeValue x
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
                                    getBytes $ indices !! idx
                        where beginIdx = sum $ take idx indices
