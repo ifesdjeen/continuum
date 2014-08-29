@@ -10,6 +10,8 @@ import           Control.Applicative ((<$>))
 
 import qualified Data.Map as Map
 
+import           Continuum.Types
+import           Control.Arrow
 import           Data.List (elemIndex)
 import           GHC.Generics(Generic)
 
@@ -20,13 +22,6 @@ import           Data.Maybe (isJust, fromJust, catMaybes)
 import           Control.Monad.Except(forM_, forM, throwError)
 
 -- import Debug.Trace
-
-data DbError = IndexesDecodeError String |
-               FieldDecodeError String B.ByteString |
-               FieldNotFoundError |
-               DecodeFieldByIndexError String [Int] |
-               OtherError
-             deriving (Show, Eq, Ord, Generic)
 
 data Success = Success
 
@@ -74,7 +69,7 @@ unpackDouble _ = error "Can't unpack Double"
 instance Serialize DbValue
 instance Serialize DbError
 
--- change String to ByteString
+-- TODO: change String to ByteString
 -- overloadedstrings
 data DbRecord = DbRecord Integer (Map.Map String DbValue) |
                 DbPlaceholder Integer
@@ -115,11 +110,17 @@ removePlaceholder (DbPlaceholder _) = False
 encodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
 encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
   where encodeKey = encode (timestamp, sid)
-        encodeValue = encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
+        encodeValue = encode . catMaybes $ fmap (`Map.lookup` vals) (fields schema)
 
-decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> Either String DbRecord
+decodeValue :: B.ByteString -> Either DbError DbValue
+decodeValue x = left ValueDecodeError $ decode x
+
+decodeKey :: B.ByteString -> Either DbError (Integer, Integer)
+decodeKey x = left KeyDecodeError $ decode x
+
+decodeRecord :: DbSchema ->  (B.ByteString, B.ByteString) -> Either DbError DbRecord
 decodeRecord schema (k, v) = do
-  (timestamp, _) <- decode k :: Either String (Integer, Integer)
+  (timestamp, _) <- decodeKey k
   decodedValue   <- decodeValues schema v
   return $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedValue)
 
@@ -193,10 +194,9 @@ decodeIndexes schema bs = case decodeIndexes' bs of
                             (Right x) -> Right $ map fromIntegral x
                        where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
 
-
-decodeValues :: DbSchema -> B.ByteString -> Either String [DbValue]
-decodeValues schema bs = do x <- decodeAll bs
-                            sequence $ (map decode x)
+decodeValues :: DbSchema -> B.ByteString -> Either DbError [DbValue]
+decodeValues schema bs = do x <- left ValuesDecodeError $ decodeAll bs
+                            sequence $ (map decodeValue x)
                           where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
                                                         forM idx (\c -> getBytes (fromIntegral c))
 

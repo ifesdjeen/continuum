@@ -96,17 +96,17 @@ putRecord record@(DbRecord timestamp _) = do
   storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
   -- Write an actual value to the database
 
-  -- liftIO $ when (sid `mod` 1000 == 0) $ do putStrLn ("=>> Written: " ++ (show (timestamp, sid)))
-
   storagePut $ indexingEncodeRecord schema' record sid
 
+putRecord (DbPlaceholder timestamp) =
+  storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
 
-findByTimestamp :: Integer -> AppState (Either String [DbRecord])
+findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
 findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = compareTimestamps (==) timestamp
 
-findRange :: Integer -> Integer -> AppState (Either String [DbRecord])
+findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
 findRange beginTs end = scan (Just begin) (withFullRecord id checker append) []
                       where begin = encodeBeginTimestamp beginTs
                             checker = compareTimestamps (<=) end
@@ -134,15 +134,14 @@ runApp path schema' actions = do
 -- StateT DBContext (ResourceT IO) a
 -- type ScanOp a = ResourceT (Either String) a
 
--- Full record aggregation Pipeline,
--- Receives a decoded record, passes it through mapper, puts into
--- accumulator until `checker` returns true.
-withFullRecord ::
-          (DbRecord -> i)
-       -> (i -> acc -> Bool)
-       -> (i -> acc -> acc)
-       -> DbSchema
-       -> AggregationFn acc
+-- | Full record aggregation Pipeline,
+-- Receives a decoded @'DbRecord', passes it through @mapFn, puts into
+-- @acc until @checker returns true.
+withFullRecord :: (DbRecord -> i)
+               -> (i -> acc -> Bool)
+               -> (i -> acc -> acc)
+               -> DbSchema
+               -> AggregationFn acc
 
 withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
   a <- decodeRecord schema' (k, v)
@@ -151,19 +150,32 @@ withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
     then return $ reduceFn mapped acc
     else return $ acc
 
+-- withField :: String
+--           -> (DbValue -> i)
+--           -> (i -> acc -> Bool)
+--           -> (i -> acc -> acc)
+--           -> DbSchema
+--           -> AggregationFn acc
+
+-- withField field mapFn checker reduceFn schema' kv acc = do
+--   a <- decodeFieldByName field schema' kv
+--   let mapped = mapFn a
+--   if checker mapped acc
+--     then return $ reduceFn mapped acc
+--     else return $ acc
 
 scanAll :: (Eq acc, Show acc) =>
               (DbRecord -> i)
            -> (i -> acc -> acc)
            -> acc
-           -> AppState (Either String acc)
+           -> AppState (Either DbError acc)
 scanAll mapFn reduceFn = scan Nothing (withFullRecord mapFn alwaysTrue reduceFn)
 
 scan :: (Eq acc, Show acc) =>
          Maybe ByteString
          -> (DbSchema -> AggregationFn acc)
          -> acc
-         -> AppState (Either String acc)
+         -> AppState (Either DbError acc)
 scan begin op acc = do
   db' <- db
   ro' <- ro
@@ -181,7 +193,7 @@ scanIntern :: (Eq acc, Show acc, MonadResource m) =>
                Iterator
             -> AggregationFn acc
             -> acc
-            -> m (Either String acc)
+            -> m (Either DbError acc)
 
 scanIntern iter op acc = do
           next <- iterEntry iter
@@ -192,10 +204,10 @@ scanIntern iter op acc = do
 
             Just (k, v) ->
               case op (k, v) acc of
-                (Right res) -> do
+                val@(Right res) -> do
                                iterNext iter
                                if res == acc
-                                 then return $ Right res
+                                 then return val
                                  else scanIntern iter op res
-                val@(Left a) -> return val
+                val@(Left _) -> return val
             _ -> return $ Right acc
