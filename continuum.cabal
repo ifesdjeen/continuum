@@ -13,19 +13,36 @@ source-repository head
 
 library
   Default-Language:     Haskell2010
-  GHC-Options:          -Wall
-  hs-source-dirs:      src
-  extra-libraries:     leveldb
-
+  ghc-options:          -Wall
+  hs-source-dirs:       src
+  extra-libraries:      leveldb
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
                        , Continuum.Aggregation
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Actions
-                       , Continuum.JsonLoader
                        , Continuum.Types
 
+  build-depends:          base                   >= 4 && < 5
+                        , aeson                  >= 0.8.0.0
+                        , mtl                    >2.1
+                        , time                   >= 1.4.2
+                        , transformers
+                        , process                >= 1.1.0.2
+                        , containers             >0.5
+                        , leveldb-haskell-fork   >= 0.3.2
+                        , resourcet              >= 1.1.2.2
+                        , bytestring             >= 0.10.4.0
+                        , cereal                 >= 0.4.0.1
+                        , data-default
+                        , transformers-base      >= 0.4.1 && < 0.5
+
+executable continuum-dev
+  Default-Language:     Haskell2010
+  hs-source-dirs:       src
+  -- ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2
+  main-is:              Continuum/JsonLoader.hs
   build-depends:          base                   >= 4 && < 5
                         , aeson                  >= 0.8.0.0
                         , mtl                    >2.1
