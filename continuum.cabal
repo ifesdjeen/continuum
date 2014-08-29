@@ -19,6 +19,7 @@ library
 
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
+                       , Continuum.Aggregation
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Actions
