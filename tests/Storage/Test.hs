@@ -19,6 +19,7 @@ main =  hspec $ do
 
   describe "Basic DB Functionality" $ do
     it "setup" $ cleanup >>= shouldReturn (return())
+
     it "should put items into the database and retrieve them" $  do
       let res = runApp testDBPath testSchema $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]

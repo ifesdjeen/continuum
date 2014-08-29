@@ -1,9 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Continuum.JsonLoader where
+module Main (main) where
 
+import           Data.ByteString.Char8 (pack)
+import qualified Data.Serialize as S
 import Data.Time.Clock.POSIX
-
+import System.Process(system)
 import           Data.List (elemIndex)
 import Control.Applicative ((<$>), (<*>), empty)
 import Data.Aeson
@@ -50,8 +52,11 @@ testDBPath :: String
 testDBPath = "/tmp/production-data"
 
 
-main :: IO ()
-main = do
+main2 :: IO ()
+main2 = do
+
+  liftIO $ cleanup
+
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
   line <- return $ take 100000 $ lines content
   decoded <- return $ (map decodeStr line)
@@ -62,10 +67,10 @@ main = do
     forM_ decoded $ \x ->
 
       putRecord (makeRecord (date x)
-                 [("request_ip", DbString (request_ip x)),
-                  ("host",       DbString (host x)),
-                  ("uri",        DbString (uri x)),
-                  ("status",     DbString (status x))
+                 [("request_ip", DbString (pack (request_ip x))),
+                  ("host",       DbString (pack (host x))),
+                  ("uri",        DbString (pack (uri x))),
+                  ("status",     DbString (pack (status x)))
                  ])
 
   return ()
@@ -77,7 +82,7 @@ main = do
     -- let reply = Coord 123.4 20
     -- BL.putStrLn (encode reply)
 
-showAll = runApp testDBPath prodSchema $ do
+main = runApp testDBPath prodSchema $ do
   -- records <- scanAll id
   --              (:)
   --              []
@@ -93,6 +98,10 @@ showAll = runApp testDBPath prodSchema $ do
   --a <- scanRaw Nothing (decodeFieldByName "status") alwaysTrue gradualGroupBy (Map.empty)
   --liftIO $ putStrLn (show $ a)
 
+  -- before <- liftIO $ getPOSIXTime
+  -- let a = map (\x -> S.encode "some string") [0..100000]
+  -- after <- liftIO $ getPOSIXTime
+  -- liftIO $ putStrLn $ show (after - before)
 
   -- a <- scanAll id (:) []
   -- liftIO $ putStrLn (show $ a >>= (\x -> return $ take 5 x))
@@ -103,8 +112,7 @@ showAll = runApp testDBPath prodSchema $ do
 
   liftIO $ putStrLn $ show a
   liftIO $ putStrLn $ show (after - before)
-  liftIO $ putStrLn $ show (after - before)
-  liftIO $ putStrLn $ show (after - before)
+
   -- (0.89 secs, 1124496080 bytes)
 
   -- a <- aggregateAllByRecord (getFieldByName "status") gradualGroupBy (Map.empty)
@@ -113,3 +121,6 @@ showAll = runApp testDBPath prodSchema $ do
   return ()
 
   -- liftIO $ putStrLn (show $ foldl Set.insert Set.empty (extractField "status") <$> c)
+
+cleanup :: IO ()
+cleanup = system ("rm -fr " ++ testDBPath) >> return ()
