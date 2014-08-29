@@ -18,7 +18,6 @@ groupBy :: (Ord a) => [b] -> (b -> a) -> (Group a b)
 groupBy records groupFn = Group $ Map.toList $ foldr appendToGroup Map.empty records
                           where appendToGroup entry acc = Map.insertWith (++) (groupFn entry) [entry] acc
 
-
 gradualGroupBy :: (Ord a) => a -> Map.Map a Integer -> Map.Map a Integer
 gradualGroupBy i acc = Map.insertWith (+) i 1 acc
 
