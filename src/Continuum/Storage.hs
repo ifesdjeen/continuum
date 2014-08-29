@@ -71,7 +71,8 @@ putRecord record@(DbRecord timestamp _) = do
   schema' <- schema
 
   -- Write empty timestamp to be used for iteration, overwrite if needed
-  storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
+  -- storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
+
   -- Write an actual value to the database
 
   storagePut $ indexingEncodeRecord schema' record sid
@@ -201,19 +202,34 @@ scanIntern :: (Eq acc, Show acc, MonadResource m) =>
 scanIntern iter op acc = do
           next <- iterEntry iter
 
-          case next of
-            Just (_, v) | v == tsPlaceholder ->
-              iterNext iter >> scanIntern iter op acc
-
-            Just (k, v) ->
-              case op (k, v) acc of
+          if isJust next
+             then case op (fromJust next) acc of
                 val@(Right res) -> do
-                               iterNext iter
-                               if res == acc
-                                 then return val
-                                 else scanIntern iter op res
+                  iterNext iter
+                  scanIntern iter op res
                 val@(Left _) -> return val
-            _ -> return $ Right acc
+             else return $ Right acc
+
+             -- then case op (fromJust next) acc of
+             --    val@(Right res) -> do
+             --      iterNext iter
+             --      scanIntern iter op res
+             --    val@(Left _) -> return val
+             -- else return $ Right acc
+
+
+
+          -- case next of
+          --   Just (k, v) ->
+          --     case op (k, v) acc of
+          --       val@(Right res) -> do
+          --                      iterNext iter
+          --                      --if res == acc -- WTF
+          --                      --  then return val
+          --                      -- else scanIntern iter op res
+          --                      scanIntern iter op res
+          --       val@(Left _) -> return val
+          --   _ -> return $ Right acc
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
