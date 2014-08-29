@@ -118,9 +118,13 @@ encodeRecord _ (DbPlaceholder timestamp) sid = (encodeKey, encodeValue)
   where encodeKey = encode (timestamp, sid)
         encodeValue = tsPlaceholder
 
+-- | Decode a single value (mostly a wrapper over @decode, giving a more concrete
+-- Error type)
 decodeValue :: ByteString -> Either DbError DbValue
 decodeValue x = left ValueDecodeError $ decode x
 
+-- | Decode a single key (mostly a wrapper over @decode, giving a more concrete
+-- Error type)
 decodeKey :: ByteString -> Either DbError (Integer, Integer)
 decodeKey x = left KeyDecodeError $ decode x
 

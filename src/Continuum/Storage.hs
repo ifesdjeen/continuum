@@ -144,18 +144,35 @@ withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
 -- Receives a decoded field specified by name, passes it through @mapFn, puts into
 -- @acc until @checker returns true
 withField :: ByteString
-          -> (DbValue -> i)
-          -> (i -> acc -> Bool)
+          -> ((Integer, DbValue) -> i)
+          -> ((Integer, DbValue) -> acc -> Bool)
           -> (i -> acc -> acc)
           -> DbSchema
           -> AggregationFn acc
 
 withField field mapFn checker reduceFn schema' kv acc = do
-  a <- decodeFieldByName field schema' kv
-  let mapped = mapFn a
-  if checker mapped acc
+  val    <- decodeFieldByName field schema' kv
+  (k, _) <- decodeKey (fst kv)
+  let mapped = mapFn (k, val)
+  if checker (k, val) acc
     then return $ reduceFn mapped acc
     else return $ acc
+
+withFields :: [ByteString]
+           -> ((Integer, [DbValue]) -> i)
+           -> ((Integer, [DbValue]) -> acc -> Bool)
+           -> (i -> acc -> acc)
+           -> DbSchema
+           -> AggregationFn acc
+
+withFields field mapFn checker reduceFn schema' kv acc = do
+  val <- decodeFieldsByName field schema' kv
+  (k, _) <- decodeKey (fst kv)
+  let mapped = mapFn (k, val)
+  if checker (k, val) acc
+    then return $ reduceFn mapped acc
+    else return $ acc
+
 
 -- | Scan an entire shard
 scanAll :: (Eq acc, Show acc) =>
