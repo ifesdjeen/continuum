@@ -78,9 +78,6 @@ ro = liftM fst rwOptions
 wo :: MonadState DBContext m => m WriteOptions
 wo = liftM snd rwOptions
 
-tsPlaceholder :: ByteString
-tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
-
 storagePut :: (ByteString, ByteString) -> AppState ()
 storagePut (key, value) = do
   db' <- db
@@ -89,7 +86,7 @@ storagePut (key, value) = do
 
 putRecord :: DbRecord -> AppState ()
 putRecord record@(DbRecord timestamp _) = do
-  sid <- getAndincrementSequence -- :: StateT DBContext IO (Maybe Integer)
+  sid <- getAndincrementSequence
   schema' <- schema
 
   -- Write empty timestamp to be used for iteration, overwrite if needed
@@ -98,8 +95,10 @@ putRecord record@(DbRecord timestamp _) = do
 
   storagePut $ indexingEncodeRecord schema' record sid
 
-putRecord (DbPlaceholder timestamp) =
-  storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
+putRecord val@(DbPlaceholder _) = do
+  sid <- getAndincrementSequence
+  schema' <- schema
+  storagePut $ encodeRecord schema' val sid
 
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
 findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
@@ -176,6 +175,7 @@ scan :: (Eq acc, Show acc) =>
          -> (DbSchema -> AggregationFn acc)
          -> acc
          -> AppState (Either DbError acc)
+
 scan begin op acc = do
   db' <- db
   ro' <- ro

@@ -64,10 +64,12 @@ unpackDouble :: DbValue -> Double
 unpackDouble (DbDouble i) = i
 unpackDouble _ = error "Can't unpack Double"
 
--- instance Serialize DbTimestamp
--- instance Serialize DbSequenceId
+tsPlaceholder :: B.ByteString
+tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
+
 instance Serialize DbValue
 instance Serialize DbError
+
 
 -- TODO: change String to ByteString
 -- overloadedstrings
@@ -111,6 +113,10 @@ encodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
 encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
   where encodeKey = encode (timestamp, sid)
         encodeValue = encode . catMaybes $ fmap (`Map.lookup` vals) (fields schema)
+
+encodeRecord _ (DbPlaceholder timestamp) sid = (encodeKey, encodeValue)
+  where encodeKey = encode (timestamp, sid)
+        encodeValue = tsPlaceholder
 
 decodeValue :: B.ByteString -> Either DbError DbValue
 decodeValue x = left ValueDecodeError $ decode x
@@ -196,7 +202,7 @@ decodeIndexes schema bs = case decodeIndexes' bs of
 
 decodeValues :: DbSchema -> B.ByteString -> Either DbError [DbValue]
 decodeValues schema bs = do x <- left ValuesDecodeError $ decodeAll bs
-                            sequence $ (map decodeValue x)
+                            mapM decodeValue x
                           where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
                                                         forM idx (\c -> getBytes (fromIntegral c))
 
