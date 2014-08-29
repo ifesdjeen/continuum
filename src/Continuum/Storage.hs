@@ -24,17 +24,9 @@ import           Data.Maybe (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 
 
-type AppState a = StateT DBContext (ResourceT IO) a
+
 -- type AppResource a = ResourceT AppState IO a
 
-type RWOptions = (ReadOptions, WriteOptions)
-
-data DBContext = DBContext { ctxDb          :: DB
-                             , ctxSchema    :: DbSchema
-                             , sequenceNumber :: Integer
-                             -- , ctxKeyspace  :: ByteString
-                             , ctxRwOptions :: RWOptions
-                           }
 
 makeContext :: DB -> DbSchema -> RWOptions -> DBContext
 makeContext db' schema' rwOptions' = DBContext {ctxDb = db',
