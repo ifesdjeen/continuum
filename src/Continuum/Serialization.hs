@@ -26,8 +26,6 @@ import           Control.Monad.Except(forM_, forM, throwError)
 
 data Success = Success
 
-data DbType = DbtInt | DbtString
-
 -- data DbTimestamp = Integer
 --                  deriving (Show, Eq, Ord, Generic)
 
@@ -83,20 +81,6 @@ data Group key val = Group [(key, [val])]
                    | GroupAggregate [(key, val)]
                    deriving (Show, Eq, Ord)
 
-data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
-                           , fields         :: [ByteString]
-                           , indexMappings  :: Map.Map Int ByteString
-                           , schemaMappings :: Map.Map ByteString DbType }
-
-makeSchema :: [(ByteString, DbType)] -> DbSchema
-makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
-                                     , fields = fields'
-                                     , schemaMappings = Map.fromList stringTypeList
-                                     , indexMappings = iMappings }
-  where fields' = fmap fst stringTypeList
-        fMappings = Map.fromList $ zip fields' iterateFrom0
-        iMappings = Map.fromList $ zip iterateFrom0 fields'
-        iterateFrom0 = (iterate (1+) 0)
 
 
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
@@ -134,8 +118,8 @@ decodeRecord schema (k, v) = do
   decodedValue   <- decodeValues schema v
   return $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedValue)
 
-unwrapRecord :: Either String DbRecord -> DbRecord
-unwrapRecord (Right x) = x
+-- unwrapRecord :: Either String DbRecord -> DbRecord
+-- unwrapRecord (Right x) = x
 
 encodeBeginTimestamp :: Integer -> ByteString
 encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
@@ -145,16 +129,31 @@ encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
 -- isSameTimestamp begin (DbPlaceholder current) _ = begin == current
 -- isSameTimestamp begin _ _ = False
 
+class EndCriteria a where
+  matchEnd :: (Integer -> Integer -> Bool)
+              -> Integer
+              -> a
+              -> Bool
 
-compareTimestamps :: (Integer -> Integer -> Bool)
-                     -> Integer
-                     -> DbRecord
-                     -> a
-                     -> Bool
+instance EndCriteria (DbRecord) where
+  matchEnd op rangeEnd (DbRecord current _) = current `op` rangeEnd
+  matchEnd op rangeEnd (DbPlaceholder current) = current `op` rangeEnd
 
-compareTimestamps op begin (DbRecord current _) _ = current `op` begin
-compareTimestamps op begin (DbPlaceholder current) _ = current `op` begin
-compareTimestamps _  _ _ _ = False
+instance EndCriteria (Integer, DbValue) where
+  matchEnd op rangeEnd (current, _) = current `op` rangeEnd
+
+instance EndCriteria (Integer, [DbValue]) where
+  matchEnd op rangeEnd (current, _) = current `op` rangeEnd
+
+matchTs :: (EndCriteria i) =>
+           (Integer -> Integer -> Bool)
+           -> Integer
+           -> i
+           -> acc
+           -> Bool
+
+matchTs op rangeEnd item _ = matchEnd op rangeEnd item
+
 
 append :: a -> [a] -> [a]
 append val acc = acc ++ [val]
@@ -238,4 +237,11 @@ decodeFieldByName field schema (_, bs) = if isJust idx
                                             then decodeFieldByIndex indices (fromJust idx) bs
                                             else throwError FieldNotFoundError
   where idx = elemIndex field (fields schema)
+        indices = decodeIndexes schema bs
+
+decodeFieldsByName :: [ByteString] -> DbSchema -> (ByteString, ByteString) -> Either DbError [DbValue]
+decodeFieldsByName flds schema (_, bs) = if isJust idxs
+                                         then mapM (\idx -> decodeFieldByIndex indices idx bs) (fromJust idxs)
+                                         else throwError FieldNotFoundError
+  where idxs = mapM (`elemIndex` (fields schema)) flds
         indices = decodeIndexes schema bs

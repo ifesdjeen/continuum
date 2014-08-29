@@ -5,7 +5,7 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord, findByTimestamp, findRange, scanAll,
-        alwaysTrue, scan, withFullRecord)
+        alwaysTrue, scan, withFullRecord, withField, withFields)
        where
 
 --  import Debug.Trace
@@ -85,13 +85,13 @@ putRecord val@(DbPlaceholder _) = do
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
 findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
                             where begin   = encodeBeginTimestamp timestamp
-                                  checker = compareTimestamps (==) timestamp
+                                  checker = matchTs (==) timestamp
 
 -- | Find records in the range
 findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
 findRange beginTs end = scan (Just begin) (withFullRecord id checker append) []
                       where begin = encodeBeginTimestamp beginTs
-                            checker = compareTimestamps (<=) end
+                            checker = matchTs (<=) end
 
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
@@ -99,6 +99,7 @@ alwaysTrue = \_ _ -> True
 runApp :: String -> DbSchema -> AppState a -> IO (a)
 runApp path schema' actions = do
   runResourceT $ do
+    -- TODO: add indexes
     db' <- Base.open path opts
     let ctx = makeContext db' schema' (readOpts, writeOpts)
     -- liftResourceT $ (flip evalStateT) ctx actions
@@ -120,7 +121,7 @@ runApp path schema' actions = do
 -- Receives a decoded @'DbRecord', passes it through @mapFn, puts into
 -- @acc until @checker returns true.
 withFullRecord :: (DbRecord -> i)
-               -> (i -> acc -> Bool)
+               -> (DbRecord -> acc -> Bool)
                -> (i -> acc -> acc)
                -> DbSchema
                -> AggregationFn acc
@@ -128,7 +129,7 @@ withFullRecord :: (DbRecord -> i)
 withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
   a <- decodeRecord schema' (k, v)
   let mapped = mapFn a
-  if checker mapped acc
+  if checker a acc
     then return $ reduceFn mapped acc
     else return $ acc
 

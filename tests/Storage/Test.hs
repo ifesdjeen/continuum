@@ -5,6 +5,7 @@ module Storage.Test where
 
 import Continuum.Serialization
 import Continuum.Storage
+import Continuum.Types
 
 import System.Process(system)
 import Test.Hspec

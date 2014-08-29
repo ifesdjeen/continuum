@@ -4,6 +4,7 @@
 module Serialization.Test where
 
 import Continuum.Serialization
+import Continuum.Types
 
 import Test.Hspec
 import Test.Hspec.Expectations

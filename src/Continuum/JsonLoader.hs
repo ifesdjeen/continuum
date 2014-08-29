@@ -16,6 +16,7 @@ import qualified Data.Set as Set
 import Continuum.Storage
 import Continuum.Serialization
 import Continuum.Actions
+import Continuum.Types
 
 data Entry = Entry { request_ip :: String
                    , status :: String

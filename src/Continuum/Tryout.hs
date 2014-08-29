@@ -11,6 +11,7 @@ import System.Process(system)
 import Control.Monad.State
 import Continuum.Storage
 import Continuum.Serialization
+import Continuum.Types
 
 import qualified Data.Map as Map
 
