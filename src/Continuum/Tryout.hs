@@ -12,7 +12,7 @@ import Control.Monad.State
 import Continuum.Storage
 import Continuum.Serialization
 import Continuum.Types
-
+import Continuum.Aggregation
 import qualified Data.Map as Map
 
 testDBPath :: String
@@ -27,6 +27,7 @@ testSchema = makeSchema [ ("a", DbtInt)
 main :: IO ()
 main = runApp testDBPath testSchema $ do
   liftIO $ cleanup
+
   putRecord $ makeRecord 123 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
   putRecord $ makeRecord 128 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
   putRecord $ makeRecord 129 [("a", (DbInt 12345)), ("b", (DbString "asd"))]

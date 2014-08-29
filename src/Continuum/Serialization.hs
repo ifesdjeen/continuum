@@ -154,7 +154,6 @@ matchTs :: (EndCriteria i) =>
 
 matchTs op rangeEnd item _ = matchEnd op rangeEnd item
 
-
 append :: a -> [a] -> [a]
 append val acc = acc ++ [val]
 
@@ -209,6 +208,7 @@ decodeValues schema bs = do x <- left ValuesDecodeError $ decodeAll bs
                           where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
                                                         forM idx (\c -> getBytes (fromIntegral c))
 
+
 decodeFrom :: Int -> ByteString -> Either String DbValue
 decodeFrom from bs = case read bs of
                           (Left a)  -> error a
@@ -231,6 +231,13 @@ decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
         read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
                                    getBytes $ indices !! idx
                        where beginIdx = sum $ take idx indices
+
+-- GetField typeclass???? For bytestings
+getFieldByName :: ByteString -> DbRecord -> Either DbError DbValue
+getFieldByName field (DbRecord _ values) = if isJust fieldVal
+                                           then return $ fromJust fieldVal
+                                           else throwError FieldNotFoundError
+  where fieldVal = Map.lookup field values
 
 decodeFieldByName :: ByteString -> DbSchema -> (ByteString, ByteString) -> Either DbError DbValue
 decodeFieldByName field schema (_, bs) = if isJust idx

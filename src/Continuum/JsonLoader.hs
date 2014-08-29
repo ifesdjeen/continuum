@@ -2,6 +2,8 @@
 
 module Continuum.JsonLoader where
 
+import Data.Time.Clock.POSIX
+
 import           Data.List (elemIndex)
 import Control.Applicative ((<$>), (<*>), empty)
 import Data.Aeson
@@ -17,6 +19,8 @@ import Continuum.Storage
 import Continuum.Serialization
 import Continuum.Actions
 import Continuum.Types
+import Continuum.Aggregation
+
 
 data Entry = Entry { request_ip :: String
                    , status :: String
@@ -89,6 +93,23 @@ showAll = runApp testDBPath prodSchema $ do
   --a <- scanRaw Nothing (decodeFieldByName "status") alwaysTrue gradualGroupBy (Map.empty)
   --liftIO $ putStrLn (show $ a)
 
+
+  -- a <- scanAll id (:) []
+  -- liftIO $ putStrLn (show $ a >>= (\x -> return $ take 5 x))
+
+  before <- liftIO $ getPOSIXTime
+  a <- aggregateAllByField "status" snd gradualGroupBy (Map.empty)
+  after <- liftIO $ getPOSIXTime
+
+  liftIO $ putStrLn $ show a
+  liftIO $ putStrLn $ show (after - before)
+  liftIO $ putStrLn $ show (after - before)
+  liftIO $ putStrLn $ show (after - before)
+  -- (0.89 secs, 1124496080 bytes)
+
+  -- a <- aggregateAllByRecord (getFieldByName "status") gradualGroupBy (Map.empty)
+  -- liftIO $ putStrLn $ show a
+  -- (1.13 secs, 2398191368 bytes)
   return ()
 
   -- liftIO $ putStrLn (show $ foldl Set.insert Set.empty (extractField "status") <$> c)
