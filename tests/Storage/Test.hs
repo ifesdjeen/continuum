@@ -63,11 +63,32 @@ main =  hspec $ do
                                 ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
                                 ])
 
-    it "should " $  do
+    it "should scan a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
+            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            findRange 300 456
+
+      res `shouldReturn` (Right [makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
+                                ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
+                                ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+                                ])
+
+    -- it "should iterate " $  do
+    --   let res = runApp testDBPath testSchema $ do
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
 
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDBPath) >> return ()
+
+
+-- TODO: port tests to quickcheck
+---

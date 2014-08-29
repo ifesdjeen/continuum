@@ -25,15 +25,16 @@ testSchema = makeSchema [ ("a", DbtInt)
 
 main :: IO ()
 main = runApp testDBPath testSchema $ do
+  liftIO $ cleanup
+  putRecord $ makeRecord 123 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  putRecord $ makeRecord 128 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  putRecord $ makeRecord 129 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
+  putRecord $ makeRecord 130 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
 
-  -- putRecord $ makeRecord 123 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
-  -- putRecord $ makeRecord 124 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
-  -- putRecord $ makeRecord 125 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
-  -- putRecord $ makeRecord 126 [("a", (DbInt 12345)), ("b", (DbString "asd"))]
-
+  a <- scan (Just $ encodeBeginTimestamp 126) (withFullRecord id alwaysTrue append) []
   -- a <- scanAll2 id (:) []
 
-  liftIO $ print "asd"
+  liftIO $ print (show a)
 
       -- full = indexingEncodeRecord testSchema record 1
       -- encoded = snd $ full

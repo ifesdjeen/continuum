@@ -5,7 +5,7 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord, findByTimestamp, findRange, scanAll,
-        alwaysTrue)
+        alwaysTrue, scan, withFullRecord)
        where
 
 --  import Debug.Trace
@@ -204,3 +204,6 @@ scanIntern iter op acc = do
                                  else scanIntern iter op res
                 val@(Left _) -> return val
             _ -> return $ Right acc
+
+-- TODO: add batch put operstiaon
+-- TODO: add delete operation
