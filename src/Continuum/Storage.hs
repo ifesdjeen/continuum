@@ -12,26 +12,15 @@ module Continuum.Storage
 import           Continuum.Types
 import           Continuum.Options
 import           Continuum.Serialization
--- import           Control.Applicative ((<$>))
-
--- import           Data.Serialize (Serialize, encode, decode)
 import           Data.Serialize (encode)
--- import qualified Data.Map as Map
-
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
                                                  iterSeek, iterFirst, -- iterItems,
-                                                 withIterator, iterNext, iterEntry,
-                                                 )
----import           Database.LevelDB.Iterator (Iterator)
-
-
+                                                 withIterator, iterNext, iterEntry)
 import           Data.ByteString        (ByteString)
 import           Control.Monad.State
 import           Data.Maybe (isJust, fromJust)
-
-
 import           Control.Monad.Trans.Resource
 
 
@@ -100,11 +89,13 @@ putRecord val@(DbPlaceholder _) = do
   schema' <- schema
   storagePut $ encodeRecord schema' val sid
 
+-- | Find a particular record by the timestamp
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
 findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = compareTimestamps (==) timestamp
 
+-- | Find records in the range
 findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
 findRange beginTs end = scan (Just begin) (withFullRecord id checker append) []
                       where begin = encodeBeginTimestamp beginTs
@@ -149,20 +140,24 @@ withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
     then return $ reduceFn mapped acc
     else return $ acc
 
--- withField :: String
---           -> (DbValue -> i)
---           -> (i -> acc -> Bool)
---           -> (i -> acc -> acc)
---           -> DbSchema
---           -> AggregationFn acc
+-- | Field aggregation pipeline
+-- Receives a decoded field specified by name, passes it through @mapFn, puts into
+-- @acc until @checker returns true
+withField :: ByteString
+          -> (DbValue -> i)
+          -> (i -> acc -> Bool)
+          -> (i -> acc -> acc)
+          -> DbSchema
+          -> AggregationFn acc
 
--- withField field mapFn checker reduceFn schema' kv acc = do
---   a <- decodeFieldByName field schema' kv
---   let mapped = mapFn a
---   if checker mapped acc
---     then return $ reduceFn mapped acc
---     else return $ acc
+withField field mapFn checker reduceFn schema' kv acc = do
+  a <- decodeFieldByName field schema' kv
+  let mapped = mapFn a
+  if checker mapped acc
+    then return $ reduceFn mapped acc
+    else return $ acc
 
+-- | Scan an entire shard
 scanAll :: (Eq acc, Show acc) =>
               (DbRecord -> i)
            -> (i -> acc -> acc)
@@ -186,8 +181,6 @@ scan begin op acc = do
                  else iterFirst iter
                scanIntern iter (op schema') acc
   return $ records
-
-
 
 scanIntern :: (Eq acc, Show acc, MonadResource m) =>
                Iterator

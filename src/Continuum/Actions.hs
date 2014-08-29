@@ -1,14 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Continuum.Actions where
 
 import           Data.Maybe (fromJust)
 import qualified Data.Map as Map
 import           Data.List (nub)
 import qualified Data.Set as Set
+import           Data.ByteString        (ByteString)
 
 import Continuum.Serialization
 import Control.Applicative
 
-extractField :: String -> DbRecord -> DbValue
+extractField :: ByteString -> DbRecord -> DbValue
 extractField field (DbRecord _ record) = fromJust $ Map.lookup field record
 
 groupBy :: (Ord a) => [b] -> (b -> a) -> (Group a b)
@@ -18,7 +21,6 @@ groupBy records groupFn = Group $ Map.toList $ foldr appendToGroup Map.empty rec
 
 gradualGroupBy :: (Ord a) => a -> Map.Map a Integer -> Map.Map a Integer
 gradualGroupBy i acc = Map.insertWith (+) i 1 acc
-
 
 -- groupBy :: (Ord a) => [DbRecord] -> (DbRecord -> a) -> (Group a DbRecord)
 -- groupBy records groupFn = Group $ Map.toList $ foldr appendToGroup Map.empty records

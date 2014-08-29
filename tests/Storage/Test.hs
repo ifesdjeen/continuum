@@ -42,6 +42,7 @@ main =  hspec $ do
                                 ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])])
 
     it "setup" $ cleanup >>= shouldReturn (return())
+
     it "should return inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
@@ -61,6 +62,9 @@ main =  hspec $ do
                                 ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
                                 ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
                                 ])
+
+    it "should " $  do
+      let res = runApp testDBPath testSchema $ do
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
