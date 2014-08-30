@@ -55,6 +55,8 @@ main =  hspec $ do
             putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
             putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
 
+            putRecord $ makeRecord 555 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
             findRange 123 456
 
       res `shouldReturn` (Right [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
@@ -74,6 +76,8 @@ main =  hspec $ do
             putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
             putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
             putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+
+            putRecord $ makeRecord 700 [("a", (DbInt 3)), ("b", (DbString "3"))]
 
             findRange 300 456
 
