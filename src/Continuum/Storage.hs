@@ -4,12 +4,13 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findByTimestamp, findRange, scanAll,
+        runApp, putRecord, findByTimestamp, findRange, gaplessScan,
         alwaysTrue, scan, withFullRecord, withField, withFields)
        where
 
 --  import Debug.Trace
 import           Continuum.Types
+import           Continuum.Folds
 import           Continuum.Options
 import           Continuum.Serialization
 import           Data.Serialize (encode)
@@ -84,15 +85,16 @@ putRecord val@(DbPlaceholder _) = do
 
 -- | Find a particular record by the timestamp
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
-findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) [] id
+findByTimestamp timestamp = gaplessScan (Just begin) decodeRecord (stopCondition checker appendFold)
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = matchTs (==) timestamp
 
 -- | Find records in the range
 findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
-findRange beginTs end = scan (Just begin) (withFullRecord id checker append) [] id
+findRange beginTs end = gaplessScan (Just begin) decodeRecord (stopCondition checker appendFold)
                       where begin = encodeBeginTimestamp beginTs
                             checker = matchTs (<=) end
+
 
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
@@ -167,17 +169,8 @@ withFields field mapFn checker reduceFn schema' acc kv = do
     then return $ reduceFn acc mapped
     else return $ acc
 
-
--- | Scan an entire shard
-scanAll :: (DbRecord -> i)
-           -> (acc -> i -> acc)
-           -> acc
-           -> (acc -> done)
-           -> AppState (Either DbError done)
-scanAll mapFn reduceFn = scan Nothing (withFullRecord mapFn alwaysTrue reduceFn)
-
 scan ::  Maybe ByteString
-         -> (DbSchema -> AggregationFn acc)
+         -> (DbSchema -> (acc -> (ByteString, ByteString) -> (Either DbError acc)))
          -> acc
          -> (acc -> done)
          -> AppState (Either DbError done)
@@ -193,11 +186,28 @@ scan begin op acc done = do
                scanIntern iter (op schema') acc
   return $ (records >>= (\x -> return $ done x))
 
+
+gaplessScan ::  Maybe ByteString
+         -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
+         -> L.Fold i acc
+         -> AppState (Either DbError acc)
+
+gaplessScan begin mapop (L.Fold foldop acc done) = do
+  db' <- db
+  ro' <- ro
+  schema' <- schema
+  records <- withIterator db' ro' $ \iter -> do
+               if (isJust begin)
+                 then iterSeek iter (fromJust begin)
+                 else iterFirst iter
+               scanIntern iter (\acc x -> (mapop schema' x) >>= (\y -> return $ foldop acc y)) acc
+  return $ (records >>= (\x -> return $ done x))
+
 scanIntern :: (MonadResource m) =>
                Iterator
-            -> (acc -> (ByteString, ByteString) -> (Either DbError acc))
-            -> acc
-            -> m (Either DbError acc)
+               -> (acc -> (ByteString, ByteString) -> (Either DbError acc))
+               -> acc
+               -> m (Either DbError acc)
 
 scanIntern iter op acc = do
           next <- iterEntry iter

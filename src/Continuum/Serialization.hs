@@ -246,3 +246,15 @@ decodeFieldsByName flds schema (_, bs) = if isJust idxs
                                          else throwError FieldNotFoundError
   where idxs = mapM (`elemIndex` (fields schema)) flds
         indices = decodeIndexes schema bs
+
+
+decodeFieldsByName2 :: [ByteString] -> DbSchema -> (ByteString, ByteString) -> Either DbError (Integer, [DbValue])
+decodeFieldsByName2 flds schema (k, bs) = do
+  (decodedK, _) <- decodeKey k
+  decodedVal <- decodeVal bs
+  return $ (decodedK, decodedVal)
+  where decodeVal bs = if isJust idxs
+                       then mapM (\idx -> decodeFieldByIndex indices idx bs) (fromJust idxs)
+                       else throwError FieldNotFoundError
+        idxs = mapM (`elemIndex` (fields schema)) flds
+        indices = decodeIndexes schema bs
