@@ -26,9 +26,9 @@ library
 
   build-depends:          base                   >= 4 && < 5
                         , aeson                  >= 0.8.0.0
+                        , foldl                  >= 1.0.5
                         , mtl                    >2.1
-                        , time                   >= 1.4.2
-                        , transformers
+                        , transformers           >= 0.4.1.0
                         , process                >= 1.1.0.2
                         , containers             >0.5
                         , leveldb-haskell-fork   >= 0.3.2
@@ -38,24 +38,19 @@ library
                         , data-default
                         , transformers-base      >= 0.4.1 && < 0.5
 
+
 executable continuum-dev
   Default-Language:     Haskell2010
-  hs-source-dirs:       src
+  hs-source-dirs:       exec
   -- ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2
-  main-is:              Continuum/JsonLoader.hs
-  build-depends:          base                   >= 4 && < 5
+  main-is:              JsonLoader.hs
+  build-depends:        continuum
+                        , base                   >= 4 && < 5
                         , aeson                  >= 0.8.0.0
-                        , mtl                    >2.1
-                        , time                   >= 1.4.2
-                        , transformers
                         , process                >= 1.1.0.2
-                        , containers             >0.5
-                        , leveldb-haskell-fork   >= 0.3.2
-                        , resourcet              >= 1.1.2.2
+                        , transformers           >= 0.4.1.0
                         , bytestring             >= 0.10.4.0
-                        , cereal                 >= 0.4.0.1
-                        , data-default
-                        , transformers-base      >= 0.4.1 && < 0.5
+                        , time                   >= 1.4.2
 
 test-suite tests
   ghc-options:          -Wall
