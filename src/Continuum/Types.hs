@@ -23,7 +23,7 @@ data DbError = IndexesDecodeError String
              | OtherError
              deriving (Show, Eq, Ord, Generic)
 
-type AggregationFn acc = ((ByteString, ByteString) -> acc -> (Either DbError acc))
+type AggregationFn acc = (acc -> (ByteString, ByteString) -> (Either DbError acc))
 
 data DbType = DbtInt | DbtString
 

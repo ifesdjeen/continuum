@@ -22,7 +22,7 @@ import           Data.ByteString        (ByteString)
 import           Control.Monad.State
 import           Data.Maybe (isJust, fromJust)
 import           Control.Monad.Trans.Resource
-
+import qualified Control.Foldl as L
 
 
 -- type AppResource a = ResourceT AppState IO a
@@ -84,13 +84,13 @@ putRecord val@(DbPlaceholder _) = do
 
 -- | Find a particular record by the timestamp
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
-findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) []
+findByTimestamp timestamp = scan (Just begin) (withFullRecord id checker append) [] id
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = matchTs (==) timestamp
 
 -- | Find records in the range
 findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
-findRange beginTs end = scan (Just begin) (withFullRecord id checker append) []
+findRange beginTs end = scan (Just begin) (withFullRecord id checker append) [] id
                       where begin = encodeBeginTimestamp beginTs
                             checker = matchTs (<=) end
 
@@ -123,15 +123,15 @@ runApp path schema' actions = do
 -- @acc until @checker returns true.
 withFullRecord :: (DbRecord -> i)
                -> (DbRecord -> acc -> Bool)
-               -> (i -> acc -> acc)
+               -> (acc -> i -> acc)
                -> DbSchema
                -> AggregationFn acc
 
-withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
+withFullRecord mapFn checker reduceFn schema' acc (k, v) = do
   a <- decodeRecord schema' (k, v)
   let mapped = mapFn a
   if checker a acc
-    then return $ reduceFn mapped acc
+    then return $ reduceFn acc mapped
     else return $ acc
 
 -- | Field aggregation pipeline
@@ -140,49 +140,49 @@ withFullRecord mapFn checker reduceFn schema' (k, v) acc = do
 withField :: ByteString
           -> ((Integer, DbValue) -> i)
           -> ((Integer, DbValue) -> acc -> Bool)
-          -> (i -> acc -> acc)
+          -> (acc -> i -> acc)
           -> DbSchema
           -> AggregationFn acc
 
-withField field mapFn checker reduceFn schema' kv acc = do
+withField field mapFn checker reduceFn schema' acc kv = do
   val    <- decodeFieldByName field schema' kv
   (k, _) <- decodeKey (fst kv)
   let mapped = mapFn (k, val)
   if checker (k, val) acc
-    then return $ reduceFn mapped acc
+    then return $ reduceFn acc mapped
     else return $ acc
 
 withFields :: [ByteString]
            -> ((Integer, [DbValue]) -> i)
            -> ((Integer, [DbValue]) -> acc -> Bool)
-           -> (i -> acc -> acc)
+           -> (acc -> i -> acc)
            -> DbSchema
            -> AggregationFn acc
 
-withFields field mapFn checker reduceFn schema' kv acc = do
+withFields field mapFn checker reduceFn schema' acc kv = do
   val <- decodeFieldsByName field schema' kv
   (k, _) <- decodeKey (fst kv)
   let mapped = mapFn (k, val)
   if checker (k, val) acc
-    then return $ reduceFn mapped acc
+    then return $ reduceFn acc mapped
     else return $ acc
 
 
 -- | Scan an entire shard
-scanAll :: (Eq acc, Show acc) =>
-              (DbRecord -> i)
-           -> (i -> acc -> acc)
+scanAll :: (DbRecord -> i)
+           -> (acc -> i -> acc)
            -> acc
-           -> AppState (Either DbError acc)
+           -> (acc -> done)
+           -> AppState (Either DbError done)
 scanAll mapFn reduceFn = scan Nothing (withFullRecord mapFn alwaysTrue reduceFn)
 
-scan :: (Eq acc, Show acc) =>
-         Maybe ByteString
+scan ::  Maybe ByteString
          -> (DbSchema -> AggregationFn acc)
          -> acc
-         -> AppState (Either DbError acc)
+         -> (acc -> done)
+         -> AppState (Either DbError done)
 
-scan begin op acc = do
+scan begin op acc done = do
   db' <- db
   ro' <- ro
   schema' <- schema
@@ -191,11 +191,11 @@ scan begin op acc = do
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
                scanIntern iter (op schema') acc
-  return $ records
+  return $ (records >>= (\x -> return $ done x))
 
-scanIntern :: (Eq acc, Show acc, MonadResource m) =>
+scanIntern :: (MonadResource m) =>
                Iterator
-            -> AggregationFn acc
+            -> (acc -> (ByteString, ByteString) -> (Either DbError acc))
             -> acc
             -> m (Either DbError acc)
 
@@ -203,33 +203,12 @@ scanIntern iter op acc = do
           next <- iterEntry iter
 
           if isJust next
-             then case op (fromJust next) acc of
+             then case op acc (fromJust next) of
                 val@(Right res) -> do
                   iterNext iter
                   scanIntern iter op res
                 val@(Left _) -> return val
              else return $ Right acc
-
-             -- then case op (fromJust next) acc of
-             --    val@(Right res) -> do
-             --      iterNext iter
-             --      scanIntern iter op res
-             --    val@(Left _) -> return val
-             -- else return $ Right acc
-
-
-
-          -- case next of
-          --   Just (k, v) ->
-          --     case op (k, v) acc of
-          --       val@(Right res) -> do
-          --                      iterNext iter
-          --                      --if res == acc -- WTF
-          --                      --  then return val
-          --                      -- else scanIntern iter op res
-          --                      scanIntern iter op res
-          --       val@(Left _) -> return val
-          --   _ -> return $ Right acc
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation

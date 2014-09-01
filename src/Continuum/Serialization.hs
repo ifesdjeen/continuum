@@ -155,8 +155,8 @@ matchTs :: (EndCriteria i) =>
 
 matchTs op rangeEnd item _ = matchEnd op rangeEnd item
 
-append :: a -> [a] -> [a]
-append val acc = acc ++ [val]
+append :: [a] -> a -> [a]
+append acc val = acc ++ [val]
 
 instance (Ord a) => Functor (Group a) where
   fmap f (Group vals) = Group $ fmap mapEntries vals

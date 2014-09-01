@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Continuum.Actions where
 
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, maybe)
 import qualified Data.Map as Map
 import           Data.List (nub)
 import qualified Data.Set as Set
@@ -20,6 +22,43 @@ groupBy records groupFn = Group $ Map.toList $ foldr appendToGroup Map.empty rec
 
 gradualGroupBy :: (Ord a) => a -> Map.Map a Integer -> Map.Map a Integer
 gradualGroupBy i acc = Map.insertWith (+) i 1 acc
+
+
+---- Ord k => (Maybe a -> Maybe a) -> k -> Map.Map k a -> Map.Map k a
+
+groupReduce :: (Ord a) =>
+               (i -> a)
+               -> (i -> b)
+               -> (b -> acc -> acc)
+               -> acc
+               -> i
+               -> Map.Map a acc
+               -> Map.Map a acc
+
+groupReduce keyFn valueFn foldFn accInit entry m = --undefined
+  Map.alter updateFn (keyFn entry) m
+  where updateFn i = case i of
+          (Just x) -> Just $ foldFn (valueFn entry) x
+          (Nothing) -> Just accInit
+
+
+
+-- class FoldOperation a acc where
+--   initial :: a
+--   foldOp :: (a -> acc -> acc)
+
+
+  -- foldOp i acc = i + acc
+  -- doFold Sum
+-- instance Foldable (SumFold) where
+--   foldl
+
+
+
+
+
+-- groupCount :: (Ord a) => a -> Map.Map a Integer -> Map.Map a Integer
+-- groupCount entry acc =
 
 -- groupBy :: (Ord a) => [DbRecord] -> (DbRecord -> a) -> (Group a DbRecord)
 -- groupBy records groupFn = Group $ Map.toList $ foldr appendToGroup Map.empty records
