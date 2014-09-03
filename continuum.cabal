@@ -52,7 +52,7 @@ executable continuum-dev
                         , transformers           >= 0.4.1.0
                         , bytestring             >= 0.10.4.0
                         , time                   >= 1.4.2
-
+                        , containers             >0.5
 test-suite tests
   ghc-options:          -Wall
   main-is:              Main.hs
