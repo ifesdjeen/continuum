@@ -2,6 +2,7 @@
 
 module Main (main) where
 
+import qualified Data.Map as Map
 import           Data.ByteString.Char8 (pack)
 import Data.Time.Clock.POSIX
 import System.Process(system)
@@ -17,6 +18,7 @@ import Continuum.Storage
 import Continuum.Serialization
 import Continuum.Actions
 import Continuum.Types
+import Continuum.Folds
 import Continuum.Aggregation
 
 
@@ -70,75 +72,17 @@ main2 = do
                  ])
 
   return ()
-  -- print decoded
-  -- putStrLn $ show linesOfFile
-
-    -- let req = decode "{\"x\":3.0,\"y\":-1.0}" :: Maybe Coord
-    -- print req
-    -- let reply = Coord 123.4 20
-    -- BL.putStrLn (encode reply)
 
 main = runApp testDBPath prodSchema $ do
-  -- records <- scanAll id
-  --              (:)
-  --              []
-               -- Set.empty
+  before <- liftIO $ getPOSIXTime
+  -- a <- aggregateAllByField "status" snd groupFold
+  a <- aggregateAllByField "status" snd (groupFold (\x -> (x, x)) countFold)
+  after <- liftIO $ getPOSIXTime
 
-  -- liftIO $ putStrLn "===== ALL ===== "
-  -- liftIO $ putStrLn (show $ take 5 records)
+  liftIO $ putStrLn $ show a
+  liftIO $ putStrLn $ show (after - before)
 
-  -- let count _ acc = acc + 1
-  --     a = foldGroup count 0 $ groupBy records (byFieldMaybe "status")
-  -- liftIO $ putStrLn (show $ a)
-
-  --a <- scanRaw Nothing (decodeFieldByName "status") alwaysTrue gradualGroupBy (Map.empty)
-  --liftIO $ putStrLn (show $ a)
-
-  -- before <- liftIO $ getPOSIXTime
-  -- let a = map (\x -> S.encode "some string") [0..100000]
-  -- after <- liftIO $ getPOSIXTime
-  -- liftIO $ putStrLn $ show (after - before)
-
-  -- a <- scanAll id (:) []
-  -- liftIO $ putStrLn (show $ a >>= (\x -> return $ take 5 x))
-
-  -- before <- liftIO $ getPOSIXTime
-  -- a <- aggregateAllByField "status" snd gradualGroupBy (Map.empty)
-  -- after <- liftIO $ getPOSIXTime
-
-  -- liftIO $ putStrLn $ show a
-  -- liftIO $ putStrLn $ show (after - before)
-
-  -- before <- liftIO $ getPOSIXTime
-  -- a <- aggregateAllByField "status" snd gradualGroupBy (Map.empty)
-  -- after <- liftIO $ getPOSIXTime
-
-  -- liftIO $ putStrLn $ show a
-  -- liftIO $ putStrLn $ show (after - before)
-
-  -- before <- liftIO $ getPOSIXTime
-  -- a <- aggregateAllByField "status" snd gradualGroupBy (Map.empty)
-  -- after <- liftIO $ getPOSIXTime
-
-  -- liftIO $ putStrLn $ show a
-  -- liftIO $ putStrLn $ show (after - before)
-
-
-  -- before <- liftIO $ getPOSIXTime
-  -- a <- aggregateAllByField "status" snd gradualGroupBy (Map.empty)
-  -- after <- liftIO $ getPOSIXTime
-
-  -- liftIO $ putStrLn $ show a
-  -- liftIO $ putStrLn $ show (after - before)
-
-  -- (0.89 secs, 1124496080 bytes)
-
-  -- a <- aggregateAllByRecord (getFieldByName "status") gradualGroupBy (Map.empty)
-  -- liftIO $ putStrLn $ show a
-  -- (1.13 secs, 2398191368 bytes)
   return ()
-
-  -- liftIO $ putStrLn (show $ foldl Set.insert Set.empty (extractField "status") <$> c)
 
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDBPath) >> return ()
