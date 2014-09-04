@@ -21,7 +21,6 @@ library
                        , Continuum.Aggregation
                        , Continuum.Tryout
                        , Continuum.Options
-                       , Continuum.Actions
                        , Continuum.Types
                        , Continuum.Folds
 
@@ -38,7 +37,7 @@ library
                         , cereal                 >= 0.4.0.1
                         , data-default
                         , transformers-base      >= 0.4.1 && < 0.5
-
+                        , criterion              >=1.0.1.0
 
 executable continuum-dev
   Default-Language:     Haskell2010
@@ -53,6 +52,7 @@ executable continuum-dev
                         , bytestring             >= 0.10.4.0
                         , time                   >= 1.4.2
                         , containers             >0.5
+
 test-suite tests
   ghc-options:          -Wall
   main-is:              Main.hs
