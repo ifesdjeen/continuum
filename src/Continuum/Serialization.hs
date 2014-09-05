@@ -6,9 +6,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Continuum.Serialization where
-import           Control.Applicative ((<$>))
--- import           GHC.Word (Word8)
 
+
+import           Control.Applicative ((<$>))
+import           GHC.Word (Word64)
+import Foreign
+import           Data.Bits
 import qualified Data.Map as Map
 
 import           Continuum.Types
@@ -94,25 +97,19 @@ removePlaceholder :: DbRecord -> Bool
 removePlaceholder (DbRecord _ _) = True
 removePlaceholder (DbPlaceholder _) = False
 
-encodeRecord :: DbSchema -> DbRecord -> Integer -> (ByteString, ByteString)
-encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
-  where encodeKey = encode (timestamp, sid)
-        encodeValue = encode . catMaybes $ fmap (`Map.lookup` vals) (fields schema)
-
-encodeRecord _ (DbPlaceholder timestamp) sid = (encodeKey, encodeValue)
-  where encodeKey = encode (timestamp, sid)
-        encodeValue = tsPlaceholder
-
 -- | Decode a single value (mostly a wrapper over @decode, giving a more concrete
 -- Error type)
 decodeValue :: ByteString -> Either DbError DbValue
 decodeValue x = left ValueDecodeError $ decode x
+{-# INLINE decodeValue #-}
 
 -- | Decode a single key (mostly a wrapper over @decode, giving a more concrete
 -- Error type)
 decodeKey :: ByteString -> Either DbError (Integer, Integer)
-decodeKey x = left KeyDecodeError $ decode x
+decodeKey x = return $ (unpackWord64 (BS.take 8 x), unpackWord64 (BS.drop 8 x))
 
+{-# INLINE decodeKey #-}
+-- left KeyDecodeError $ decode x
 decodeRecord :: DbSchema ->  (ByteString, ByteString) -> Either DbError DbRecord
 decodeRecord schema (k, v) = do
   (timestamp, _) <- decodeKey k
@@ -123,7 +120,7 @@ decodeRecord schema (k, v) = do
 -- unwrapRecord (Right x) = x
 
 encodeBeginTimestamp :: Integer -> ByteString
-encodeBeginTimestamp timestamp = encode (timestamp, 0 :: Integer)
+encodeBeginTimestamp timestamp = BS.concat [(packWord64 timestamp), (packWord64 0)]
 
 -- isSameTimestamp :: Integer -> DbRecord -> a -> Bool
 -- isSameTimestamp begin (DbRecord current _) _ = begin == current
@@ -155,9 +152,6 @@ matchTs :: (EndCriteria i) =>
 
 matchTs op rangeEnd item _ = matchEnd op rangeEnd item
 
-append :: [a] -> a -> [a]
-append acc val = acc ++ [val]
-
 instance (Ord a) => Functor (Group a) where
   fmap f (Group vals) = Group $ fmap mapEntries vals
     where mapEntries (k, v) = (k, fmap f v)
@@ -188,73 +182,96 @@ byTime interval (DbRecord t _) = interval * (t `quot` interval)
 
 indexingEncodeRecord :: DbSchema -> DbRecord -> Integer -> (ByteString, ByteString)
 indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
-  where encodeKey = encode (timestamp, sid)
+  where encodeKey = BS.concat [(packWord64 timestamp), (packWord64 sid)]
+        -- encode (timestamp, sid)
         -- encodedVals = fmap encode $ catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
         encodedParts = fmap encode $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
         lengths = BS.length <$> encodedParts
         encodeValue = runPut $ do
+          -- Change to BS.Pack
           forM_ lengths (putWord8 . fromIntegral)
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeIndexes :: DbSchema -> ByteString -> Either DbError [Int]
-decodeIndexes schema bs = case decodeIndexes' bs of
-                            (Left a) -> throwError $ IndexesDecodeError a
-                            (Right x) -> Right $ map fromIntegral x
-                       where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
+decodeIndexes :: DbSchema -> ByteString -> [Int]
+decodeIndexes schema bs = map fromIntegral (BS.unpack (BS.take (length $ (fields schema)) bs))
+
+-- decodeIndexes schema bs = case decodeIndexes' (BS.take (5 * (length $ (fields schema))) bs) of
+--                             (Left a) -> throwError $ IndexesDecodeError a
+--                             (Right x) -> Right $ map fromIntegral x
+--                        -- where decodeIndexes' = runGet $ forM (fields schema) (\_ -> getWord8)
+--                        where decodeIndexes' = runGet $ getListOf getWord8
+{-# INLINE decodeIndexes #-}
 
 decodeValues :: DbSchema -> ByteString -> Either DbError [DbValue]
 decodeValues schema bs = do x <- left ValuesDecodeError $ decodeAll bs
                             mapM decodeValue x
-                          where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
-                                                        forM idx (\c -> getBytes (fromIntegral c))
+                            where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
+                                                          forM idx (\c -> getBytes (fromIntegral c))
 
-decodeFrom :: Int -> ByteString -> Either String DbValue
-decodeFrom from bs = case read bs of
-                          (Left a)  -> error a
-                          (Right x) -> decode x
-  where read = runGet $ do uncheckedSkip from
-                           rem <- remaining
-                           getBytes rem
+-- | Decodes field by index
+decodeFieldByIndex :: [Int]
+                      -> Int
+                      -> ByteString
+                      -> Either DbError DbValue
+decodeFieldByIndex indices idx bs = decodeValue $ BS.take (indices !! idx) $ BS.drop startFrom bs
+    where
+      {-# INLINE startFrom #-}
+      startFrom = (length indices) + (sum $ take idx indices)
+{-# INLINE decodeFieldByIndex #-}
 
-decodeFieldByIndex :: Either DbError [Int] -> Int -> ByteString -> Either DbError DbValue
-decodeFieldByIndex eitherIndices idx bs = eitherIndices >>= read'
-  where read' indices = case read indices bs of
-          (Left a)  -> throwError $ DecodeFieldByIndexError a indices
-          (Right x) -> decodeValue x
-        read indices = runGet $ do uncheckedSkip (beginIdx + length indices)
-                                   getBytes $ indices !! idx
-                       where beginIdx = sum $ take idx indices
-
--- GetField typeclass???? For bytestings
-getFieldByName :: ByteString -> DbRecord -> Either DbError DbValue
-getFieldByName field (DbRecord _ values) = if isJust fieldVal
-                                           then return $ fromJust fieldVal
-                                           else throwError FieldNotFoundError
-  where fieldVal = Map.lookup field values
-
-decodeFieldByName :: ByteString -> DbSchema -> (ByteString, ByteString) -> Either DbError DbValue
-decodeFieldByName field schema (_, bs) = if isJust idx
-                                            then decodeFieldByIndex indices (fromJust idx) bs
-                                            else throwError FieldNotFoundError
-  where idx = elemIndex field (fields schema)
-        indices = decodeIndexes schema bs
-
-decodeFieldsByName :: [ByteString] -> DbSchema -> (ByteString, ByteString) -> Either DbError [DbValue]
-decodeFieldsByName flds schema (_, bs) = if isJust idxs
-                                         then mapM (\idx -> decodeFieldByIndex indices idx bs) (fromJust idxs)
-                                         else throwError FieldNotFoundError
-  where idxs = mapM (`elemIndex` (fields schema)) flds
-        indices = decodeIndexes schema bs
-
-
-decodeFieldsByName2 :: [ByteString] -> DbSchema -> (ByteString, ByteString) -> Either DbError (Integer, [DbValue])
-decodeFieldsByName2 flds schema (k, bs) = do
+-- | Decodes a all fields within the record by name
+decodeFieldsByName :: [ByteString]
+                       -> DbSchema
+                       -> (ByteString, ByteString)
+                       -> Either DbError (Integer, [DbValue])
+decodeFieldsByName flds schema (k, bs) = do
   (decodedK, _) <- decodeKey k
-  decodedVal <- decodeVal bs
+  decodedVal    <- decodeVal bs
   return $ (decodedK, decodedVal)
   where decodeVal bs = if isJust idxs
                        then mapM (\idx -> decodeFieldByIndex indices idx bs) (fromJust idxs)
                        else throwError FieldNotFoundError
-        idxs = mapM (`elemIndex` (fields schema)) flds
+        idxs    = mapM (`elemIndex` (fields schema)) flds
         indices = decodeIndexes schema bs
+
+-- | Decodes a single field within the record by name
+decodeFieldByName :: ByteString
+                     -> DbSchema
+                     -> (ByteString, ByteString)
+                     -> Either DbError (Integer, DbValue)
+decodeFieldByName field schema (k, bs) = do
+  (decodedK, _) <- decodeKey k
+  decodedVal    <- decodeVal bs
+  return $ (decodedK, decodedVal)
+  where decodeVal bs = if isJust idx
+                       then decodeFieldByIndex indices (fromJust idx) bs
+                       else throwError FieldNotFoundError
+        idx     = elemIndex field (fields schema)
+        indices = decodeIndexes schema bs
+
+
+packWord64 :: Integer -> ByteString
+packWord64 i =
+  let w = (fromIntegral i :: Word64)
+  in BS.pack $ [ (fromIntegral (w `shiftR` 56) :: Word8)
+               , (fromIntegral (w `shiftR` 48) :: Word8)
+               , (fromIntegral (w `shiftR` 40) :: Word8)
+               , (fromIntegral (w `shiftR` 32) :: Word8)
+               , (fromIntegral (w `shiftR` 24) :: Word8)
+               , (fromIntegral (w `shiftR` 16) :: Word8)
+               , (fromIntegral (w `shiftR`  8) :: Word8)
+               , (fromIntegral (w)             :: Word8)]
+{-# INLINE packWord64 #-}
+
+unpackWord64 :: ByteString -> Integer
+unpackWord64 s =
+    (fromIntegral (s `BS.index` 0) `shiftL` 56) .|.
+    (fromIntegral (s `BS.index` 1) `shiftL` 48) .|.
+    (fromIntegral (s `BS.index` 2) `shiftL` 40) .|.
+    (fromIntegral (s `BS.index` 3) `shiftL` 32) .|.
+    (fromIntegral (s `BS.index` 4) `shiftL` 24) .|.
+    (fromIntegral (s `BS.index` 5) `shiftL` 16) .|.
+    (fromIntegral (s `BS.index` 6) `shiftL`  8) .|.
+    (fromIntegral (s `BS.index` 7) )
+{-# INLINE unpackWord64 #-}
