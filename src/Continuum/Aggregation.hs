@@ -16,7 +16,7 @@ aggregateRangeByFields :: Integer
                           -> AppState (Either DbError acc)
 
 aggregateRangeByFields rangeBegin rangeEnd fields foldOp =
-  gaplessScan (Just begin) (decodeFieldsByName2 fields) (stopCondition checker foldOp)
+  gaplessScan (Just begin) (decodeFieldsByName fields) (stopCondition checker foldOp)
   where begin = encodeBeginTimestamp rangeBegin
         checker = matchTs (<=) rangeEnd
 
@@ -24,28 +24,25 @@ aggregateRangeByFields rangeBegin rangeEnd fields foldOp =
 aggregateRangeByField :: Integer
                          -> Integer
                          -> ByteString
-                         -> ((Integer, DbValue) -> i)
-                         -> L.Fold i acc
+                         -> L.Fold (Integer, DbValue) acc
                          -> AppState (Either DbError acc)
 
-aggregateRangeByField rangeBegin rangeEnd field mapFn (L.Fold reduceFn acc done) =
-  scan (Just begin) (withField field mapFn checker reduceFn) acc done
+aggregateRangeByField rangeBegin rangeEnd field foldOp =
+  gaplessScan (Just begin) (decodeFieldByName field) (stopCondition checker foldOp)
   where begin = encodeBeginTimestamp rangeBegin
         checker = matchTs (<=) rangeEnd
 
 
-aggregateAllByField :: (Show acc, Eq acc) =>
-                       ByteString
-                       -> ((Integer, DbValue) -> i)
-                       -> L.Fold i acc
+aggregateAllByField :: ByteString
+                       -> L.Fold (Integer, DbValue) acc
                        -> AppState (Either DbError acc)
 
-aggregateAllByField field mapFn (L.Fold reduceFn acc done) =
-  scan Nothing (withField field mapFn alwaysTrue reduceFn) acc done
+aggregateAllByField field =
+  gaplessScan Nothing (decodeFieldByName field)
 
 aggregateAllByRecord :: (DbRecord -> i)
-                        -> L.Fold i acc
+                        -> L.Fold DbRecord acc
                         -> AppState (Either DbError acc)
 
-aggregateAllByRecord mapFn (L.Fold reduceFn acc done) =
-  scan Nothing (withFullRecord mapFn alwaysTrue reduceFn) acc done
+aggregateAllByRecord mapFn =
+  gaplessScan Nothing decodeRecord
