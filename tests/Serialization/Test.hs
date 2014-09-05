@@ -22,24 +22,24 @@ main =  hspec $ do
 
   describe "Serialization" $ do
 
-    let full    = indexingEncodeRecord testSchema record 1
-        encoded = snd $ full
+    -- TODO: Rename indexing encode to type class serialize
+    let encoded = indexingEncodeRecord testSchema record 1
         record  = makeRecord 123 [ ("a", (DbInt 123))
                                  , ("b", (DbString "STRINGIE"))
                                  , ("c", (DbString "STRINGO"))]
-        indices = decodeIndexes testSchema encoded
+        indices = decodeIndexes testSchema (snd encoded)
     it "reads out indexes from serialized items" $
-      indices `shouldBe` (Right [6,17,16])
+      indices `shouldBe` [6,17,16]
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex indices x encoded
+      let decodeFn = \x -> decodeFieldByIndex indices x (snd encoded)
       decodeFn 0 `shouldBe` (Right $ DbInt    123)
       decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
 
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByName x testSchema full
-      decodeFn "a" `shouldBe` (Right $ DbInt    123)
-      decodeFn "b" `shouldBe` (Right $ DbString "STRINGIE")
-      decodeFn "c" `shouldBe` (Right $ DbString "STRINGO")
+      let decodeFn = \x -> decodeFieldByName x testSchema encoded
+      decodeFn "a" `shouldBe` (Right $ (123, DbInt    123))
+      decodeFn "b" `shouldBe` (Right $ (123, DbString "STRINGIE"))
+      decodeFn "c" `shouldBe` (Right $ (123, DbString "STRINGO"))
