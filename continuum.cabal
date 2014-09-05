@@ -7,6 +7,11 @@ maintainer:          alexp@coffeenco.de
 build-type:          Simple
 cabal-version:       >=1.10
 
+Flag Binaries
+  description:      Build examples
+  default:          False
+  manual:           True
+
 source-repository head
   type:     git
   location: https://github.com/ifesdjeen/continuum.git
@@ -32,7 +37,7 @@ library
 
                         , process                >= 1.1.0.2
                         , containers             >0.5
-                        , leveldb-haskell-fork   >= 0.3.3
+                        , leveldb-haskell-fork   >= 0.3.4
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
                         , cereal                 >= 0.4.0.1
@@ -55,6 +60,10 @@ executable continuum-dev
                         , bytestring             >= 0.10.4.0
                         , time                   >= 1.4.2
                         , containers             >0.5
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
 
 executable continuum-bench
   Default-Language:     Haskell2010
@@ -69,6 +78,10 @@ executable continuum-bench
                         , cereal                 >= 0.4.0.1
                         , bytestring             >= 0.10.4.0
   ghc-options:          -Wall -O2
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
 
 test-suite tests
   ghc-options:          -Wall
