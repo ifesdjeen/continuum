@@ -16,23 +16,22 @@ import Control.Monad.IO.Class
 
 import Continuum.Storage
 import Continuum.Serialization
-import Continuum.Actions
 import Continuum.Types
 import Continuum.Folds
 import Continuum.Aggregation
 
 
 data Entry = Entry { request_ip :: String
-                   , status :: String
-                   , host :: String
-                   , uri :: String
-                   , date :: Integer }
-             deriving (Show)
+                   , status     :: String
+                   , host       :: String
+                   , uri        :: String
+                   , date       :: Integer }
+           deriving (Show)
 
 prodSchema = makeSchema [ ("request_ip", DbtString)
-                        , ("host", DbtString)
-                        , ("uri", DbtString)
-                        , ("status", DbtString)]
+                        , ("host",       DbtString)
+                        , ("uri",        DbtString)
+                        , ("status",     DbtString)]
 
 instance FromJSON Entry where
     parseJSON (Object v) = Entry <$>
@@ -75,8 +74,9 @@ main2 = do
 
 main = runApp testDBPath prodSchema $ do
   before <- liftIO $ getPOSIXTime
-  -- a <- aggregateAllByField "status" snd groupFold
-  a <- aggregateAllByField "status" snd (groupFold (\x -> (x, x)) countFold)
+
+  a <- aggregateAllByField "status" (groupFold (\(_, x) -> (x, 0)) countFold)
+
   after <- liftIO $ getPOSIXTime
 
   liftIO $ putStrLn $ show a
