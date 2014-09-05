@@ -5,7 +5,7 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord, findByTimestamp, findRange, gaplessScan,
-        alwaysTrue, scan, withFullRecord, withField, withFields)
+        alwaysTrue)
        where
 
 --  import Debug.Trace
@@ -70,24 +70,14 @@ putRecord :: DbRecord -> AppState ()
 putRecord record@(DbRecord timestamp _) = do
   sid <- getAndincrementSequence
   schema' <- schema
-
-  -- Write empty timestamp to be used for iteration, overwrite if needed
-  -- storagePut ((encode (timestamp, 0 :: Integer)), tsPlaceholder)
-
-  -- Write an actual value to the database
-
   storagePut $ indexingEncodeRecord schema' record sid
-
-putRecord val@(DbPlaceholder _) = do
-  sid <- getAndincrementSequence
-  schema' <- schema
-  storagePut $ encodeRecord schema' val sid
 
 -- | Find a particular record by the timestamp
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
 findByTimestamp timestamp = gaplessScan (Just begin) decodeRecord (stopCondition checker appendFold)
                             where begin   = encodeBeginTimestamp timestamp
                                   checker = matchTs (==) timestamp
+
 
 -- | Find records in the range
 findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
@@ -119,73 +109,6 @@ runApp path schema' actions = do
 
 -- StateT DBContext (ResourceT IO) a
 -- type ScanOp a = ResourceT (Either String) a
-
--- | Full record aggregation Pipeline,
--- Receives a decoded @'DbRecord', passes it through @mapFn, puts into
--- @acc until @checker returns true.
-withFullRecord :: (DbRecord -> i)
-               -> (DbRecord -> acc -> Bool)
-               -> (acc -> i -> acc)
-               -> DbSchema
-               -> AggregationFn acc
-
-withFullRecord mapFn checker reduceFn schema' acc (k, v) = do
-  a <- decodeRecord schema' (k, v)
-  let mapped = mapFn a
-  if checker a acc
-    then return $ reduceFn acc mapped
-    else return $ acc
-
--- | Field aggregation pipeline
--- Receives a decoded field specified by name, passes it through @mapFn, puts into
--- @acc until @checker returns true
-withField :: ByteString
-          -> ((Integer, DbValue) -> i)
-          -> ((Integer, DbValue) -> acc -> Bool)
-          -> (acc -> i -> acc)
-          -> DbSchema
-          -> AggregationFn acc
-
-withField field mapFn checker reduceFn schema' acc kv = do
-  val    <- decodeFieldByName field schema' kv
-  (k, _) <- decodeKey (fst kv)
-  let mapped = mapFn (k, val)
-  if checker (k, val) acc
-    then return $ reduceFn acc mapped
-    else return $ acc
-
-withFields :: [ByteString]
-           -> ((Integer, [DbValue]) -> i)
-           -> ((Integer, [DbValue]) -> acc -> Bool)
-           -> (acc -> i -> acc)
-           -> DbSchema
-           -> AggregationFn acc
-
-withFields field mapFn checker reduceFn schema' acc kv = do
-  val <- decodeFieldsByName field schema' kv
-  (k, _) <- decodeKey (fst kv)
-  let mapped = mapFn (k, val)
-  if checker (k, val) acc
-    then return $ reduceFn acc mapped
-    else return $ acc
-
-scan ::  Maybe ByteString
-         -> (DbSchema -> (acc -> (ByteString, ByteString) -> (Either DbError acc)))
-         -> acc
-         -> (acc -> done)
-         -> AppState (Either DbError done)
-
-scan begin op acc done = do
-  db' <- db
-  ro' <- ro
-  schema' <- schema
-  records <- withIterator db' ro' $ \iter -> do
-               if (isJust begin)
-                 then iterSeek iter (fromJust begin)
-                 else iterFirst iter
-               scanIntern iter (op schema') acc
-  return $ (records >>= (\x -> return $ done x))
-
 
 gaplessScan ::  Maybe ByteString
          -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
