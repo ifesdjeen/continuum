@@ -1,15 +1,19 @@
 LIBHSLEVELDB = dist/build/*.a
-LIBLEVELDB   = /usr/local/lib/libleveldb*
+LIBHYPERLEVELDB = /usr/local/lib/libhyperleveldb*
 
 export LD_LIBRARY_PATH="/usr/local/lib"
 
-travis : $(LIBLEVELDB)
+travis : $(LIBHYPERLEVELDB)
 
-$(LIBLEVELDB) :
+$(LIBHYPERLEVELDB) :
 		(cd /tmp;                                               \
-			git clone https://code.google.com/p/leveldb/;         \
-			cd leveldb;                                           \
-			make;                                                 \
-			sudo cp -P ./libleveldb.* /usr/local/lib;             \
-			sudo cp -r include/leveldb /usr/local/include/;       \
+			git@github.com:rescrv/HyperLevelDB.git;               \
+			cd HyperLevelDB;                                      \
+		  autoreconf -i;                                        \
+		  ./configure;                                          \
+		  make;                                                 \
+		  make install;                                         \
+		  ldconfig;                                             \
+			sudo cp -P ./libhyperleveldb.* /usr/local/lib;        \
+			sudo cp -r include/hyperleveldb /usr/local/include/;  \
 			ls -lah /usr/local/lib/ )
