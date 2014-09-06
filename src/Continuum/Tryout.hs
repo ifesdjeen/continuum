@@ -3,7 +3,6 @@
 
 module Continuum.Tryout where
 
-import           System.Process          (system)
 import           Control.Monad.State
 
 import           Continuum.Storage
@@ -17,16 +16,11 @@ import qualified Data.Map as Map
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
 
-cleanup :: IO ()
-cleanup = system ("rm -fr " ++ testDBPath) >> return ()
-
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
 
 main :: IO ()
 main = runApp testDBPath testSchema $ do
-
-  liftIO $ cleanup
 
   putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "a"))]
   putRecord $ makeRecord 128 [("a", (DbInt 2)), ("b", (DbString "a"))]
@@ -45,5 +39,3 @@ main = runApp testDBPath testSchema $ do
   -- a <- scanAll2 id (:) []
 
   -- liftIO $ print (show a)
-
-  liftIO $ cleanup
