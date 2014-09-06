@@ -29,10 +29,10 @@ main =  hspec $ do
                                  , ("c", (DbString "STRINGO"))]
         indices = decodeIndexes testSchema (snd encoded)
     it "reads out indexes from serialized items" $
-      indices `shouldBe` [6,17,16]
+      indices `shouldBe` [8,8,7]
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex indices x (snd encoded)
+      let decodeFn = \x -> decodeFieldByIndex testSchema indices x (snd encoded)
       decodeFn 0 `shouldBe` (Right $ DbInt    123)
       decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")

@@ -26,6 +26,7 @@ data DbError = IndexesDecodeError String
 type AggregationFn acc = (acc -> (ByteString, ByteString) -> (Either DbError acc))
 
 data DbType = DbtInt | DbtString
+                       deriving(Show)
 
 -- type AggregationPipeline acc = ((ByteString, ByteString) -> acc -> (Either String acc))
 
@@ -46,14 +47,18 @@ data DBContext = DBContext { ctxDb          :: DB
 data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
                            , fields         :: [ByteString]
                            , indexMappings  :: Map.Map Int ByteString
-                           , schemaMappings :: Map.Map ByteString DbType }
+                           , schemaMappings :: Map.Map ByteString DbType
+                           , schemaTypes    :: [DbType]
+                           }
 
 makeSchema :: [(ByteString, DbType)] -> DbSchema
 makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
                                      , fields = fields'
                                      , schemaMappings = Map.fromList stringTypeList
-                                     , indexMappings = iMappings }
+                                     , indexMappings = iMappings
+                                     , schemaTypes = schemaTypes'}
   where fields' = fmap fst stringTypeList
+        schemaTypes' = fmap snd stringTypeList
         fMappings = Map.fromList $ zip fields' iterateFrom0
         iMappings = Map.fromList $ zip iterateFrom0 fields'
         iterateFrom0 = (iterate (1+) 0)
