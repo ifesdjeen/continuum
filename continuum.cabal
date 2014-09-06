@@ -20,7 +20,7 @@ library
   Default-Language:     Haskell2010
   ghc-options:          -Wall
   hs-source-dirs:       src
-  extra-libraries:      leveldb
+  extra-libraries:      hyperleveldb
   extensions:           CPP, MagicHash
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
@@ -34,10 +34,9 @@ library
                         , aeson                  >= 0.8.0.0
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
-
-                        , process                >= 1.1.0.2
+                                                , process                >= 1.1.0.2
                         , containers             >0.5
-                        , leveldb-haskell-fork   >= 0.3.4
+                        , leveldb-haskell-fork   >= 0.3.4.1
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
                         , cereal                 >= 0.4.0.1
