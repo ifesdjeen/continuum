@@ -7,8 +7,8 @@ travis : $(LIBHYPERLEVELDB)
 
 $(LIBHYPERLEVELDB) :
 		(cd /tmp;                                               \
-     git clone git@github.com:rescrv/HyperLevelDB.git;      \
-     cd HyperLevelDB;                                       \
+     git clone --depth=50 --branch=master git://github.com/rescrv/HyperLevelDB.git hyperleveldb; \
+     cd hyperleveldb;                                       \
 		 autoreconf -i;                                         \
 		 ./configure;                                           \
 		 make;                                                  \
