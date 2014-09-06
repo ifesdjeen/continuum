@@ -30,15 +30,16 @@ main = runApp testDBPath testSchema $ do
 
   putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "a"))]
   putRecord $ makeRecord 128 [("a", (DbInt 2)), ("b", (DbString "a"))]
-  putRecord $ makeRecord 129 [("a", (DbInt 3)), ("b", (DbString "b"))]
-  putRecord $ makeRecord 130 [("a", (DbInt 4)), ("b", (DbString "d"))]
+  -- putRecord $ makeRecord 129 [("a", (DbInt 3)), ("b", (DbString "b"))]
+  -- putRecord $ makeRecord 130 [("a", (DbInt 4)), ("b", (DbString "d"))]
 
   -- a <- scan (Just $ encodeBeginTimestamp 126) (withFullRecord id alwaysTrue append) []
 
   -- a <- aggregateAllByField "b" snd (groupReduce id id (\_ acc -> acc + 1) 1) Map.empty
   -- a <- aggregateAllByField "a" snd (\i acc -> acc + (unpackInt i)) 0
 
-  a <- aggregateAllByField "b" appendFold
+  -- a <- aggregateAllByField "b" appendFold
+  a <- findByTimestamp 123
   liftIO $ putStrLn $ show a
 
   -- a <- scanAll2 id (:) []

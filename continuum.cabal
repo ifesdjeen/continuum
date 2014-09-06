@@ -12,16 +12,24 @@ Flag Binaries
   default:          False
   manual:           True
 
+Flag Profiling
+  description:      Profiling mode
+  default:          False
+  manual:           True
+
 source-repository head
   type:     git
   location: https://github.com/ifesdjeen/continuum.git
 
 library
   Default-Language:     Haskell2010
-  ghc-options:          -Wall
+  if flag(Profiling)
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
+  else
+    ghc-options:          -Wall -O2 -Wall
   hs-source-dirs:       src
   extra-libraries:      hyperleveldb
-  extensions:           CPP, MagicHash
+  other-extensions:     CPP, MagicHash
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
                        , Continuum.Aggregation
@@ -31,10 +39,9 @@ library
                        , Continuum.Folds
 
   build-depends:          base                   >= 4 && < 5
-                        , aeson                  >= 0.8.0.0
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
-                                                , process                >= 1.1.0.2
+                        , process                >= 1.1.0.2
                         , containers             >0.5
                         , leveldb-haskell-fork   >= 0.3.4.1
                         , resourcet              >= 1.1.2.2
@@ -48,8 +55,17 @@ library
 executable continuum-dev
   Default-Language:     Haskell2010
   hs-source-dirs:       exec
-  -- ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2
-  ghc-options:          -Wall -O2
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
+
+  if flag(Profiling)
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
+  else
+    ghc-options:          -Wall
+
+  -- ghc-options:          -Wall -O2
   main-is:              JsonLoader.hs
   build-depends:        continuum
                         , base                   >= 4 && < 5
@@ -59,10 +75,6 @@ executable continuum-dev
                         , bytestring             >= 0.10.4.0
                         , time                   >= 1.4.2
                         , containers             >0.5
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
 
 executable continuum-bench
   Default-Language:     Haskell2010
