@@ -190,7 +190,7 @@ decodeFieldByName field schema (k, bs) = do
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
                    else throwError FieldNotFoundError
-  return (decodedK, decodedVal)
+  return $! (decodedK, decodedVal)
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 {-# INLINE decodeFieldByName #-}

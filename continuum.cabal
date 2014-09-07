@@ -61,7 +61,7 @@ executable continuum-dev
   if flag(Profiling)
     ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
   else
-    ghc-options:          -Wall
+    ghc-options:          -Wall -rtsopts -O2
 
   -- ghc-options:          -Wall -O2
   main-is:              JsonLoader.hs

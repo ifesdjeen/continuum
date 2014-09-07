@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main (main) where
@@ -56,7 +57,7 @@ main2 = do
   liftIO $ cleanup
 
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
-  line <- return $ take 100000 $ lines content
+  line <- return $ lines content
   decoded <- return $ (map decodeStr line)
 
   -- putStrLn $ show decoded
@@ -75,7 +76,7 @@ main2 = do
 
 main = runApp testDBPath prodSchema $ do
   before <- liftIO $ getPOSIXTime
-  a <- aggregateAllByField "status" (groupFold (\(_, x) -> (x, 0)) countFold)
+  a <- aggregateAllByField "status" (groupFold (\ !(_, x) -> (x, 0)) countFold)
   after <- liftIO $ getPOSIXTime
   liftIO $ putStrLn $ show a
   liftIO $ putStrLn $ show (after - before)

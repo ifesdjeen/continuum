@@ -1,4 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Continuum.Folds (countFold
                        , appendFold
@@ -6,13 +7,13 @@ module Continuum.Folds (countFold
                        , groupFold)
        where
 
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Control.Foldl as L
 
 -- | Count Fold
 countFold :: L.Fold a Int
 countFold = L.Fold step 0 id
-  where step acc i = acc + 1
+  where step !acc !i = acc + 1
 
 -- | Append Fold
 appendFold :: L.Fold a [a]
@@ -25,14 +26,15 @@ groupFold :: (Ord k) =>
               -> L.Fold v res
               -> L.Fold a (Map.Map k res)
 groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty rewrap
-  where step acc val =
+  where step !acc !val =
           let (k,v) = conv val in
           Map.alter (updateFn v) k acc
 
         rewrap x = Map.map doneIntern x
 
+        -- TODO: this is
         updateFn v i = case i of
-          (Just x) -> Just $ stepIntern x v
+          (Just x)  -> Just $ stepIntern x v
           (Nothing) -> Just accIntern
 
 -- | Stop Condition Fold

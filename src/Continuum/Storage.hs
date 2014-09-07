@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
@@ -8,7 +9,7 @@ module Continuum.Storage
         alwaysTrue)
        where
 
---  import Debug.Trace
+import Control.Applicative
 import           Continuum.Types
 import           Continuum.Folds
 import           Continuum.Options
@@ -119,25 +120,27 @@ gaplessScan begin mapop (L.Fold foldop acc done) = do
                if (isJust begin)
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
-               scanIntern iter (\acc x -> (mapop schema' x) >>= (\y -> return $ foldop acc y)) acc
-  return $ (records >>= (\x -> return $ done x))
+               -- let step acc x = (mapop schema' x) >>= (\y -> return $ foldop acc' y)
+               --- acc is either
+               --- result of mapop is either
+               let step !acc !x = (mapop schema' x) >>= \i -> fmap (\x -> foldop x i) acc
+               scanIntern iter step (Right acc)
+  return $! fmap done records -- (records >>= (\x -> return $ done x))
 
 scanIntern :: (MonadResource m) =>
                Iterator
-               -> (acc -> (ByteString, ByteString) -> (Either DbError acc))
+               -> (acc -> (ByteString, ByteString) -> acc)
                -> acc
-               -> m (Either DbError acc)
+               -> m acc
 
-scanIntern iter op acc = do
+scanIntern iter op acc = s acc
+  where s !acc = do
           next <- iterEntry iter
+          iterNext iter
 
           if isJust next
-             then case op acc (fromJust next) of
-                (Right res) -> do
-                  iterNext iter
-                  scanIntern iter op res
-                val@(Left _) -> return val
-             else return $ Right acc
+            then s (op acc (fromJust next))
+            else return acc
 {-# INLINE scanIntern #-}
 
 -- TODO: add batch put operstiaon
