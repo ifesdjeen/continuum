@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -14,7 +13,6 @@ import qualified Data.Map as Map
 
 import           Continuum.Types
 import           Data.List (elemIndex)
-import           GHC.Generics(Generic)
 
 import           Data.Serialize as S
 import           Data.ByteString (ByteString)
@@ -26,27 +24,6 @@ import           Control.Monad.Except(forM_, throwError)
 -- import Debug.Trace
 
 data Success = Success
-
--- data DbTimestamp = Integer
---                  deriving (Show, Eq, Ord, Generic)
-
--- type DbTimestamp = Integer
--- type DbSequenceId = Maybe Integer
--- newtype DbSequenceId = DbSequenceId (Maybe Integer)
---                      deriving (Show, Eq, Ord, Generic)
-
--- data DbSequenceId = DbSequenceId (Maybe Integer)
---                   deriving (Show, Eq, Ord, Generic)
-
-data DbValue = DbInt Integer
-             | DbFloat Float
-             | DbDouble Double
-             | DbString ByteString
-             | DbTimestamp Integer
-             | DbSequenceId Integer
-             -- | DbList [DbValue]
-             -- | DbMap [(DbValue, DbValue)]
-             deriving (Show, Eq, Ord, Generic)
 
 unpackString :: DbValue -> ByteString
 unpackString (DbString i) = i
@@ -64,18 +41,8 @@ unpackDouble :: DbValue -> Double
 unpackDouble (DbDouble i) = i
 unpackDouble _ = error "Can't unpack Double"
 
-tsPlaceholder :: ByteString
-tsPlaceholder = encode (DbString "____placeholder" :: DbValue)
-
-instance Serialize DbValue
-instance Serialize DbError
-
-
 -- TODO: change String to ByteString
 -- overloadedstrings
-data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
-                DbPlaceholder Integer
-                deriving(Show, Eq)
 
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
 makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
@@ -93,14 +60,14 @@ fastDecodeValue DbtString bs = return $ DbString bs
 
 -- | Decode a single key (mostly a wrapper over @decode, giving a more concrete
 -- Error type)
-decodeKey :: ByteString -> Either DbError (Integer, Integer)
-decodeKey x = return $ (unpackWord64 (BS.take 8 x), unpackWord64 (BS.drop 8 x))
+decodeKey :: ByteString -> Either DbError Integer
+decodeKey x = return $ unpackWord64 (BS.take 8 x)
 
 {-# INLINE decodeKey #-}
 -- left KeyDecodeError $ decode x
 decodeRecord :: DbSchema ->  (ByteString, ByteString) -> Either DbError DbRecord
 decodeRecord schema (k, v) = do
-  (timestamp, _) <- decodeKey k
+  timestamp      <- decodeKey k
   decodedValue   <- decodeValues schema v
   return $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedValue)
 
@@ -171,7 +138,7 @@ decodeIndexes schema bs = map fromIntegral (BS.unpack (BS.take (length (fields s
 {-# INLINE decodeIndexes #-}
 
 slide :: [Int] -> [(Int, Int)]
-slide (f:s:xs) = (f,s) : (slide (s:xs))
+slide (f:s:xs) = (f,s) : slide (s:xs)
 slide _ = []
 
 decodeValues :: DbSchema -> ByteString -> Either DbError [DbValue]
@@ -203,14 +170,12 @@ decodeFieldsByName :: [ByteString]
                        -> (ByteString, ByteString)
                        -> Either DbError (Integer, [DbValue])
 decodeFieldsByName flds schema (k, bs) = do
-  (decodedK, _) <- decodeKey k
-  decodedVal    <- decodeVal bs
-  return (decodedK, decodedVal)
-  where
-    {-# INLINE decodeVal #-}
-    decodeVal bs = if isJust idxs
+  decodedK      <- decodeKey k
+  decodedVal    <- if isJust idxs
                    then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
                    else throwError FieldNotFoundError
+  return (decodedK, decodedVal)
+  where
     {-# INLINE idxs #-}
     idxs         = mapM (`elemIndex` (fields schema)) flds
 {-# INLINE decodeFieldsByName #-}
@@ -221,27 +186,26 @@ decodeFieldByName :: ByteString
                      -> (ByteString, ByteString)
                      -> Either DbError (Integer, DbValue)
 decodeFieldByName field schema (k, bs) = do
-  (decodedK, _) <- decodeKey k
-  decodedVal    <- decodeVal bs
+  decodedK      <- decodeKey k
+  decodedVal    <- if isJust idx
+                   then decodeFieldByIndex schema indices (fromJust idx) bs
+                   else throwError FieldNotFoundError
   return (decodedK, decodedVal)
-  where decodeVal bs = if isJust idx
-                       then decodeFieldByIndex schema indices (fromJust idx) bs
-                       else throwError FieldNotFoundError
-        idx     = elemIndex field (fields schema)
+  where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 {-# INLINE decodeFieldByName #-}
 
 packWord64 :: Integer -> ByteString
 packWord64 i =
   let w = (fromIntegral i :: Word64)
-  in BS.pack $ [ (fromIntegral (w `shiftR` 56) :: Word8)
-               , (fromIntegral (w `shiftR` 48) :: Word8)
-               , (fromIntegral (w `shiftR` 40) :: Word8)
-               , (fromIntegral (w `shiftR` 32) :: Word8)
-               , (fromIntegral (w `shiftR` 24) :: Word8)
-               , (fromIntegral (w `shiftR` 16) :: Word8)
-               , (fromIntegral (w `shiftR`  8) :: Word8)
-               , (fromIntegral (w)             :: Word8)]
+  in BS.pack [ (fromIntegral (w `shiftR` 56) :: Word8)
+             , (fromIntegral (w `shiftR` 48) :: Word8)
+             , (fromIntegral (w `shiftR` 40) :: Word8)
+             , (fromIntegral (w `shiftR` 32) :: Word8)
+             , (fromIntegral (w `shiftR` 24) :: Word8)
+             , (fromIntegral (w `shiftR` 16) :: Word8)
+             , (fromIntegral (w `shiftR`  8) :: Word8)
+             , (fromIntegral (w)             :: Word8)]
 {-# INLINE packWord64 #-}
 
 unpackWord64 :: ByteString -> Integer

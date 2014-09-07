@@ -13,7 +13,6 @@ import           Continuum.Types
 import           Continuum.Folds
 import           Continuum.Options
 import           Continuum.Serialization
-import           Data.Serialize (encode)
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
@@ -45,9 +44,6 @@ getAndincrementSequence = do
   modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
   return $ sequenceNumber old
 
--- getSequence :: MonadState DBContext m => m Integer
--- getSequence = gets sequenceNumber
-
 schema :: MonadState DBContext m => m DbSchema
 schema = gets ctxSchema
 
@@ -67,7 +63,7 @@ storagePut (key, value) = do
   Base.put db' wo' key value
 
 putRecord :: DbRecord -> AppState ()
-putRecord record@(DbRecord timestamp _) = do
+putRecord record = do
   sid <- getAndincrementSequence
   schema' <- schema
   storagePut $ encodeRecord schema' record sid
@@ -137,11 +133,12 @@ scanIntern iter op acc = do
 
           if isJust next
              then case op acc (fromJust next) of
-                val@(Right res) -> do
+                (Right res) -> do
                   iterNext iter
                   scanIntern iter op res
                 val@(Left _) -> return val
              else return $ Right acc
+{-# INLINE scanIntern #-}
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation

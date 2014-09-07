@@ -8,14 +8,14 @@ import           Control.Monad.State
 import           Continuum.Storage
 import           Continuum.Serialization
 import           Continuum.Types
-import           Continuum.Aggregation
-import           Continuum.Folds
-
-import qualified Data.Map as Map
+-- import           Continuum.Aggregation
+-- import           Continuum.Folds
+-- import qualified Data.Map as Map
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
 
+testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
 

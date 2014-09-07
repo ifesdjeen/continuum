@@ -73,7 +73,7 @@ executable continuum-dev
                         , bytestring             >= 0.10.4.0
                         , time                   >= 1.4.2
                         , containers             >0.5
-
+                        , foldl                  >= 1.0.5
 executable continuum-bench
   Default-Language:     Haskell2010
   hs-source-dirs:       exec

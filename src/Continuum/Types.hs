@@ -62,3 +62,19 @@ makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
         fMappings = Map.fromList $ zip fields' iterateFrom0
         iMappings = Map.fromList $ zip iterateFrom0 fields'
         iterateFrom0 = (iterate (1+) 0)
+
+
+
+data DbValue = DbInt Integer
+             | DbFloat Float
+             | DbDouble Double
+             | DbString ByteString
+             | DbTimestamp Integer
+             | DbSequenceId Integer
+             -- | DbList [DbValue]
+             -- | DbMap [(DbValue, DbValue)]
+             deriving (Show, Eq, Ord, Generic)
+
+data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
+                DbPlaceholder Integer
+                deriving(Show, Eq)

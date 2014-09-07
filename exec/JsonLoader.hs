@@ -19,6 +19,7 @@ import Continuum.Serialization
 import Continuum.Types
 import Continuum.Folds
 import Continuum.Aggregation
+import qualified Control.Foldl as L
 
 
 data Entry = Entry { request_ip :: String
@@ -74,11 +75,8 @@ main2 = do
 
 main = runApp testDBPath prodSchema $ do
   before <- liftIO $ getPOSIXTime
-
   a <- aggregateAllByField "status" (groupFold (\(_, x) -> (x, 0)) countFold)
-
   after <- liftIO $ getPOSIXTime
-
   liftIO $ putStrLn $ show a
   liftIO $ putStrLn $ show (after - before)
 
