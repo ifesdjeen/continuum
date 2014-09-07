@@ -19,7 +19,7 @@ main :: IO ()
 main = defaultMain [
   -- bench "with pure value"   $ whnf (decode :: ByteString -> Either String ByteString) encoded
   bench "with pure value"   $ whnf (decode :: ByteString -> Either String DbValue)    encodedDbValue
-  , bench "with db record " $ whnf (decodeFieldByName "b" testSchema)               (indexingEncodeRecord testSchema testDbRecord 1)
+  , bench "with db record " $ whnf (decodeFieldByName "b" testSchema)               (encodeRecord testSchema testDbRecord 1)
 
 
   ]

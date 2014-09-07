@@ -70,7 +70,7 @@ putRecord :: DbRecord -> AppState ()
 putRecord record@(DbRecord timestamp _) = do
   sid <- getAndincrementSequence
   schema' <- schema
-  storagePut $ indexingEncodeRecord schema' record sid
+  storagePut $ encodeRecord schema' record sid
 
 -- | Find a particular record by the timestamp
 findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])

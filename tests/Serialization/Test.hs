@@ -23,7 +23,7 @@ main =  hspec $ do
   describe "Serialization" $ do
 
     -- TODO: Rename indexing encode to type class serialize
-    let encoded = indexingEncodeRecord testSchema record 1
+    let encoded = encodeRecord testSchema record 1
         record  = makeRecord 123 [ ("a", (DbInt 123))
                                  , ("b", (DbString "STRINGIE"))
                                  , ("c", (DbString "STRINGO"))]

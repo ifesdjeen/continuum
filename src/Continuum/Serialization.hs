@@ -9,13 +9,10 @@ module Continuum.Serialization where
 
 
 import           Control.Applicative ((<$>))
-import           GHC.Word (Word64)
 import Foreign
-import           Data.Bits
 import qualified Data.Map as Map
 
 import           Continuum.Types
-import           Control.Arrow
 import           Data.List (elemIndex)
 import           GHC.Generics(Generic)
 
@@ -24,9 +21,9 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 
 import           Data.Maybe (isJust, fromJust, catMaybes)
-import           Control.Monad.Except(forM_, forM, throwError)
+import           Control.Monad.Except(forM_, throwError)
 
-import Debug.Trace
+-- import Debug.Trace
 
 data Success = Success
 
@@ -80,30 +77,11 @@ data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
                 DbPlaceholder Integer
                 deriving(Show, Eq)
 
--- (Ord key, Eq val) =>
-data Group key val = Group [(key, [val])]
-                   | GroupAggregate [(key, val)]
-                   deriving (Show, Eq, Ord)
-
-
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
 makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 validate :: DbSchema -> DbRecord -> Either String Success
 validate = error "Not Implemented"
-
-removePlaceholder :: DbRecord -> Bool
-removePlaceholder (DbRecord _ _) = True
-removePlaceholder (DbPlaceholder _) = False
-
--- | Decode a single value (mostly a wrapper over @decode, giving a more concrete
--- Error type)
-decodeValue :: ByteString -> Either DbError DbValue
-decodeValue x = left ValueDecodeError $ decode x
-{-# INLINE decodeValue #-}
-
-encodeValue :: DbValue -> ByteString
-encodeValue = encode
 
 fastEncodeValue :: DbValue -> ByteString
 fastEncodeValue (DbInt    value) = packWord64 value
@@ -111,7 +89,7 @@ fastEncodeValue (DbString value) = value
 
 fastDecodeValue :: DbType -> ByteString -> Either DbError DbValue
 fastDecodeValue DbtInt bs    = return $ DbInt $ unpackWord64 bs
-fastDecodeValue DbtString bs = return $ DbString $ bs
+fastDecodeValue DbtString bs = return $ DbString bs
 
 -- | Decode a single key (mostly a wrapper over @decode, giving a more concrete
 -- Error type)
@@ -162,21 +140,6 @@ matchTs :: (EndCriteria i) =>
 
 matchTs op rangeEnd item _ = matchEnd op rangeEnd item
 
-instance (Ord a) => Functor (Group a) where
-  fmap f (Group vals) = Group $ fmap mapEntries vals
-    where mapEntries (k, v) = (k, fmap f v)
-
-foldGroup :: (b -> c -> c) -> c -> Group a b -> Group a c
-foldGroup f acc (Group vals) = GroupAggregate $ fmap foldEntries vals
-                             where foldEntries (k, v) = (k, Prelude.foldr f acc v)
-
-foldGroup1 :: (val -> val -> val) -> Group key val -> Group key val
-foldGroup1 f (Group vals) = GroupAggregate $ fmap foldEntries vals
-                            where foldEntries (k, v) = (k, Prelude.foldr1 f v)
-
-foldTuple :: (b -> c -> c) -> c -> (a, [b]) -> (a, c)
-foldTuple f acc (k, coll) = (k, Prelude.foldr f acc coll)
-
 byField :: ByteString -> DbRecord -> DbValue
 byField f (DbRecord _ m) = fromJust $ Map.lookup f m
 byField _ _ = DbInt 1 -- WTF
@@ -190,8 +153,8 @@ byTime interval (DbRecord t _) = interval * (t `quot` interval)
 
 -- Add multi-groups for grouping via multiple fields / preds
 
-indexingEncodeRecord :: DbSchema -> DbRecord -> Integer -> (ByteString, ByteString)
-indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
+encodeRecord :: DbSchema -> DbRecord -> Integer -> (ByteString, ByteString)
+encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
   where encodeKey = BS.concat [(packWord64 timestamp), (packWord64 sid)]
         -- encode (timestamp, sid)
         -- encodedVals = fmap encode $ catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
@@ -204,7 +167,7 @@ indexingEncodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeVa
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
 decodeIndexes :: DbSchema -> ByteString -> [Int]
-decodeIndexes schema bs = map fromIntegral (BS.unpack (BS.take (length $ (fields schema)) bs))
+decodeIndexes schema bs = map fromIntegral (BS.unpack (BS.take (length (fields schema)) bs))
 {-# INLINE decodeIndexes #-}
 
 slide :: [Int] -> [(Int, Int)]
@@ -214,9 +177,9 @@ slide _ = []
 decodeValues :: DbSchema -> ByteString -> Either DbError [DbValue]
 decodeValues schema bs = mapM (\(t, s) -> fastDecodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
-    indices                 = decodeIndexes schema bs
-    bytestrings             = snd (foldl step ((BS.drop (length indices) bs), []) indices)
-    step (remaining, acc) n = (BS.drop n remaining, acc ++ [(BS.take n remaining)])
+    indices                  = decodeIndexes schema bs
+    bytestrings              = snd (foldl step (BS.drop (length indices) bs, []) indices)
+    step (remaining', acc) n = (BS.drop n remaining', acc ++ [BS.take n remaining'])
                             -- where decodeAll = runGet $ do idx <- forM (fields schema) (\_ -> getWord8)
                             --                               forM idx (\c -> getBytes (fromIntegral c))
 
@@ -242,12 +205,15 @@ decodeFieldsByName :: [ByteString]
 decodeFieldsByName flds schema (k, bs) = do
   (decodedK, _) <- decodeKey k
   decodedVal    <- decodeVal bs
-  return $ (decodedK, decodedVal)
-  where decodeVal bs = if isJust idxs
-                       then mapM (\idx -> decodeFieldByIndex schema indices idx bs) (fromJust idxs)
-                       else throwError FieldNotFoundError
-        idxs    = mapM (`elemIndex` (fields schema)) flds
-        indices = decodeIndexes schema bs
+  return (decodedK, decodedVal)
+  where
+    {-# INLINE decodeVal #-}
+    decodeVal bs = if isJust idxs
+                   then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
+                   else throwError FieldNotFoundError
+    {-# INLINE idxs #-}
+    idxs         = mapM (`elemIndex` (fields schema)) flds
+{-# INLINE decodeFieldsByName #-}
 
 -- | Decodes a single field within the record by name
 decodeFieldByName :: ByteString
@@ -257,7 +223,7 @@ decodeFieldByName :: ByteString
 decodeFieldByName field schema (k, bs) = do
   (decodedK, _) <- decodeKey k
   decodedVal    <- decodeVal bs
-  return $ (decodedK, decodedVal)
+  return (decodedK, decodedVal)
   where decodeVal bs = if isJust idx
                        then decodeFieldByIndex schema indices (fromJust idx) bs
                        else throwError FieldNotFoundError
