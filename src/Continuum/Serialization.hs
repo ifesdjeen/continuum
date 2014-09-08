@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -21,7 +22,7 @@ import qualified Data.ByteString as BS
 import           Data.Maybe (isJust, fromJust, catMaybes)
 import           Control.Monad.Except(forM_, throwError)
 
--- import Debug.Trace
+import Debug.Trace
 
 data Success = Success
 
@@ -185,7 +186,7 @@ decodeFieldByName :: ByteString
                      -> DbSchema
                      -> (ByteString, ByteString)
                      -> Either DbError (Integer, DbValue)
-decodeFieldByName field schema (k, bs) = do
+decodeFieldByName field !schema !(k, bs) = do
   decodedK      <- decodeKey k
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
@@ -193,7 +194,7 @@ decodeFieldByName field schema (k, bs) = do
   return $! (decodedK, decodedVal)
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
-{-# INLINE decodeFieldByName #-}
+
 
 packWord64 :: Integer -> ByteString
 packWord64 i =

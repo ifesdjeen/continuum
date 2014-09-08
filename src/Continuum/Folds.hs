@@ -14,7 +14,7 @@ import qualified Control.Foldl as L
 -- | Count Fold
 countFold :: L.Fold a Int
 countFold = L.Fold step 0 id
-  where step !acc !i = let res = acc + 1 in (trace (show res) res)
+  where step !acc !i = acc + 1
 
 -- | Append Fold
 appendFold :: L.Fold a [a]

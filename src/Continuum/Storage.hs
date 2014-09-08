@@ -108,6 +108,12 @@ runApp path schema' actions = do
 -- StateT DBContext (ResourceT IO) a
 -- type ScanOp a = ResourceT (Either String) a
 
+forceM :: Monad m => m a -> m a
+forceM m = do v <- m; return $! v
+
+strictFmap :: Monad m => (a -> b) -> m a -> m b
+strictFmap f m = liftM f (forceM m)
+
 gaplessScan ::  Maybe ByteString
          -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
          -> L.Fold i acc
@@ -124,7 +130,7 @@ gaplessScan begin mapop (L.Fold foldop acc done) = do
                -- let step acc x = (mapop schema' x) >>= (\y -> return $ foldop acc' y)
                --- acc is either
                --- result of mapop is either
-               let step !acc !x = (mapop schema' x) >>= \i -> fmap (\acc' -> foldop acc' i) acc
+               let step !acc !x = (mapop schema' x) >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
                scanIntern iter step (Right acc)
   return $! fmap done records -- (records >>= (\x -> return $ done x))
 
@@ -150,14 +156,18 @@ scanIntern :: (MonadResource m) =>
                -> acc
                -> m acc
 
-scanIntern iter op orig = execStateT s orig
-  where s = do
+scanIntern iter op orig = s orig
+  where s !acc = do
           next <- iterEntry iter
           iterNext iter
 
           if isJust next
-            then modify (\ !a -> op a (fromJust next)) >> s
-            else return ()
+            then s (op acc (fromJust next))
+            -- a <- s
+            -- return $ (op a (fromJust next))
+
+            else return acc
+
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
