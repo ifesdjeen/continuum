@@ -2,7 +2,7 @@
 
 module Continuum.Types where
 
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
 import           GHC.Generics           (Generic)
 import           Control.Monad.Trans.Resource

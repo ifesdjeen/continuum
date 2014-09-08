@@ -7,13 +7,14 @@ module Continuum.Folds (countFold
                        , groupFold)
        where
 
+import Debug.Trace
 import qualified Data.Map.Strict as Map
 import qualified Control.Foldl as L
 
 -- | Count Fold
 countFold :: L.Fold a Int
 countFold = L.Fold step 0 id
-  where step !acc !i = acc + 1
+  where step !acc !i = let res = acc + 1 in (trace (show res) res)
 
 -- | Append Fold
 appendFold :: L.Fold a [a]

@@ -9,6 +9,7 @@ module Continuum.Storage
         alwaysTrue)
        where
 
+import           Debug.Trace
 import Control.Applicative
 import           Continuum.Types
 import           Continuum.Folds
@@ -20,7 +21,7 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  iterSeek, iterFirst, -- iterItems,
                                                  withIterator, iterNext, iterEntry)
 import           Data.ByteString        (ByteString)
-import           Control.Monad.State
+import           Control.Monad.State.Strict
 import           Data.Maybe (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
@@ -123,9 +124,25 @@ gaplessScan begin mapop (L.Fold foldop acc done) = do
                -- let step acc x = (mapop schema' x) >>= (\y -> return $ foldop acc' y)
                --- acc is either
                --- result of mapop is either
-               let step !acc !x = (mapop schema' x) >>= \i -> fmap (\x -> foldop x i) acc
+               let step !acc !x = (mapop schema' x) >>= \i -> fmap (\acc' -> foldop acc' i) acc
                scanIntern iter step (Right acc)
   return $! fmap done records -- (records >>= (\x -> return $ done x))
+
+-- scanIntern  :: (MonadResource m) =>
+--                Iterator
+--                -> (acc -> (ByteString, ByteString) -> acc)
+--                -> acc
+--                -> m acc
+
+-- scanIntern iter op acc = s acc
+--   where s !acc = do
+--           next <- iterEntry iter
+--           iterNext iter
+
+--           if isJust next
+--             then s (op acc (fromJust next))
+--             else return acc
+
 
 scanIntern :: (MonadResource m) =>
                Iterator
@@ -133,15 +150,14 @@ scanIntern :: (MonadResource m) =>
                -> acc
                -> m acc
 
-scanIntern iter op acc = s acc
-  where s !acc = do
+scanIntern iter op orig = execStateT s orig
+  where s = do
           next <- iterEntry iter
           iterNext iter
 
           if isJust next
-            then s (op acc (fromJust next))
-            else return acc
-{-# INLINE scanIntern #-}
+            then modify (\ !a -> op a (fromJust next)) >> s
+            else return ()
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation

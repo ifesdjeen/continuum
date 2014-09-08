@@ -3,6 +3,9 @@
 
 module Storage.Test where
 
+import Control.Monad (forM_)
+import Continuum.Aggregation
+import Continuum.Folds
 import Continuum.Serialization
 import Continuum.Storage
 import Continuum.Types
@@ -86,6 +89,13 @@ main =  hspec $ do
                                 ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
                                 ])
 
+
+    it "should iterate over a large amount of records" $  do
+      let res = runApp testDBPath testSchema $ do
+            forM_ [1..1000000]
+              (\i -> putRecord $ makeRecord i [("a", (DbInt 1)), ("b", (DbString "1"))])
+            aggregateAllByField "status" countFold
+      res `shouldReturn` (Right 1000000)
     -- it "should iterate " $  do
     --   let res = runApp testDBPath testSchema $ do
 
