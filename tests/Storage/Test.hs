@@ -47,7 +47,6 @@ main =  hspec $ do
                                 ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])])
 
     it "setup" $ cleanup >>= shouldReturn (return())
-
     it "should return inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
@@ -70,6 +69,7 @@ main =  hspec $ do
                                 ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
                                 ])
 
+    it "setup" $ cleanup >>= shouldReturn (return())
     it "should scan a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
@@ -90,11 +90,12 @@ main =  hspec $ do
                                 ])
 
 
+    it "setup" $ cleanup >>= shouldReturn (return())
     it "should iterate over a large amount of records" $  do
       let res = runApp testDBPath testSchema $ do
             forM_ [1..1000000]
               (\i -> putRecord $ makeRecord i [("a", (DbInt 1)), ("b", (DbString "1"))])
-            aggregateAllByField "status" countFold
+            aggregateAllByField "a" countFold
       res `shouldReturn` (Right 1000000)
     -- it "should iterate " $  do
     --   let res = runApp testDBPath testSchema $ do
