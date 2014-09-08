@@ -12,8 +12,8 @@ $(LIBHYPERLEVELDB) :
 		 autoreconf -i;                                         \
 		 ./configure;                                           \
 		 make;                                                  \
-		 make install;                                          \
-		 sudo ldconfig; \
+		 sudo make install;                                     \
+		 sudo ldconfig;                                         \
 		 sudo cp -P ./libhyperleveldb.* /usr/local/lib;         \
 		 sudo cp -r include/hyperleveldb /usr/local/include/;   \
 		 ls -lah /usr/local/lib/ )
