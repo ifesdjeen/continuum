@@ -33,6 +33,7 @@ library
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
                        , Continuum.Aggregation
+                       , Continuum.NewFile
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Types
