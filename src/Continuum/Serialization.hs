@@ -9,7 +9,7 @@ module Continuum.Serialization where
 
 
 import           Control.Applicative ((<$>))
-import Foreign
+import           Foreign
 import qualified Data.Map as Map
 
 import           Continuum.Types
@@ -65,7 +65,6 @@ decodeKey :: ByteString -> Either DbError Integer
 decodeKey x = return $ unpackWord64 (BS.take 8 x)
 
 {-# INLINE decodeKey #-}
--- left KeyDecodeError $ decode x
 decodeRecord :: DbSchema ->  (ByteString, ByteString) -> Either DbError DbRecord
 decodeRecord schema (k, v) = do
   timestamp      <- decodeKey k

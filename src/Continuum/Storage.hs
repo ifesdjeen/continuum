@@ -9,8 +9,7 @@ module Continuum.Storage
         alwaysTrue)
        where
 
-import           Debug.Trace
-import Control.Applicative
+-- import           Debug.Trace
 import           Continuum.Types
 import           Continuum.Folds
 import           Continuum.Options
@@ -20,14 +19,11 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
                                                  iterSeek, iterFirst, -- iterItems,
                                                  withIterator, iterNext, iterEntry)
-import           Data.ByteString        (ByteString)
+import           Data.ByteString                (ByteString)
 import           Control.Monad.State.Strict
-import           Data.Maybe (isJust, fromJust)
+import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
-
-
--- type AppResource a = ResourceT AppState IO a
 
 
 makeContext :: DB -> DbSchema -> RWOptions -> DBContext
@@ -42,7 +38,6 @@ db = gets ctxDb
 getAndincrementSequence :: MonadState DBContext m => m Integer
 getAndincrementSequence = do
   old <- get
-  -- put old {sequenceNumber = (sequenceNumber old) + 1}
   modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
   return $ sequenceNumber old
 
@@ -104,51 +99,32 @@ runApp path schema' actions = do
 -- customComparator :: Comparator
 -- customComparator = Comparator compareKeys
 
+liftEither :: (a -> b -> c) -> Either DbError a -> Either DbError b -> Either DbError c
+liftEither f (Right a) (Right b) = return $! f a b
+liftEither _ (Left a)  _         = Left a
+liftEither _ _         (Left b)  = Left b
 
--- StateT DBContext (ResourceT IO) a
--- type ScanOp a = ResourceT (Either String) a
-
-forceM :: Monad m => m a -> m a
-forceM m = do v <- m; return $! v
-
-strictFmap :: Monad m => (a -> b) -> m a -> m b
-strictFmap f m = liftM f (forceM m)
-
-gaplessScan ::  Maybe ByteString
-         -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
-         -> L.Fold i acc
-         -> AppState (Either DbError acc)
+gaplessScan :: Maybe ByteString
+            -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
+            -> L.Fold i acc
+            -> AppState (Either DbError acc)
 
 gaplessScan begin mapop (L.Fold foldop acc done) = do
   db' <- db
   ro' <- ro
   schema' <- schema
+  let mapop' = mapop schema'
   records <- withIterator db' ro' $ \iter -> do
                if (isJust begin)
                  then iterSeek iter (fromJust begin)
                  else iterFirst iter
-               -- let step acc x = (mapop schema' x) >>= (\y -> return $ foldop acc' y)
-               --- acc is either
-               --- result of mapop is either
-               let step !acc !x = (mapop schema' x) >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
+               -- Funnily enough, all the folloing is the equivalent of same thing, but all three yield
+               -- different performance. For now, I'm sticking with leftEither
+               -- let step !acc !x = mapop' x >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
+               -- let step !acc !x = liftA2 foldop acc (mapop' x)
+               let step !acc !x = liftEither foldop acc (mapop' x)
                scanIntern iter step (Right acc)
   return $! fmap done records -- (records >>= (\x -> return $ done x))
-
--- scanIntern  :: (MonadResource m) =>
---                Iterator
---                -> (acc -> (ByteString, ByteString) -> acc)
---                -> acc
---                -> m acc
-
--- scanIntern iter op acc = s acc
---   where s !acc = do
---           next <- iterEntry iter
---           iterNext iter
-
---           if isJust next
---             then s (op acc (fromJust next))
---             else return acc
-
 
 scanIntern :: (MonadResource m) =>
                Iterator
@@ -163,11 +139,7 @@ scanIntern iter op orig = s orig
 
           if isJust next
             then s (op acc (fromJust next))
-            -- a <- s
-            -- return $ (op a (fromJust next))
-
             else return acc
-
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation

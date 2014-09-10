@@ -41,6 +41,7 @@ library
 
   build-depends:          base                   >= 4 && < 5
                         , foldl                  >= 1.0.5
+                        , deepseq
                         , mtl                    >2.1
                         , containers             >0.5
                         , leveldb-haskell-fork   >= 0.3.4.1
