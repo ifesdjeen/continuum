@@ -9,9 +9,7 @@ import           Continuum.Serialization
 main :: IO ()
 main = defaultMain [
   -- bench "with pure value"   $ whnf (decode :: ByteString -> Either String ByteString) encoded
-  bench "with db record " $ whnf (decodeFieldByName "b" testSchema)               (encodeRecord testSchema testDbRecord 1)
-
-
+  bench "with db record " $ whnf (decodeRecord (Field "b") testSchema)               (encodeRecord testSchema testDbRecord 1)
   ]
 
 

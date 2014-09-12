@@ -77,7 +77,7 @@ main2 = do
 main = runApp testDBPath prodSchema $ do
   forM_ [0..100] $ \x -> do
           before <- liftIO $ getPOSIXTime
-          a <- aggregateAllByField "status" (groupFold (\ !(_, x) -> (x, 0)) countFold)
+          a <- aggregateAllByField "status" (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
           -- a <- aggregateAllByField "status" countFold
           after <- liftIO $ getPOSIXTime
           liftIO $ putStrLn $ show a
