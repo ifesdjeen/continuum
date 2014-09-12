@@ -9,11 +9,11 @@ import           Continuum.Storage
 import           Continuum.Serialization
 import           Continuum.Types
 -- import           Continuum.Aggregation
--- import           Continuum.Folds
+import           Continuum.Folds
 -- import qualified Data.Map as Map
 
 testDBPath :: String
-testDBPath = "/tmp/haskell-leveldb-tests"
+testDBPath = "/tmp/haskell-leveldb-tests5"
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
@@ -33,9 +33,11 @@ main = runApp testDBPath testSchema $ do
   -- a <- aggregateAllByField "a" snd (\i acc -> acc + (unpackInt i)) 0
 
   -- a <- aggregateAllByField "b" appendFold
-  a <- findByTimestamp 123
-  liftIO $ putStrLn $ show a
+  -- a <- findByTimestamp 123
+  -- liftIO $ putStrLn $ show a
 
+  a <- scan (TsSingleKey 123)    Record appendFold
+  a <- scan (TsOpenEnd 123)      Record appendFold
+  a <- scan (TsKeyRange 123 300) Record appendFold
+  liftIO $ print (show a)
   -- a <- scanAll2 id (:) []
-
-  -- liftIO $ print (show a)

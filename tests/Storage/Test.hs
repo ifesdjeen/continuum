@@ -9,6 +9,7 @@ import Continuum.Folds
 import Continuum.Serialization
 import Continuum.Storage
 import Continuum.Types
+import Control.Monad.IO.Class
 
 import System.Process(system)
 import Test.Hspec
@@ -25,68 +26,114 @@ main =  hspec $ do
 
     it "should put items into the database and retrieve them" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            findByTimestamp 123
-      res `shouldReturn` (Right [(makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])])
+            putRecord $ makeRecord 123 [("a", (DbInt 1)),
+                                        ("b", (DbString "1"))]
+            scan (TsSingleKey 123) Record appendFold
+      res `shouldReturn` Right [DbRecordResult $
+                                makeRecord 123 [("a", DbInt 1),
+                                                ("b", DbString "1")]]
 
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should retrieve items by given timestamp" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 123 [("a", DbInt 1),
+                                        ("b", DbString "1")]
+            putRecord $ makeRecord 123 [("a", DbInt 2),
+                                        ("b", DbString "2")]
+            putRecord $ makeRecord 123 [("a", DbInt 3),
+                                        ("b", DbString "3")]
 
-            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 456 [("a", DbInt 1),
+                                        ("b", DbString "1")]
+            putRecord $ makeRecord 456 [("a", DbInt 2),
+                                        ("b", DbString "2")]
+            putRecord $ makeRecord 456 [("a", DbInt 3),
+                                        ("b", DbString "3")]
 
-            findByTimestamp 123
+            scan (TsSingleKey 123) Record appendFold
 
-      res `shouldReturn` (Right [ (makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))])
-                                ,(makeRecord 123 [("a", (DbInt 2)), ("b", (DbString "2"))])
-                                ,(makeRecord 123 [("a", (DbInt 3)), ("b", (DbString "3"))])])
+      res `shouldReturn` Right [DbRecordResult $
+                                makeRecord 123 [("a", DbInt 1),
+                                                ("b", DbString "1")],
+                                DbRecordResult $
+                                makeRecord 123 [("a", DbInt 2),
+                                                ("b", DbString "2")],
+                                DbRecordResult $
+                                makeRecord 123 [("a", DbInt 3),
+                                                ("b", DbString "3")]]
 
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should return inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 123 [("a", (DbInt 1)),
+                                        ("b", (DbString "1"))]
+            putRecord $ makeRecord 124 [("a", (DbInt 2)),
+                                        ("b", (DbString "2"))]
+            putRecord $ makeRecord 125 [("a", (DbInt 3)),
+                                        ("b", (DbString "3"))]
 
-            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 1)),
+                                        ("b", (DbString "1"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 2)),
+                                        ("b", (DbString "2"))]
+            putRecord $ makeRecord 456 [("a", (DbInt 3)),
+                                        ("b", (DbString "3"))]
 
-            putRecord $ makeRecord 555 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 555 [("a", (DbInt 3)),
+                                        ("b", (DbString "3"))]
 
-            findRange 123 456
+            scan (TsKeyRange 123 456) Record appendFold
 
-      res `shouldReturn` (Right [ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-                                ,makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
-                                ,makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
-                                ,makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-                                ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-                                ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
-                                ])
+      res `shouldReturn` Right [DbRecordResult $
+                                makeRecord 123 [("a", DbInt 1),
+                                                ("b", DbString "1")],
+                                DbRecordResult $
+                                makeRecord 124 [("a", DbInt 2),
+                                                ("b", DbString "2")],
+                                DbRecordResult $
+                                makeRecord 125 [("a", DbInt 3),
+                                                ("b", DbString "3")],
+                                DbRecordResult $
+                                makeRecord 456 [("a", DbInt 1),
+                                                ("b", DbString "1")],
+                                DbRecordResult $
+                                makeRecord 456 [("a", DbInt 2),
+                                                ("b", DbString "2")],
+                                DbRecordResult $
+                                makeRecord 456 [("a", DbInt 3),
+                                                ("b", DbString "3")]]
 
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should scan a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 124 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 125 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 123 [("a", DbInt 1),
+                                        ("b", DbString "1")]
+            putRecord $ makeRecord 124 [("a", DbInt 2),
+                                        ("b", DbString "2")]
+            putRecord $ makeRecord 125 [("a", DbInt 3),
+                                        ("b", DbString "3")]
 
-            putRecord $ makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 456 [("a", DbInt 1),
+                                        ("b", DbString "1")]
+            putRecord $ makeRecord 456 [("a", DbInt 2),
+                                        ("b", DbString "2")]
+            putRecord $ makeRecord 456 [("a", DbInt 3),
+                                        ("b", DbString "3")]
 
-            putRecord $ makeRecord 700 [("a", (DbInt 3)), ("b", (DbString "3"))]
+            putRecord $ makeRecord 700 [("a", DbInt 3),
+                                        ("b", DbString "3")]
 
-            findRange 300 456
+            scan (TsKeyRange 300 456) Record appendFold
 
-      res `shouldReturn` (Right [makeRecord 456 [("a", (DbInt 1)), ("b", (DbString "1"))]
-                                ,makeRecord 456 [("a", (DbInt 2)), ("b", (DbString "2"))]
-                                ,makeRecord 456 [("a", (DbInt 3)), ("b", (DbString "3"))]
+      res `shouldReturn` (Right [DbRecordResult $
+                                 makeRecord 456 [("a", DbInt 1),
+                                                 ("b", DbString "1")],
+                                 DbRecordResult $
+                                 makeRecord 456 [("a", DbInt 2),
+                                                 ("b", DbString "2")],
+                                 DbRecordResult $
+                                 makeRecord 456 [("a", DbInt 3),
+                                                 ("b", DbString "3")]
                                 ])
 
 
@@ -94,9 +141,12 @@ main =  hspec $ do
     it "should iterate over a large amount of records" $  do
       let res = runApp testDBPath testSchema $ do
             forM_ [1..1000000]
-              (\i -> putRecord $ makeRecord i [("a", (DbInt 1)), ("b", (DbString "1"))])
-            aggregateAllByField "a" countFold
+              (\i -> putRecord $ makeRecord i [("a", DbInt 1),
+                                               ("b", DbString "1")])
+            scan EntireKeyspace (Field "a") countFold
       res `shouldReturn` (Right 1000000)
+
+
     -- it "should iterate " $  do
     --   let res = runApp testDBPath testSchema $ do
 
