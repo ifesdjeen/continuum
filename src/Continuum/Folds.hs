@@ -3,10 +3,10 @@
 
 module Continuum.Folds (countFold
                        , appendFold
-                       , stopCondition
                        , groupFold)
        where
 
+import Continuum.Types
 import Debug.Trace
 import qualified Data.Map.Strict as Map
 import qualified Control.Foldl as L
@@ -23,11 +23,10 @@ appendFold :: L.Fold a [a]
 appendFold = L.Fold step [] id
   where step acc val = acc ++ [val]
 
--- | Group Fold
 groupFold :: (Ord k) =>
-              (a -> (k, v))
+              (DbResult -> (k, v))
               -> L.Fold v res
-              -> L.Fold a (Map.Map k res)
+              -> L.Fold DbResult (Map.Map k res)
 groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty rewrap
   where
     {-# INLINE step #-}
@@ -41,16 +40,3 @@ groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty 
     updateFn v i = case i of
       (Just x)  -> Just $! stepIntern x v
       (Nothing) -> Just accIntern
-
--- | Stop Condition Fold
-stopCondition :: (forall acc. (i -> acc -> Bool)) -> L.Fold i done -> L.Fold i done
-stopCondition checker (L.Fold step acc done) = L.Fold wrapStep acc done
-  where wrapStep acc i = if checker i acc
-                      then step acc i
-                      else acc
-
-
-
--- L.Fold :: (acc -> i -> acc) -> acc -> (acc -> done) -> L.Fold i done
-
---- select min value within range
