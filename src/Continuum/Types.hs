@@ -13,27 +13,24 @@ import qualified Data.Map as Map
 
 type AppState a = StateT DBContext (ResourceT IO) a
 
-data DbError = IndexesDecodeError String
-             | FieldDecodeError String ByteString
-             | ValuesDecodeError String
-             | ValueDecodeError String
-             | KeyDecodeError String
-             | FieldNotFoundError
+data DbError = IndexesDecodeError      String
+             | FieldDecodeError        String ByteString
+             | ValuesDecodeError       String
+             | ValueDecodeError        String
+             | KeyDecodeError          String
              | DecodeFieldByIndexError String [Int]
+             | FieldNotFoundError
              | OtherError
              deriving (Show, Eq, Ord, Generic)
-
-type AggregationFn acc = (acc -> (ByteString, ByteString) -> (Either DbError acc))
 
 data DbType = DbtInt | DbtString
                        deriving(Show)
 
--- type AggregationPipeline acc = ((ByteString, ByteString) -> acc -> (Either String acc))
-
-
 type RWOptions = (ReadOptions, WriteOptions)
 
+-- |
 -- | DB CONTEXT
+-- |
 
 data DBContext = DBContext { ctxDb          :: DB
                              , ctxSchema    :: DbSchema
@@ -42,7 +39,9 @@ data DBContext = DBContext { ctxDb          :: DB
                              , ctxRwOptions :: RWOptions
                            }
 
+-- |
 -- | DB SCHEMA
+-- |
 
 data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
                            , fields         :: [ByteString]
@@ -52,18 +51,20 @@ data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
                            }
 
 makeSchema :: [(ByteString, DbType)] -> DbSchema
-makeSchema stringTypeList = DbSchema { fieldMappings = fMappings
-                                     , fields = fields'
+makeSchema stringTypeList = DbSchema { fieldMappings  = fMappings
+                                     , fields         = fields'
                                      , schemaMappings = Map.fromList stringTypeList
-                                     , indexMappings = iMappings
-                                     , schemaTypes = schemaTypes'}
-  where fields' = fmap fst stringTypeList
+                                     , indexMappings  = iMappings
+                                     , schemaTypes    = schemaTypes'}
+  where fields'      = fmap fst stringTypeList
         schemaTypes' = fmap snd stringTypeList
-        fMappings = Map.fromList $ zip fields' iterateFrom0
-        iMappings = Map.fromList $ zip iterateFrom0 fields'
+        fMappings    = Map.fromList $ zip fields' iterateFrom0
+        iMappings    = Map.fromList $ zip iterateFrom0 fields'
         iterateFrom0 = (iterate (1+) 0)
 
-
+-- |
+-- | DB VALUE
+-- |
 
 data DbValue = DbInt Integer
              | DbFloat Float
@@ -78,3 +79,36 @@ data DbValue = DbInt Integer
 data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
                 DbPlaceholder Integer
                 deriving(Show, Eq)
+
+makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
+makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
+
+
+-- |
+-- | DB RESULT
+-- |
+
+data DbResult = DbRecordResult DbRecord
+              | DbFieldResult  (Integer, DbValue)
+              | DbFieldsResult (Integer, [DbValue])
+              deriving(Show, Eq)
+
+-- |
+-- | RANGE
+-- |
+
+data KeyRange = OpenEnd          ByteString
+                | TsOpenEnd      Integer
+                | SingleKey      ByteString
+                | TsSingleKey    Integer
+                | KeyRange       ByteString ByteString
+                | TsKeyRange     Integer Integer
+                | EntireKeyspace
+
+-- |
+-- | AGGREGATES
+-- |
+
+data Decoding = Field  ByteString
+              | Fields [ByteString]
+              | Record
