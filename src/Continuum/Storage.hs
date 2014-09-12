@@ -5,11 +5,12 @@
 
 module Continuum.Storage
        (DB, DBContext,
-        runApp, putRecord, findByTimestamp, findRange, gaplessScan,
-        alwaysTrue)
+        runApp, putRecord,
+        alwaysTrue, scan)
        where
 
 -- import           Debug.Trace
+import           Control.Applicative ((<$>), (<*>))
 import           Continuum.Types
 import           Continuum.Folds
 import           Continuum.Options
@@ -17,14 +18,16 @@ import           Continuum.Serialization
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
+                                                 iterKey, iterValue,
                                                  iterSeek, iterFirst, -- iterItems,
                                                  withIterator, iterNext, iterEntry)
 import           Data.ByteString                (ByteString)
+import qualified Data.ByteString as BS
 import           Control.Monad.State.Strict
 import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
-
+import           Control.Monad.IO.Class    (MonadIO (liftIO))
 
 makeContext :: DB -> DbSchema -> RWOptions -> DBContext
 makeContext db' schema' rwOptions' = DBContext {ctxDb = db',
@@ -65,20 +68,6 @@ putRecord record = do
   schema' <- schema
   storagePut $ encodeRecord schema' record sid
 
--- | Find a particular record by the timestamp
-findByTimestamp :: Integer -> AppState (Either DbError [DbRecord])
-findByTimestamp timestamp = gaplessScan (Just begin) decodeRecord (stopCondition checker appendFold)
-                            where begin   = encodeBeginTimestamp timestamp
-                                  checker = matchTs (==) timestamp
-
-
--- | Find records in the range
-findRange :: Integer -> Integer -> AppState (Either DbError [DbRecord])
-findRange beginTs end = gaplessScan (Just begin) decodeRecord (stopCondition checker appendFold)
-                      where begin = encodeBeginTimestamp beginTs
-                            checker = matchTs (<=) end
-
-
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
 
@@ -104,42 +93,101 @@ liftEither f (Right a) (Right b) = return $! f a b
 liftEither _ (Left a)  _         = Left a
 liftEither _ _         (Left b)  = Left b
 
-gaplessScan :: Maybe ByteString
-            -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
-            -> L.Fold i acc
-            -> AppState (Either DbError acc)
+-- TODO: add batch put operstiaon
+-- TODO: add delete operation
 
-gaplessScan begin mapop (L.Fold foldop acc done) = do
+
+
+scan :: KeyRange -- -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
+        -> Decoding
+        -> L.Fold DbResult acc
+        -> AppState (Either DbError acc)
+
+scan keyRange decoding (L.Fold foldop acc done) = do
   db' <- db
   ro' <- ro
   schema' <- schema
-  let mapop' = mapop schema'
   records <- withIterator db' ro' $ \iter -> do
-               if (isJust begin)
-                 then iterSeek iter (fromJust begin)
-                 else iterFirst iter
-               -- Funnily enough, all the folloing is the equivalent of same thing, but all three yield
-               -- different performance. For now, I'm sticking with leftEither
-               -- let step !acc !x = mapop' x >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
-               -- let step !acc !x = liftA2 foldop acc (mapop' x)
-               let step !acc !x = liftEither foldop acc (mapop' x)
-               scanIntern iter step (Right acc)
+    let mapop        = decodeRecord decoding schema'
+        getNext      = advanceIterator iter keyRange
+        step !acc !x = liftEither foldop acc (mapop x)
+    setStartPosition iter keyRange
+
+    -- Funnily enough, all the folloing is the equivalent of same thing, but all three yield
+    -- different performance. For now, I'm sticking with leftEither
+    -- let step !acc !x = mapop' x >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
+    -- let step !acc !x = liftA2 foldop acc (mapop' x)
+    scanStep getNext step (Right acc)
   return $! fmap done records -- (records >>= (\x -> return $ done x))
 
-scanIntern :: (MonadResource m) =>
-               Iterator
+
+scanStep :: (MonadResource m) =>
+               m (Maybe (ByteString, ByteString))
                -> (acc -> (ByteString, ByteString) -> acc)
                -> acc
                -> m acc
 
-scanIntern iter op orig = s orig
+scanStep getNext op orig = s orig
   where s !acc = do
-          next <- iterEntry iter
-          iterNext iter
-
+          next <- getNext
           if isJust next
             then s (op acc (fromJust next))
             else return acc
 
--- TODO: add batch put operstiaon
--- TODO: add delete operation
+advanceIterator :: MonadResource m => Iterator -> KeyRange -> m (Maybe (ByteString, ByteString))
+advanceIterator iter (KeyRange _ rangeEnd) = do
+  mkey <- iterKey iter
+  mval <- iterValue iter
+  iterNext iter
+  return $ (,) <$> (maybeInterrupt mkey) <*> mval
+  where maybeInterrupt k = k >>= interruptCondition
+        interruptCondition resKey = if resKey <= rangeEnd
+                                    then Just resKey
+                                    else Nothing
+
+advanceIterator iter (TsKeyRange _ rangeEnd) =
+  advanceIterator iter (KeyRange BS.empty (encodeEndTimestamp rangeEnd))
+
+advanceIterator iter (SingleKey singleKey) = do
+  mkey <- iterKey iter
+  mval <- iterValue iter
+  iterNext iter
+  return $ (,) <$> (maybeInterrupt mkey) <*> mval
+  where maybeInterrupt k = k >>= interruptCondition
+        interruptCondition resKey = if resKey == singleKey
+                                    then Just resKey
+                                    else Nothing
+
+advanceIterator iter (TsSingleKey intKey) = do
+  mkey <- iterKey iter
+  mval <- iterValue iter
+  iterNext iter
+  return $ (,) <$> (maybeInterrupt mkey) <*> mval
+  where maybeInterrupt k = k >>= interruptCondition
+        encodedKey = packWord64 intKey
+        interruptCondition resKey = if (BS.take 8 resKey) == encodedKey
+                                    then Just resKey
+                                    else Nothing
+
+
+advanceIterator iter _ = do
+  mkey <- iterKey iter
+  mval <- iterValue iter
+  iterNext iter
+  return $ (,) <$> mkey <*> mval
+
+setStartPosition :: MonadResource m => Iterator -> KeyRange -> m ()
+
+setStartPosition iter (OpenEnd startPosition)    = iterSeek iter startPosition
+setStartPosition iter (TsOpenEnd startPosition)  =
+  setStartPosition iter (OpenEnd (encodeBeginTimestamp startPosition))
+
+setStartPosition iter (SingleKey startPosition)  = iterSeek iter startPosition
+setStartPosition iter (TsSingleKey startPosition)  =
+  setStartPosition iter (SingleKey (encodeBeginTimestamp startPosition))
+
+setStartPosition iter (KeyRange startPosition _) = iterSeek iter startPosition
+setStartPosition iter (TsKeyRange startPosition _) =
+  setStartPosition iter (KeyRange (encodeBeginTimestamp startPosition) BS.empty)
+
+setStartPosition iter EntireKeyspace = iterFirst iter
