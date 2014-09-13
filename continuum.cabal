@@ -73,7 +73,7 @@ executable continuum-dev
                         , process                >= 1.1.0.2
                         , transformers           >= 0.4.1.0
                         , bytestring             >= 0.10.4.0
-                        , time                   = 1.4.2
+                        , time                   >= 1.4.2 && < 1.5
                         , containers             >0.5
                         , foldl                  >= 1.0.5
 executable continuum-bench
