@@ -101,7 +101,7 @@ decodeIndexes schema bs =
   map fromIntegral $ BS.unpack $ BS.take (length (fields schema)) bs
 {-# INLINE decodeIndexes #-}
 
-slide :: [Int] -> [(Int, Int)]
+slide :: [a] -> [(a, a)]
 slide (f:s:xs) = (f,s) : slide (s:xs)
 slide _ = []
 
