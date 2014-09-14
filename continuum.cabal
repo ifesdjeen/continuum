@@ -26,14 +26,13 @@ library
   if flag(Profiling)
     ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
   else
-    ghc-options:          -Wall -O2 -Wall
+    ghc-options:          -Wall -O2 -Wall -threaded
   hs-source-dirs:       src
   extra-libraries:      hyperleveldb
   other-extensions:     CPP, MagicHash
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
                        , Continuum.Aggregation
-                       , Continuum.NewFile
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Types
@@ -41,12 +40,14 @@ library
 
   build-depends:          base                   >= 4 && < 5
                         , foldl                  >= 1.0.5
-                        , deepseq
+                        , io-streams             >= 1.1.4.6
                         , mtl                    >2.1
                         , containers             >0.5
                         , leveldb-haskell-fork   >= 0.3.4.1
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
+                        , async                  >= 2.0.1.6
+                        -- , parallel-io            >= 0.3.3
                         , cereal                 >= 0.4.0.1
                         , data-default
                         , transformers           >= 0.4.1.0
@@ -61,9 +62,9 @@ executable continuum-dev
     buildable:      False
 
   if flag(Profiling)
-    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
-    ghc-options:          -Wall -rtsopts -O2
+    ghc-options:          -Wall -rtsopts -O2  -threaded
 
   -- ghc-options:          -Wall -O2
   main-is:              JsonLoader.hs
