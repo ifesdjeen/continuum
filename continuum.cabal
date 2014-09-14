@@ -24,9 +24,9 @@ source-repository head
 library
   Default-Language:     Haskell2010
   if flag(Profiling)
-    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
-    ghc-options:          -Wall -O2 -Wall -threaded
+    ghc-options:          -Wall -O2 -threaded -threaded -eventlog -rtsopts
   hs-source-dirs:       src
   extra-libraries:      hyperleveldb
   other-extensions:     CPP, MagicHash
@@ -46,8 +46,7 @@ library
                         , leveldb-haskell-fork   >= 0.3.4.1
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
-                        , async                  >= 2.0.1.6
-                        -- , parallel-io            >= 0.3.3
+                        , parallel-io            >= 0.3.3
                         , cereal                 >= 0.4.0.1
                         , data-default
                         , transformers           >= 0.4.1.0
@@ -64,7 +63,7 @@ executable continuum-dev
   if flag(Profiling)
     ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
-    ghc-options:          -Wall -rtsopts -O2  -threaded
+    ghc-options:          -Wall -rtsopts -O2 -threaded
 
   -- ghc-options:          -Wall -O2
   main-is:              JsonLoader.hs
@@ -77,6 +76,7 @@ executable continuum-dev
                         , time                   >= 1.4.2 && < 1.5
                         , containers             >0.5
                         , foldl                  >= 1.0.5
+
 executable continuum-bench
   Default-Language:     Haskell2010
   hs-source-dirs:       exec

@@ -7,12 +7,13 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord,
-        alwaysTrue, scan, parallelScan)
+        alwaysTrue, scan, parallelScan , parallelSums)
        where
 
 -- import           Debug.Trace
 
-import           Control.Concurrent.Async
+import Control.Concurrent
+import Control.Concurrent.ParallelIO.Global
 import           Control.Applicative ((<$>), (<*>))
 import           Continuum.Types
 import           Continuum.Folds
@@ -137,45 +138,66 @@ makeRanges [a] = [TsOpenEnd a]
 
 parallelScan = do
   c <- makeRanges <$> readChunks
-  a <- readChunks
-
   st <- get
-  -- Scatter Scan Operations
-  -- toWait <- forM c (\(s,e) -> execAsync (scan (TsKeyRange s e) Record countFold))
-  toWait <- liftIO $ sequence $ map (\r -> execAsyncIO st (scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold))) c
-
-  liftIO $ sequence $ map wait toWait
-
-  --return $ map wait toWait
-  -- Gather Scan Operations
-
-  -- liftIO $! sequence $! map wait toWait
+  liftIO $ print c
+  let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
+  -- sum [0..10000000]
 
 
-execAsyncIO :: DBContext -> AppState a -> IO (Async a)
-execAsyncIO  st op = async $ runResourceT $ evalStateT op st
+  liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
+  -- liftIO $ parallel $ [execAsyncIO st $ readChunk (TsKeyRange 1397426933000 1397427603000),
+  --                      execAsyncIO st $ readChunk (TsKeyRange 1397427603000 1397428412000),
+  --                      execAsyncIO st $ readChunk (TsKeyRange 1397428412000 1397429434000),
+  --                      execAsyncIO st $ readChunk (TsOpenEnd 1397429434000)]
+
+parallelSums = parallel [sumIO, sumIO, sumIO, sumIO, sumIO, sumIO, sumIO, sumIO]
+
+sumIO :: IO (Integer)
+sumIO = do
+  () <- threadDelay 1000000
+  return $ sum [0..1000000]
+
+-- parallelScan = do
+--   c <- makeRanges <$> readChunks
+--   a <- readChunks
+
+--   st <- get
+--   -- Scatter Scan Operations
+--   -- toWait <- forM c (\(s,e) -> execAsync (scan (TsKeyRange s e) Record countFold))
+--   toWait <- liftIO $ sequence $ map (\r -> execAsyncIO st (scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold))) c
+
+--   liftIO $ sequence $ map wait toWait
+
+--   --return $ map wait toWait
+--   -- Gather Scan Operations
+
+--   -- liftIO $! sequence $! map wait toWait
+
+
+execAsyncIO :: DBContext -> AppState a -> IO a
+execAsyncIO  st op = runResourceT . evalStateT op $ st
 
 
 
 
--- Generalize??
-execAsync :: AppState a -> AppState (Async a)
-execAsync op = do
-  st <- get
-  -- TODO: Figure it out.
-  -- What's happening here is that we have an operation that we have to evaluate asynchronously.
-  -- That's completely cool in that particular case, although feels a bit weird to use such a beasy
-  -- construction to do something that's quite simple.
+-- -- Generalize??
+-- execAsync :: AppState a -> AppState (Async a)
+-- execAsync op = do
+--   st <- get
+--   -- TODO: Figure it out.
+--   -- What's happening here is that we have an operation that we have to evaluate asynchronously.
+--   -- That's completely cool in that particular case, although feels a bit weird to use such a beasy
+--   -- construction to do something that's quite simple.
 
-  -- :t liftIO . async
-  -- liftIO . async :: MonadIO m => IO a -> m (Async a)
-  (liftIO . async) . runResourceT $ evalStateT op st
+--   -- :t liftIO . async
+--   -- liftIO . async :: MonadIO m => IO a -> m (Async a)
+--   (liftIO . async) . runResourceT $ evalStateT op st
 
-execWait :: AppState (Async a) -> AppState a
-execWait op = do
-  st <- get
-  let a = runResourceT $ evalStateT op st
-  liftIO $ (a >>= wait)
+-- execWait :: AppState (Async a) -> AppState a
+-- execWait op = do
+--   st <- get
+--   let a = runResourceT $ evalStateT op st
+--   liftIO $ (a >>= wait)
 
 scan :: KeyRange
         -> Decoding

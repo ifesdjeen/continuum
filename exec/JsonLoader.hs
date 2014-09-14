@@ -83,6 +83,7 @@ main = runApp testDBPath prodSchema $ do
   --         liftIO $ putStrLn $ show a
   --         liftIO $ putStrLn $ show (after - before)
 
+
   before <- liftIO $ getPOSIXTime
   a <- parallelScan
   after <- liftIO $ getPOSIXTime
