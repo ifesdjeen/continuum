@@ -6,8 +6,7 @@ import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
 import           GHC.Generics           (Generic)
 import           Control.Monad.Trans.Resource
-import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
-                                                 Iterator)
+import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions)
 
 import qualified Data.Map as Map
 
@@ -33,8 +32,10 @@ type RWOptions = (ReadOptions, WriteOptions)
 -- |
 
 data DBContext = DBContext { ctxDb          :: DB
-                             , ctxSchema    :: DbSchema
+                           , ctxChunksDb     :: DB
+                           , ctxSchema    :: DbSchema
                              , sequenceNumber :: Integer
+                             , lastSnapshot   :: Integer
                              -- , ctxKeyspace  :: ByteString
                              , ctxRwOptions :: RWOptions
                            }
@@ -104,7 +105,7 @@ data KeyRange = OpenEnd          ByteString
                 | KeyRange       ByteString ByteString
                 | TsKeyRange     Integer Integer
                 | EntireKeyspace
-
+                deriving(Show)
 -- |
 -- | AGGREGATES
 -- |

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DataKinds #-}
@@ -6,10 +7,12 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord,
-        alwaysTrue, scan)
+        alwaysTrue, scan, parallelScan)
        where
 
 -- import           Debug.Trace
+
+import           Control.Concurrent.Async
 import           Control.Applicative ((<$>), (<*>))
 import           Continuum.Types
 import           Continuum.Folds
@@ -20,23 +23,29 @@ import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
                                                  iterKey, iterValue,
                                                  iterSeek, iterFirst, -- iterItems,
-                                                 withIterator, iterNext, iterEntry)
+                                                 withIterator, iterNext, iterKeys)
 import           Data.ByteString                (ByteString)
 import qualified Data.ByteString as BS
 import           Control.Monad.State.Strict
-import           Data.Maybe                     (isJust, fromJust)
+import           Data.Maybe                     (isJust, fromJust, catMaybes)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
-import           Control.Monad.IO.Class    (MonadIO (liftIO))
 
-makeContext :: DB -> DbSchema -> RWOptions -> DBContext
-makeContext db' schema' rwOptions' = DBContext {ctxDb = db',
-                                                sequenceNumber = 1,
-                                                ctxSchema = schema',
-                                                ctxRwOptions = rwOptions'}
+makeContext :: DB -> DB -> DbSchema -> RWOptions -> DBContext
+makeContext mainDb chunksDb dbSchema rwOptions' =
+  DBContext {ctxDb          = mainDb,
+             ctxChunksDb    = chunksDb,
+             sequenceNumber = 1,
+             lastSnapshot   = 1,
+             ctxSchema      = dbSchema,
+             ctxRwOptions   = rwOptions'}
+
 
 db :: MonadState DBContext m => m DB
 db = gets ctxDb
+
+chunks :: MonadState DBContext m => m DB
+chunks = gets ctxChunksDb
 
 getAndincrementSequence :: MonadState DBContext m => m Integer
 getAndincrementSequence = do
@@ -62,9 +71,26 @@ storagePut (key, value) = do
   wo' <- wo
   Base.put db' wo' key value
 
+snapshotAfter :: Integer
+snapshotAfter = 250000
+
+maybeWriteChunk :: Integer -> DbRecord -> AppState ()
+maybeWriteChunk sid (DbRecord time _) = do
+  st <- get
+  if (sid >= (lastSnapshot st) + snapshotAfter || sid == 1)
+    then do
+    modify (\a -> a {lastSnapshot = sid})
+
+    liftIO $ print "writing chunk"
+
+    Base.put (ctxChunksDb st) (snd (ctxRwOptions st)) (packWord64 time) BS.empty
+    return ()
+    else return ()
+
 putRecord :: DbRecord -> AppState ()
 putRecord record = do
-  sid <- getAndincrementSequence
+  sid     <- getAndincrementSequence
+  ()      <- maybeWriteChunk sid record
   schema' <- schema
   storagePut $ encodeRecord schema' record sid
 
@@ -72,14 +98,14 @@ alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
 
 runApp :: String -> DbSchema -> AppState a -> IO (a)
-runApp path schema' actions = do
+runApp path dbSchema actions = do
   runResourceT $ do
     -- TODO: add indexes
-    db' <- Base.open path opts
-    let ctx = makeContext db' schema' (readOpts, writeOpts)
+    mainDb   <- Base.open (path ++ "/mainDb") opts
+    chunksDb <- Base.open (path ++ "/chunksDb") opts
+    let ctx = makeContext mainDb chunksDb dbSchema (readOpts, writeOpts)
     -- liftResourceT $ (flip evalStateT) ctx actions
-    res <- (flip evalStateT) ctx actions
-    return $ res
+    evalStateT actions ctx
 
 -- compareKeys :: ByteString -> ByteString -> Ordering
 -- compareKeys k1 k2 = compare k11 k21
@@ -96,9 +122,62 @@ liftEither _ _         (Left b)  = Left b
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
 
+readChunks :: AppState [Integer]
+readChunks = do
+  db' <- chunks
+  ro' <- ro
+  withIterator db' ro' $ \i -> (map unpackWord64) <$> (iterFirst i >> iterKeys i)
+
+-- parallelScan :: AppState [Either DbError [DbResult]]
+
+makeRanges :: [Integer] -> [KeyRange]
+makeRanges (f:s:xs) = (TsKeyRange f s) : makeRanges (s:xs)
+makeRanges [a] = [TsOpenEnd a]
 
 
-scan :: KeyRange -- -> (DbSchema -> (ByteString, ByteString) -> (Either DbError i))
+parallelScan = do
+  c <- makeRanges <$> readChunks
+  a <- readChunks
+
+  st <- get
+  -- Scatter Scan Operations
+  -- toWait <- forM c (\(s,e) -> execAsync (scan (TsKeyRange s e) Record countFold))
+  toWait <- liftIO $ sequence $ map (\r -> execAsyncIO st (scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold))) c
+
+  liftIO $ sequence $ map wait toWait
+
+  --return $ map wait toWait
+  -- Gather Scan Operations
+
+  -- liftIO $! sequence $! map wait toWait
+
+
+execAsyncIO :: DBContext -> AppState a -> IO (Async a)
+execAsyncIO  st op = async $ runResourceT $ evalStateT op st
+
+
+
+
+-- Generalize??
+execAsync :: AppState a -> AppState (Async a)
+execAsync op = do
+  st <- get
+  -- TODO: Figure it out.
+  -- What's happening here is that we have an operation that we have to evaluate asynchronously.
+  -- That's completely cool in that particular case, although feels a bit weird to use such a beasy
+  -- construction to do something that's quite simple.
+
+  -- :t liftIO . async
+  -- liftIO . async :: MonadIO m => IO a -> m (Async a)
+  (liftIO . async) . runResourceT $ evalStateT op st
+
+execWait :: AppState (Async a) -> AppState a
+execWait op = do
+  st <- get
+  let a = runResourceT $ evalStateT op st
+  liftIO $ (a >>= wait)
+
+scan :: KeyRange
         -> Decoding
         -> L.Fold DbResult acc
         -> AppState (Either DbError acc)
@@ -110,7 +189,7 @@ scan keyRange decoding (L.Fold foldop acc done) = do
   records <- withIterator db' ro' $ \iter -> do
     let mapop        = decodeRecord decoding schema'
         getNext      = advanceIterator iter keyRange
-        step !acc !x = liftEither foldop acc (mapop x)
+        step !a !x   = liftEither foldop a (mapop x)
     setStartPosition iter keyRange
 
     -- Funnily enough, all the folloing is the equivalent of same thing, but all three yield
@@ -122,10 +201,10 @@ scan keyRange decoding (L.Fold foldop acc done) = do
 
 
 scanStep :: (MonadResource m) =>
-               m (Maybe (ByteString, ByteString))
-               -> (acc -> (ByteString, ByteString) -> acc)
-               -> acc
-               -> m acc
+            m (Maybe (ByteString, ByteString))
+            -> (acc -> (ByteString, ByteString) -> acc)
+            -> acc
+            -> m acc
 
 scanStep getNext op orig = s orig
   where s !acc = do
@@ -134,6 +213,8 @@ scanStep getNext op orig = s orig
             then s (op acc (fromJust next))
             else return acc
 
+-- | Advances iterator to a single entry, exits and returns nothing in case there's either nothing
+-- more to read or we've reached the end of Key Range
 advanceIterator :: MonadResource m => Iterator -> KeyRange -> m (Maybe (ByteString, ByteString))
 advanceIterator iter (KeyRange _ rangeEnd) = do
   mkey <- iterKey iter
