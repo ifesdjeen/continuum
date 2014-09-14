@@ -54,7 +54,7 @@ testDBPath = "/tmp/production-data"
 main2 :: IO ()
 main2 = do
 
-  liftIO $ cleanup
+  -- liftIO $ cleanup
 
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
   line <- return $ lines content
@@ -75,13 +75,19 @@ main2 = do
   return ()
 
 main = runApp testDBPath prodSchema $ do
-  forM_ [0..100] $ \x -> do
-          before <- liftIO $ getPOSIXTime
-          a <- aggregateAllByField "status" (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
-          -- a <- aggregateAllByField "status" countFold
-          after <- liftIO $ getPOSIXTime
-          liftIO $ putStrLn $ show a
-          liftIO $ putStrLn $ show (after - before)
+  -- forM_ [0..100] $ \x -> do
+  --         before <- liftIO $ getPOSIXTime
+  --         a <- aggregateAllByField "status" (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
+  --         -- a <- aggregateAllByField "status" countFold
+  --         after <- liftIO $ getPOSIXTime
+  --         liftIO $ putStrLn $ show a
+  --         liftIO $ putStrLn $ show (after - before)
+
+  before <- liftIO $ getPOSIXTime
+  a <- parallelScan
+  after <- liftIO $ getPOSIXTime
+  liftIO $ putStrLn $ show a
+  liftIO $ putStrLn $ show (after - before)
 
   return ()
 
