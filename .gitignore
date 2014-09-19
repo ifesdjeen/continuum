@@ -10,3 +10,4 @@ cabal.sandbox.config
 *~
 #*
 *.json
+*_flymake.hs
