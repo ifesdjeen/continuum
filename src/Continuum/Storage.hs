@@ -7,7 +7,7 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord,
-        alwaysTrue, scan, parallelScan , parallelSums)
+        alwaysTrue, scan, parallelScan)
        where
 
 -- import           Debug.Trace
@@ -143,19 +143,7 @@ parallelScan = do
   let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
   -- sum [0..10000000]
 
-
   liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
-  -- liftIO $ parallel $ [execAsyncIO st $ readChunk (TsKeyRange 1397426933000 1397427603000),
-  --                      execAsyncIO st $ readChunk (TsKeyRange 1397427603000 1397428412000),
-  --                      execAsyncIO st $ readChunk (TsKeyRange 1397428412000 1397429434000),
-  --                      execAsyncIO st $ readChunk (TsOpenEnd 1397429434000)]
-
-parallelSums = parallel [sumIO, sumIO, sumIO, sumIO, sumIO, sumIO, sumIO, sumIO]
-
-sumIO :: IO (Integer)
-sumIO = do
-  () <- threadDelay 1000000
-  return $ sum [0..1000000]
 
 -- parallelScan = do
 --   c <- makeRanges <$> readChunks
