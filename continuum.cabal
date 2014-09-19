@@ -33,6 +33,8 @@ library
   exposed-modules:       Continuum.Storage
                        , Continuum.Serialization
                        , Continuum.Aggregation
+                       , Continuum.Cluster
+                       , Continuum.Network.Multicast
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Types
@@ -40,9 +42,12 @@ library
 
   build-depends:          base                   >= 4 && < 5
                         , foldl                  >= 1.0.5
-                        , io-streams             >= 1.1.4.6
                         , mtl                    >2.1
                         , containers             >0.5
+                        , time                   >=1.4.2
+                        , timers                 >=0.2.0.0
+                        , stm                    >=2.4.3
+                        , suspend                >=0.1.0.1
                         , leveldb-haskell-fork   >= 0.3.4.1
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
@@ -51,6 +56,8 @@ library
                         , data-default
                         , transformers           >= 0.4.1.0
                         , transformers-base      >= 0.4.1 && < 0.5
+                        , nanomsg-haskell        >= 0.2.2
+                        , network                >= 2.2.1.7
 
 executable continuum-dev
   Default-Language:     Haskell2010
@@ -111,3 +118,34 @@ test-suite tests
                       , QuickCheck >= 2.7.6
                       , hspec-expectations >= 0.6.0.1
   default-language:     Haskell2010
+
+
+
+
+
+
+
+executable continuum-nanomsg
+  Default-Language:     Haskell2010
+  hs-source-dirs:       exec
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
+
+  if flag(Profiling)
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
+  else
+    ghc-options:          -Wall -rtsopts -O2 -threaded
+
+  -- ghc-options:          -Wall -O2
+  main-is:              NanoMsgExamples.hs
+  build-depends:        continuum
+                        , base                   >= 4 && < 5
+                        , aeson                  >= 0.8.0.0
+                        , process                >= 1.1.0.2
+                        , transformers           >= 0.4.1.0
+                        , bytestring             >= 0.10.4.0
+                        , time                   >= 1.4.2 && < 1.5
+                        , containers             >0.5
+                        , foldl                  >= 1.0.5
