@@ -12,13 +12,14 @@ module Continuum.Storage
 
 -- import           Debug.Trace
 
-import Control.Concurrent
-import Control.Concurrent.ParallelIO.Global
-import           Control.Applicative ((<$>), (<*>))
-import           Continuum.Types
 import           Continuum.Folds
 import           Continuum.Options
 import           Continuum.Serialization
+import           Continuum.Types
+import           Control.Applicative ((<$>), (<*>))
+import           Control.Concurrent
+import           Control.Concurrent.ParallelIO.Global
+import           Data.Either (rights)
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
@@ -135,16 +136,25 @@ makeRanges :: [Integer] -> [KeyRange]
 makeRanges (f:s:xs) = (TsKeyRange f s) : makeRanges (s:xs)
 makeRanges [a] = [TsOpenEnd a]
 
-
 parallelScan = do
   c <- makeRanges <$> readChunks
   st <- get
   liftIO $ print c
-  let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
+  -- So that fold is kind of incorrect. What we need is a merge step.
+  -- Although to make a merge step more usable and correct, we have
+  -- to collect the data in a different way.
+
+  -- Group fold is already a second step
+  -- let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
   -- sum [0..10000000]
+  let readChunk r = scan r (Field "status") (step Count)
 
-  liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
+  -- scan r (Field "status") (step Count)
+  -- scan r (Field "status") (step Count)
+  -- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
+  res <- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i)) c
 
+  liftIO $ print $ L.fold (merge Count) (rights res)
 -- parallelScan = do
 --   c <- makeRanges <$> readChunks
 --   a <- readChunks
@@ -282,3 +292,40 @@ setStartPosition iter (TsKeyRange startPosition _) =
   setStartPosition iter (KeyRange (encodeBeginTimestamp startPosition) BS.empty)
 
 setStartPosition iter EntireKeyspace = iterFirst iter
+
+
+
+
+
+
+
+
+
+--------
+
+data Query = Count
+           | Distinct
+           | Min
+           | Max
+           | Group Query
+           deriving (Show)
+
+step :: Query -> L.Fold DbResult DbResult
+step Count = L.Fold step (DbCountStepResult []) id
+  where step (DbCountStepResult acc) (DbFieldResult (_, field)) = DbCountStepResult $ (field, 1) : acc
+
+merge :: Query -> L.Fold DbResult DbResult
+merge Count = L.Fold step (DbCountResult 0) id
+  where
+    step (DbCountResult i) (DbCountStepResult results) = DbCountResult $ foldr (+) i (map snd results)
+
+merge :: Query -> L.Fold DbResult DbResult
+merge Group Count = L.Fold step (DbCountResult 0) id
+  where
+    step (DbCountResult i) (DbCountStepResult results) = DbCountResult $ foldr (+) i (map snd results)
+
+
+-- Group Fold should only receive tuples
+
+-- merge :: Query -> DbResult -> DbResult
+-- merge (Count All) Db = undefined
