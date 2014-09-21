@@ -20,6 +20,7 @@ import           Control.Applicative ((<$>), (<*>))
 import           Control.Concurrent
 import           Control.Concurrent.ParallelIO.Global
 import           Data.Either (rights)
+import qualified Data.Map.Strict as Map
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
@@ -307,23 +308,38 @@ data Query = Count
            | Distinct
            | Min
            | Max
-           | Group Query
+
            deriving (Show)
 
 step :: Query -> L.Fold DbResult DbResult
 step Count = L.Fold step (DbCountStepResult []) id
   where step (DbCountStepResult acc) (DbFieldResult (_, field)) = DbCountStepResult $ (field, 1) : acc
 
-merge :: Query -> L.Fold DbResult DbResult
+step (Group query) = step query
+
+merge :: Query -> L.Fold -> DbResult DbResult
 merge Count = L.Fold step (DbCountResult 0) id
   where
     step (DbCountResult i) (DbCountStepResult results) = DbCountResult $ foldr (+) i (map snd results)
 
-merge :: Query -> L.Fold DbResult DbResult
-merge Group Count = L.Fold step (DbCountResult 0) id
+merge (Group query) = internal $ merge query
   where
-    step (DbCountResult i) (DbCountStepResult results) = DbCountResult $ foldr (+) i (map snd results)
+    internal (L.Fold stepIntern accIntern doneIntern) =
+      L.Fold step Map.empty rewrap
 
+      where
+        step !acc !val =
+          let (k,v) = toTuple val in
+          Map.alter (updateFn v) k acc
+
+        rewrap x = DbGroupResult $ Map.map doneIntern x
+
+        updateFn v i = case i of
+          (Just x)  -> Just $! stepIntern x v
+          (Nothing) -> Just accIntern
+
+toTuple :: DbResult -> (k, v)
+toTuple = undefined
 
 -- Group Fold should only receive tuples
 
