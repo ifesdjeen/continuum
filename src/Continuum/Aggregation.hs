@@ -18,7 +18,6 @@ aggregateRangeByFields :: Integer
 aggregateRangeByFields rangeBegin rangeEnd fields =
   scan (TsKeyRange rangeBegin rangeEnd) (Fields fields)
 
-
 aggregateAllByField :: ByteString
                        -> L.Fold DbResult acc
                        -> AppState (Either DbError acc)

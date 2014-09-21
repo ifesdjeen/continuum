@@ -6,6 +6,7 @@ module Continuum.Folds (countFold
                        , groupFold)
        where
 
+import           Data.ByteString                (ByteString)
 import Continuum.Types
 import Debug.Trace
 import qualified Data.Map.Strict as Map
@@ -18,6 +19,15 @@ countFold :: L.Fold a Int
 countFold = L.Fold step 0 id
   where step acc i = acc + 1
 
+countStepFold :: L.Fold a Int
+countStepFold = L.Fold step 0 id
+  where step acc i = acc + 1
+
+countMergeFold :: L.Fold a Int
+countMergeFold = L.Fold step 0 id
+  where step acc i = acc + 1
+
+
 -- | Append Fold
 appendFold :: L.Fold a [a]
 appendFold = L.Fold step [] id
@@ -27,6 +37,7 @@ groupFold :: (Ord k) =>
               (DbResult -> (k, v))
               -> L.Fold v res
               -> L.Fold DbResult (Map.Map k res)
+
 groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty rewrap
   where
     {-# INLINE step #-}
@@ -40,3 +51,12 @@ groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty 
     updateFn v i = case i of
       (Just x)  -> Just $! stepIntern x v
       (Nothing) -> Just accIntern
+
+
+-- Median -> Group
+-- Count -> Group
+
+-- Filtering???
+
+-- Query typeclass?
+-- Identify required fields
