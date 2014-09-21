@@ -21,6 +21,7 @@ import           Control.Concurrent
 import           Control.Concurrent.ParallelIO.Global
 import           Data.Either (rights)
 import qualified Data.Map.Strict as Map
+import           Data.Monoid
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
@@ -148,14 +149,16 @@ parallelScan = do
   -- Group fold is already a second step
   -- let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
   -- sum [0..10000000]
-  let readChunk r = scan r (Field "status") (step Count)
+  -- let readChunk r = scan r (Field "status") (step Count)
+  let readChunk r = scan r (Field "status") (step (Group Count))
 
   -- scan r (Field "status") (step Count)
   -- scan r (Field "status") (step Count)
   -- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
   res <- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i)) c
 
-  liftIO $ print $ L.fold (merge Count) (rights res)
+  liftIO $ print $ finalize $ mconcat (rights res)
+
 -- parallelScan = do
 --   c <- makeRanges <$> readChunks
 --   a <- readChunks
@@ -308,40 +311,27 @@ data Query = Count
            | Distinct
            | Min
            | Max
-
+           | Group Query
            deriving (Show)
 
 step :: Query -> L.Fold DbResult DbResult
-step Count = L.Fold step (DbCountStepResult []) id
-  where step (DbCountStepResult acc) (DbFieldResult (_, field)) = DbCountStepResult $ (field, 1) : acc
+step Count = L.Fold step (DbCountStepResult 0) id
+  where step (DbCountStepResult acc) (DbFieldResult (_, field)) = DbCountStepResult $ acc + 1
 
-step (Group query) = step query
-
-merge :: Query -> L.Fold -> DbResult DbResult
-merge Count = L.Fold step (DbCountResult 0) id
+step (Group Count) = L.Fold step (DbGroupResult $ Map.empty) id
   where
-    step (DbCountResult i) (DbCountStepResult results) = DbCountResult $ foldr (+) i (map snd results)
+    step (DbGroupResult m) (DbFieldResult (_, field)) = DbGroupResult $! Map.alter inc field m
+    inc Nothing = return $! DbCountStepResult 0
+    inc (Just (DbCountStepResult a)) = return $! DbCountStepResult (a + 1)
 
-merge (Group query) = internal $ merge query
-  where
-    internal (L.Fold stepIntern accIntern doneIntern) =
-      L.Fold step Map.empty rewrap
+instance Monoid DbResult where
+  mempty  = DbEmptyResult
+  mappend (DbCountStepResult a) (DbCountStepResult b) = DbCountStepResult $! a + b
+  mappend (DbGroupResult a) (DbGroupResult b) = DbGroupResult $! Map.unionWith (mappend) a b
 
-      where
-        step !acc !val =
-          let (k,v) = toTuple val in
-          Map.alter (updateFn v) k acc
+  mappend a DbEmptyResult = a
+  mappend DbEmptyResult b = b
+  mappend a b = error $ "can't mappend " ++ (show a) ++ " and "++ (show b)
 
-        rewrap x = DbGroupResult $ Map.map doneIntern x
-
-        updateFn v i = case i of
-          (Just x)  -> Just $! stepIntern x v
-          (Nothing) -> Just accIntern
-
-toTuple :: DbResult -> (k, v)
-toTuple = undefined
-
--- Group Fold should only receive tuples
-
--- merge :: Query -> DbResult -> DbResult
--- merge (Count All) Db = undefined
+finalize :: DbResult -> DbResult
+finalize a = a
