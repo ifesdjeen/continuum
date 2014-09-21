@@ -67,7 +67,8 @@ makeSchema stringTypeList = DbSchema { fieldMappings  = fMappings
 -- | DB VALUE
 -- |
 
-data DbValue = DbInt Integer
+data DbValue = EmptyValue
+             | DbInt Integer
              | DbFloat Float
              | DbDouble Double
              | DbString ByteString
@@ -84,14 +85,19 @@ data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
 makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
-
 -- |
 -- | DB RESULT
 -- |
 
-data DbResult = DbRecordResult DbRecord
+data DbResult = DbEmptyResult
+              | DbRecordResult DbRecord
               | DbFieldResult  (Integer, DbValue)
               | DbFieldsResult (Integer, [DbValue])
+
+              | DbCountStepResult Integer
+
+              | DbCountResult  Integer
+              | DbGroupResult (Map.Map DbValue DbResult)
               deriving(Show, Eq)
 
 -- |
