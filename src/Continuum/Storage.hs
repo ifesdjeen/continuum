@@ -75,22 +75,6 @@ storagePut (key, value) = do
   wo' <- wo
   Base.put db' wo' key value
 
-snapshotAfter :: Integer
-snapshotAfter = 250000
-
-maybeWriteChunk :: Integer -> DbRecord -> AppState ()
-maybeWriteChunk sid (DbRecord time _) = do
-  st <- get
-  if (sid >= (lastSnapshot st) + snapshotAfter || sid == 1)
-    then do
-    modify (\a -> a {lastSnapshot = sid})
-
-    liftIO $ print "writing chunk"
-
-    Base.put (ctxChunksDb st) (snd (ctxRwOptions st)) (packWord64 time) BS.empty
-    return ()
-    else return ()
-
 putRecord :: DbRecord -> AppState ()
 putRecord record = do
   sid     <- getAndincrementSequence
@@ -111,95 +95,16 @@ runApp path dbSchema actions = do
     -- liftResourceT $ (flip evalStateT) ctx actions
     evalStateT actions ctx
 
--- compareKeys :: ByteString -> ByteString -> Ordering
--- compareKeys k1 k2 = compare k11 k21
---                     where (k11, k12) = decodeKey k1
---                           (k21, k22) = decodeKey k2
--- customComparator :: Comparator
--- customComparator = Comparator compareKeys
-
-liftEither :: (a -> b -> c) -> Either DbError a -> Either DbError b -> Either DbError c
+liftEither :: (a -> b -> c)
+              -> Either DbError a
+              -> Either DbError b
+              -> Either DbError c
 liftEither f (Right a) (Right b) = return $! f a b
 liftEither _ (Left a)  _         = Left a
 liftEither _ _         (Left b)  = Left b
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
-
-readChunks :: AppState [Integer]
-readChunks = do
-  db' <- chunks
-  ro' <- ro
-  withIterator db' ro' $ \i -> (map unpackWord64) <$> (iterFirst i >> iterKeys i)
-
--- parallelScan :: AppState [Either DbError [DbResult]]
-
-makeRanges :: [Integer] -> [KeyRange]
-makeRanges (f:s:xs) = (TsKeyRange f s) : makeRanges (s:xs)
-makeRanges [a] = [TsOpenEnd a]
-
-parallelScan = do
-  c <- makeRanges <$> readChunks
-  st <- get
-  liftIO $ print c
-  -- So that fold is kind of incorrect. What we need is a merge step.
-  -- Although to make a merge step more usable and correct, we have
-  -- to collect the data in a different way.
-
-  -- Group fold is already a second step
-  -- let readChunk r = scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
-  -- sum [0..10000000]
-  -- let readChunk r = scan r (Field "status") (step Count)
-  let readChunk r = scan r (Field "status") (step (Group Count))
-
-  -- scan r (Field "status") (step Count)
-  -- scan r (Field "status") (step Count)
-  -- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i) >>= print) c
-  res <- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i)) c
-
-  liftIO $ print $ finalize $ mconcat (rights res)
-
--- parallelScan = do
---   c <- makeRanges <$> readChunks
---   a <- readChunks
-
---   st <- get
---   -- Scatter Scan Operations
---   -- toWait <- forM c (\(s,e) -> execAsync (scan (TsKeyRange s e) Record countFold))
---   toWait <- liftIO $ sequence $ map (\r -> execAsyncIO st (scan r (Field "status") (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold))) c
-
---   liftIO $ sequence $ map wait toWait
-
---   --return $ map wait toWait
---   -- Gather Scan Operations
-
---   -- liftIO $! sequence $! map wait toWait
-
-
-execAsyncIO :: DBContext -> AppState a -> IO a
-execAsyncIO  st op = runResourceT . evalStateT op $ st
-
-
-
-
--- -- Generalize??
--- execAsync :: AppState a -> AppState (Async a)
--- execAsync op = do
---   st <- get
---   -- TODO: Figure it out.
---   -- What's happening here is that we have an operation that we have to evaluate asynchronously.
---   -- That's completely cool in that particular case, although feels a bit weird to use such a beasy
---   -- construction to do something that's quite simple.
-
---   -- :t liftIO . async
---   -- liftIO . async :: MonadIO m => IO a -> m (Async a)
---   (liftIO . async) . runResourceT $ evalStateT op st
-
--- execWait :: AppState (Async a) -> AppState a
--- execWait op = do
---   st <- get
---   let a = runResourceT $ evalStateT op st
---   liftIO $ (a >>= wait)
 
 scan :: KeyRange
         -> Decoding
@@ -215,11 +120,6 @@ scan keyRange decoding (L.Fold foldop acc done) = do
         getNext      = advanceIterator iter keyRange
         step !a !x   = liftEither foldop a (mapop x)
     setStartPosition iter keyRange
-
-    -- Funnily enough, all the folloing is the equivalent of same thing, but all three yield
-    -- different performance. For now, I'm sticking with leftEither
-    -- let step !acc !x = mapop' x >>= \ !i -> strictFmap (\ !acc' -> foldop acc' i) acc
-    -- let step !acc !x = liftA2 foldop acc (mapop' x)
     scanStep getNext step (Right acc)
   return $! fmap done records -- (records >>= (\x -> return $ done x))
 
@@ -239,7 +139,10 @@ scanStep getNext op orig = s orig
 
 -- | Advances iterator to a single entry, exits and returns nothing in case there's either nothing
 -- more to read or we've reached the end of Key Range
-advanceIterator :: MonadResource m => Iterator -> KeyRange -> m (Maybe (ByteString, ByteString))
+advanceIterator :: MonadResource m =>
+                   Iterator
+                   -> KeyRange
+                   -> m (Maybe (ByteString, ByteString))
 advanceIterator iter (KeyRange _ rangeEnd) = do
   mkey <- iterKey iter
   mval <- iterValue iter
@@ -281,7 +184,10 @@ advanceIterator iter _ = do
   iterNext iter
   return $ (,) <$> mkey <*> mval
 
-setStartPosition :: MonadResource m => Iterator -> KeyRange -> m ()
+setStartPosition :: MonadResource m =>
+                    Iterator
+                    -> KeyRange
+                    -> m ()
 
 setStartPosition iter (OpenEnd startPosition)    = iterSeek iter startPosition
 setStartPosition iter (TsOpenEnd startPosition)  =
@@ -299,6 +205,47 @@ setStartPosition iter EntireKeyspace = iterFirst iter
 
 
 
+-- |
+-- | Chunking / Query Parallelisation
+-- |
+
+snapshotAfter :: Integer
+snapshotAfter = 250000
+
+maybeWriteChunk :: Integer -> DbRecord -> AppState ()
+maybeWriteChunk sid (DbRecord time _) = do
+  st <- get
+  when (sid >= (lastSnapshot st) + snapshotAfter || sid == 1) $ do
+    modify (\a -> a {lastSnapshot = sid})
+    Base.put (ctxChunksDb st) (snd (ctxRwOptions st)) (packWord64 time) BS.empty
+
+readChunks :: AppState [Integer]
+readChunks = do
+  db' <- chunks
+  ro' <- ro
+  withIterator db' ro' $ \i -> (map unpackWord64) <$> (iterFirst i >> iterKeys i)
+
+makeRanges :: [Integer]
+              -> [KeyRange]
+makeRanges (f:s:xs) = (TsKeyRange f s) : makeRanges (s:xs)
+makeRanges [a] = [TsOpenEnd a]
+
+parallelScan :: AppState DbResult
+parallelScan = do
+  c <- makeRanges <$> readChunks
+  st <- get
+  liftIO $ print c
+  -- So that fold is kind of incorrect. What we need is a merge step.
+  -- Although to make a merge step more usable and correct, we have
+  -- to collect the data in a different way.
+  let readChunk r = scan r (Field "status") (step (Group Count))
+
+  res <- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i)) c
+
+  return $ finalize $ mconcat (rights res)
+
+execAsyncIO :: DBContext -> AppState a -> IO a
+execAsyncIO  st op = runResourceT . evalStateT op $ st
 
 
 
@@ -315,23 +262,28 @@ data Query = Count
            deriving (Show)
 
 step :: Query -> L.Fold DbResult DbResult
-step Count = L.Fold step (DbCountStepResult 0) id
-  where step (DbCountStepResult acc) (DbFieldResult (_, field)) = DbCountStepResult $ acc + 1
-
-step (Group Count) = L.Fold step (DbGroupResult $ Map.empty) id
+step Count = L.Fold step (CountStep 0) id
   where
-    step (DbGroupResult m) (DbFieldResult (_, field)) = DbGroupResult $! Map.alter inc field m
-    inc Nothing = return $! DbCountStepResult 0
-    inc (Just (DbCountStepResult a)) = return $! DbCountStepResult (a + 1)
+    step (CountStep acc) (FieldRes (_, field)) = CountStep $ acc + 1
+
+step (Group Count) = L.Fold step (GroupRes $ Map.empty) id
+  where
+    step (GroupRes m) (FieldRes (_, field)) =
+      GroupRes $! Map.alter inc field m
+    inc Nothing = return $! CountStep 0
+    inc (Just (CountStep a)) = return $! CountStep (a + 1)
 
 instance Monoid DbResult where
-  mempty  = DbEmptyResult
-  mappend (DbCountStepResult a) (DbCountStepResult b) = DbCountStepResult $! a + b
-  mappend (DbGroupResult a) (DbGroupResult b) = DbGroupResult $! Map.unionWith (mappend) a b
+  mempty  = EmptyRes
+  mappend (CountStep a) (CountStep b) =
+    CountStep $! a + b
 
-  mappend a DbEmptyResult = a
-  mappend DbEmptyResult b = b
-  mappend a b = error $ "can't mappend " ++ (show a) ++ " and "++ (show b)
+  mappend (GroupRes a)  (GroupRes b) =
+    GroupRes $! Map.unionWith mappend a b
+
+  mappend a EmptyRes = a
+  mappend EmptyRes b = b
+  mappend _ _ = ErrorRes
 
 finalize :: DbResult -> DbResult
 finalize a = a
