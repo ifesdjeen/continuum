@@ -89,15 +89,16 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 -- | DB RESULT
 -- |
 
-data DbResult = DbEmptyResult
-              | DbRecordResult DbRecord
-              | DbFieldResult  (Integer, DbValue)
-              | DbFieldsResult (Integer, [DbValue])
+data DbResult = EmptyRes
+              | ErrorRes
+              | RecordRes    DbRecord
+              | FieldRes     (Integer, DbValue)
+              | FieldsRes    (Integer, [DbValue])
 
-              | DbCountStepResult Integer
+              | CountStep  Integer
+              | CountRes   Integer
+              | GroupRes   (Map.Map DbValue DbResult)
 
-              | DbCountResult  Integer
-              | DbGroupResult (Map.Map DbValue DbResult)
               deriving(Show, Eq)
 
 -- |
