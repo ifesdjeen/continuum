@@ -29,7 +29,7 @@ main =  hspec $ do
             putRecord $ makeRecord 123 [("a", (DbInt 1)),
                                         ("b", (DbString "1"))]
             scan (TsSingleKey 123) Record appendFold
-      res `shouldReturn` Right [DbRecordResult $
+      res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
                                                 ("b", DbString "1")]]
 
@@ -52,13 +52,13 @@ main =  hspec $ do
 
             scan (TsSingleKey 123) Record appendFold
 
-      res `shouldReturn` Right [DbRecordResult $
+      res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
                                                 ("b", DbString "1")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 123 [("a", DbInt 2),
                                                 ("b", DbString "2")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 123 [("a", DbInt 3),
                                                 ("b", DbString "3")]]
 
@@ -84,22 +84,22 @@ main =  hspec $ do
 
             scan (TsKeyRange 123 456) Record appendFold
 
-      res `shouldReturn` Right [DbRecordResult $
+      res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
                                                 ("b", DbString "1")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 124 [("a", DbInt 2),
                                                 ("b", DbString "2")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 125 [("a", DbInt 3),
                                                 ("b", DbString "3")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 456 [("a", DbInt 1),
                                                 ("b", DbString "1")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 456 [("a", DbInt 2),
                                                 ("b", DbString "2")],
-                                DbRecordResult $
+                                RecordRes $
                                 makeRecord 456 [("a", DbInt 3),
                                                 ("b", DbString "3")]]
 
@@ -125,13 +125,13 @@ main =  hspec $ do
 
             scan (TsKeyRange 300 456) Record appendFold
 
-      res `shouldReturn` (Right [DbRecordResult $
+      res `shouldReturn` (Right [RecordRes $
                                  makeRecord 456 [("a", DbInt 1),
                                                  ("b", DbString "1")],
-                                 DbRecordResult $
+                                 RecordRes $
                                  makeRecord 456 [("a", DbInt 2),
                                                  ("b", DbString "2")],
-                                 DbRecordResult $
+                                 RecordRes $
                                  makeRecord 456 [("a", DbInt 3),
                                                  ("b", DbString "3")]
                                 ])
@@ -154,7 +154,7 @@ testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
 
 cleanup :: IO ()
-cleanup = system ("rm -fr " ++ testDBPath) >> return ()
+cleanup = system ("rm -fr " ++ testDBPath) >> system ("mkdir " ++ testDBPath) >> return ()
 
 
 -- TODO: port tests to quickcheck
