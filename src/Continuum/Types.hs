@@ -2,13 +2,16 @@
 
 module Continuum.Types where
 
+import qualified Data.Map as Map
+
 import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
 import           GHC.Generics           (Generic)
 import           Control.Monad.Trans.Resource
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions)
-
 import qualified Data.Map as Map
+import qualified Data.Serialize as S
+import           GHC.Generics           (Generic)
 
 type AppState a = StateT DBContext (ResourceT IO) a
 
@@ -19,11 +22,16 @@ data DbError = IndexesDecodeError      String
              | KeyDecodeError          String
              | DecodeFieldByIndexError String [Int]
              | FieldNotFoundError
+             | NoSuchDatabaseError
+             | NoAggregatorAvailable
+             | SchemaDecodingError     String
              | OtherError
              deriving (Show, Eq, Ord, Generic)
 
 data DbType = DbtInt | DbtString
-                       deriving(Show)
+                       deriving(Show, Generic)
+
+instance S.Serialize DbType
 
 type RWOptions = (ReadOptions, WriteOptions)
 
@@ -31,13 +39,14 @@ type RWOptions = (ReadOptions, WriteOptions)
 -- | DB CONTEXT
 -- |
 
-data DBContext = DBContext { ctxDb          :: DB
-                           , ctxChunksDb     :: DB
-                           , ctxSchema    :: DbSchema
-                             , sequenceNumber :: Integer
-                             , lastSnapshot   :: Integer
+data DBContext = DBContext { ctxSystemDb       :: DB
+                           , ctxDbs            :: Map.Map ByteString (DbSchema, DB)
+                           , ctxChunksDb       :: DB
+                           , ctxSchema         :: DbSchema
+                           , sequenceNumber    :: Integer
+                           , lastSnapshot      :: Integer
                              -- , ctxKeyspace  :: ByteString
-                             , ctxRwOptions :: RWOptions
+                           , ctxRwOptions      :: RWOptions
                            }
 
 -- |
@@ -50,6 +59,9 @@ data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
                            , schemaMappings :: Map.Map ByteString DbType
                            , schemaTypes    :: [DbType]
                            }
+              deriving (Generic)
+instance S.Serialize DbSchema
+
 
 makeSchema :: [(ByteString, DbType)] -> DbSchema
 makeSchema stringTypeList = DbSchema { fieldMappings  = fMappings
@@ -90,7 +102,7 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 -- |
 
 data DbResult = EmptyRes
-              | ErrorRes
+              | ErrorRes     DbError
               | RecordRes    DbRecord
               | FieldRes     (Integer, DbValue)
               | FieldsRes    (Integer, [DbValue])
