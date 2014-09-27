@@ -4,6 +4,7 @@
 
 module Continuum.Cluster where
 
+import qualified Continuum.Storage as Storage
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad
@@ -16,7 +17,6 @@ import           System.Environment
 import qualified Control.Concurrent.Suspend.Lifted as Delay
 import qualified Control.Concurrent.Timer as Timer
 
-import           Control.Monad.State.Strict
 import qualified Nanomsg as N
 import qualified Data.ByteString.Char8 as C
 import qualified Network.Socket as Socket
@@ -49,7 +49,6 @@ processRequest self socket shared (ImUp node) = do
 processRequest self socket shared (Heartbeat node) = do
   time <- Clock.getPOSIXTime
   swap (\nodes -> Map.update (updateNodeTime time) node nodes) shared
-  -- print $ "got heartbeat from: " ++ (show node)
   where updateNodeTime time nodeStatus = Just $ nodeStatus { lastHeartbeat = time }
 
 processRequest self socket shared (Introduction node) = do
@@ -78,7 +77,6 @@ connectTo socket other@(Node host port) self shared | other /= self = do
   where introduce = N.send socket (encode $ Introduction self)
 
 connectTo socket other@(Node host port) self shared = return ()
-
 initializeNode :: N.Socket N.Bus
                   -> Node
                   -> Node
@@ -94,18 +92,20 @@ initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= d
           N.send socket (encode $ ImUp self)
           return ()
 
-startSeedNode = do
+startNode = do
   done <- newEmptyMVar
 
   [host, port, seedHost, seedPort] <- getArgs
   shared <- atomically $ newTVar (Map.empty :: ClusterNodes)
 
   serverSocket <- N.socket N.Bus
-  let seed = (Node seedHost seedPort)
-      self = (Node host port)
+
+  let seed         = (Node seedHost seedPort)
+      self         = (Node host port)
       boundRequest = processRequest self serverSocket
 
   initializeNode serverSocket seed self shared
+
   forkIO $ do
     let receiveop = do
           received <- N.recv serverSocket
