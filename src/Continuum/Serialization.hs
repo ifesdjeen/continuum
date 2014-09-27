@@ -54,6 +54,13 @@ encodeEndTimestamp :: Integer -> ByteString
 encodeEndTimestamp timestamp =
   BS.concat [(packWord64 timestamp), (packWord64 999999)]
 
+decodeSchema :: (ByteString, ByteString)
+                -> Either DbError (ByteString, DbSchema)
+decodeSchema (dbName, encodedSchema) =
+  case (decode encodedSchema) of
+    (Left err)     -> Left  $ SchemaDecodingError err
+    (Right schema) -> Right $ (dbName, schema)
+
 -- |
 -- | DECODING
 -- |
