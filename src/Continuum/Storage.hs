@@ -12,15 +12,15 @@ module Continuum.Storage
 
 -- import           Debug.Trace
 
-import           Continuum.Folds
 import           Continuum.Options
 import           Continuum.Serialization
 import           Continuum.Types
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Concurrent.ParallelIO.Global
-import           Data.Either (rights)
+import           Control.Monad.Except
 import qualified Data.Map.Strict as Map
 import           Data.Monoid
+import           Data.Traversable (traverse)
 import qualified Database.LevelDB.MonadResource  as Base
 import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions,
                                                  Iterator,
@@ -32,7 +32,7 @@ import           Data.ByteString                (ByteString)
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString as BS
 import           Control.Monad.State.Strict
-import           Data.Maybe                     (isJust, fromJust, catMaybes)
+import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
 
@@ -84,15 +84,16 @@ storagePut dbName (key, value) = do
   if (isJust db')
     then do
     wo' <- wo
+    -- TODO: read up about bracket
     Base.put (snd $ fromJust db') wo' key value
-    return $ EmptyRes
+    return $ return $ EmptyRes
     else
-    return $ ErrorRes NoSuchDatabaseError
+    return $ Left NoSuchDatabaseError
 
 putRecord :: ByteString -> DbRecord -> AppState DbResult
 putRecord dbName record = do
   sid     <- getAndincrementSequence
-  ()      <- maybeWriteChunk sid record
+  _       <- maybeWriteChunk sid record
   schema' <- schema
   storagePut dbName (encodeRecord schema' record sid)
 
@@ -101,26 +102,25 @@ alwaysTrue = \_ _ -> True
 
 -- prepareContext path dbSchema =
 
-runApp :: String -> DbSchema -> AppState a -> IO (a)
+runApp :: String -> DbSchema
+          -> AppState a
+          -> IO (Either DbError a)
 runApp path dbSchema actions = do
   runResourceT $ do
     -- TODO: add indexes
     systemDb  <- Base.open (path ++ "/system") opts
     chunksDb  <- Base.open (path ++ "/chunksDb") opts
     eitherDbs <- initializeDbs path systemDb
-    -- TODO: Figure out how to improve that code
-    case eitherDbs of
-      (Left err)  -> error $ show err
-      (Right dbs) ->
-        evalStateT actions (makeContext systemDb dbs chunksDb dbSchema (readOpts, writeOpts))
+    let run dbs = evalStateT actions (makeContext systemDb dbs chunksDb dbSchema (readOpts, writeOpts))
+    join <$> traverse run eitherDbs
 
-liftEither :: (a -> b -> c)
-              -> Either DbError a
-              -> Either DbError b
-              -> Either DbError c
-liftEither f (Right a) (Right b) = return $! f a b
-liftEither _ (Left a)  _         = Left a
-liftEither _ _         (Left b)  = Left b
+liftDbError :: (a -> b -> c)
+              -> DbErrorMonad a
+              -> DbErrorMonad b
+              -> DbErrorMonad c
+liftDbError f (Right a) (Right b) = return $! f a b
+liftDbError _ (Left a)  _         = Left a
+liftDbError _ _         (Left b)  = Left b
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
@@ -129,7 +129,7 @@ scan :: ByteString
         -> KeyRange
         -> Decoding
         -> L.Fold DbResult acc
-        -> AppState (Either DbError acc)
+        -> AppState acc
 
 scan dbName keyRange decoding (L.Fold foldop acc done) = do
   maybeDb <- db dbName
@@ -141,10 +141,10 @@ scan dbName keyRange decoding (L.Fold foldop acc done) = do
     records <- withIterator db' ro' $ \iter -> do
       let mapop        = decodeRecord decoding schema'
           getNext      = advanceIterator iter keyRange
-          step !a !x   = liftEither foldop a (mapop x)
+          step !a !x   = liftDbError foldop a (mapop x)
       setStartPosition iter keyRange
       scanStep getNext step (Right acc)
-    return $! fmap done records -- (records >>= (\x -> return $ done x))
+    return $! fmap done records
     else do
     return $ Left NoSuchDatabaseError
 
@@ -236,38 +236,36 @@ setStartPosition iter EntireKeyspace = iterFirst iter
 snapshotAfter :: Integer
 snapshotAfter = 250000
 
-maybeWriteChunk :: Integer -> DbRecord -> AppState ()
+maybeWriteChunk :: Integer -> DbRecord -> AppState DbResult
 maybeWriteChunk sid (DbRecord time _) = do
   st <- get
   when (sid >= (lastSnapshot st) + snapshotAfter || sid == 1) $ do
     modify (\a -> a {lastSnapshot = sid})
     Base.put (ctxChunksDb st) (snd (ctxRwOptions st)) (packWord64 time) BS.empty
+  return $ return $ EmptyRes
 
 readChunks :: AppState [Integer]
 readChunks = do
   db' <- chunks
   ro' <- ro
-  withIterator db' ro' $ \i -> (map unpackWord64) <$> (iterFirst i >> iterKeys i)
+  withIterator db' ro' $ \i -> (mapM unpackWord64) <$> (iterFirst i >> iterKeys i)
 
 initializeDbs :: MonadResource m =>
                  String
                  -> DB
-                 -> m (Either DbError (Map.Map ByteString (DbSchema, DB)))
+                 -> m (DbErrorMonad SchemaMap)
 initializeDbs path systemDb = do
   schemas <- withIterator systemDb readOpts $ readSchemas
-  case (sequence schemas) of
-    (Left err)  -> return $ Left $ err
-    -- Looks like a good place for a monad transfomer?
-    (Right res) -> do
-      a <- addDbInit path res
-      return $ Right a
+  traverse (addDbInit path) (sequence schemas)
   where readSchemas i  = (map decodeSchema) <$> (iterFirst i >> iterItems i)
 
 addDbInit :: MonadResource m =>
              String
              -> [(ByteString, DbSchema)]
-             -> m (Map.Map ByteString (DbSchema, DB))
-addDbInit path coll = liftM Map.fromList (sequence (map initDb coll))
+             -> m SchemaMap
+addDbInit path coll =
+  Map.fromList <$> mapM initDb coll
+
   where initDb (dbName, schema) = do
           db <- Base.open (path ++ (C8.unpack dbName)) opts
           return (dbName, (schema, db))
@@ -279,19 +277,30 @@ makeRanges [a] = [TsOpenEnd a]
 
 parallelScan :: ByteString -> AppState DbResult
 parallelScan dbName = do
-  c <- makeRanges <$> readChunks --
-  st <- get
-  liftIO $ print c
-  -- So that fold is kind of incorrect. What we need is a merge step.
-  -- Although to make a merge step more usable and correct, we have
-  -- to collect the data in a different way.
-  let readChunk r = scan dbName r (Field "status") (step (Group Count))
+  chunks <- readChunks
+  st     <- get
+  let ranges           = makeRanges <$> chunks
+      scanChunk r      = scan dbName r (Field "status") (step (Group Count))
+      asyncReadChunk i = (execAsyncIO st (scanChunk i)) :: IO (DbErrorMonad DbResult)
 
-  res <- liftIO $ parallel $ fmap (\i -> execAsyncIO st (readChunk i)) c
+  rangeResults <- liftIO $ runRangeQueries ranges asyncReadChunk
+  return $ (finalize . mconcat) <$> rangeResults
 
-  return $ finalize $ mconcat (rights res)
+runRangeQueries :: DbErrorMonad [KeyRange]
+                -> (KeyRange -> IO (DbErrorMonad DbResult))
+                -> IO (DbErrorMonad [DbResult])
+runRangeQueries (Left  err)    _  = return $ Left err
+runRangeQueries (Right ranges) op = do
+  res <- parallel $ map op ranges
+  return $ sequence res
 
-execAsyncIO :: DBContext -> AppState a -> IO a
+-- asd eitherRanges op = traverse (\i -> mapM op i) eitherRanges
+
+
+-- So far I've managed to get here: IO (Either DbError [DbErrorMonad DbResult])
+
+-- f (Either DbError [b])
+execAsyncIO :: DBContext -> AppState a -> IO (Either DbError a)
 execAsyncIO  st op = runResourceT . evalStateT op $ st
 
 
@@ -336,42 +345,3 @@ finalize a = a
 
 
 -- createDb
-
-
--- data Query     = Query
-data SomeObj   = SomeObj
-data IoOnlyObj = IoOnlyObj
-data Err       = Err
-
--- There's a decoder function that makes some object from String
-decodeFn :: String -> Either Err SomeObj
-decodeFn = undefined
-
--- There's a query, that runs against DB and returns array of strings
-fetchFn :: Query -> IO [String]
-fetchFn = undefined
-
--- there's some additional "context initializer", that also has IO
--- side-effects
-makeIoOnlyObj :: [SomeObj] -> IO [(SomeObj, IoOnlyObj)]
-makeIoOnlyObj = undefined
-
--- and now, there's a pipeline function, that takes query,
--- decodes results, and then runs another IO operation with the
--- results of query. And it seems to me that there are much much
--- better ways of implementing such things.
---
--- `makeIoOnlyObj` returns IO-wrapped result, and we need
--- return IO Either-wrapped.
---
--- So far what I've got is as follows. How do I improve it?
-pipelineFn :: Query
-              -> IO (Either Err [(SomeObj, IoOnlyObj)])
-pipelineFn query = do
-  a <- fetchFn query
-  return $ makeIoOnlyObj <$> (sequence (map decodeFn a))
-  -- case sequence (map decodeFn a) of
-  --   (Left  err)  -> return $ Left $ err
-  --   (Right res) -> do
-  --     a <- makeIoOnlyObj res
-  --     return $ Right a
