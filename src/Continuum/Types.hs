@@ -4,6 +4,7 @@ module Continuum.Types where
 
 import qualified Data.Map as Map
 
+import           Control.Monad.Except
 import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
 import           GHC.Generics           (Generic)
@@ -13,7 +14,12 @@ import qualified Data.Map as Map
 import qualified Data.Serialize as S
 import           GHC.Generics           (Generic)
 
-type AppState a = StateT DBContext (ResourceT IO) a
+-- type DbErrorMonadT = ExceptT DbError IO
+type DbErrorMonad  = Either  DbError
+
+type SchemaMap     = Map.Map ByteString (DbSchema, DB)
+
+type AppState a = StateT DBContext (ResourceT IO) (DbErrorMonad a)
 
 data DbError = IndexesDecodeError      String
              | FieldDecodeError        String ByteString
