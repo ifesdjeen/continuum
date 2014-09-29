@@ -51,13 +51,12 @@ testDBPath :: String
 testDBPath = "/tmp/production-data"
 
 
-main2 :: IO ()
+main2 :: IO (DbErrorMonad DbResult)
 main2 = do
-
   -- liftIO $ cleanup
 
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
-  line <- return $ lines content
+  line    <- return $ lines content
   decoded <- return $ (map decodeStr line)
 
   -- putStrLn $ show decoded
@@ -65,14 +64,13 @@ main2 = do
   runApp testDBPath prodSchema $ do
     forM_ decoded $ \x ->
 
-      putRecord (makeRecord (date x)
+      putRecord "testdb" (makeRecord (date x)
                  [("request_ip", DbString (pack (request_ip x))),
                   ("host",       DbString (pack (host x))),
                   ("uri",        DbString (pack (uri x))),
                   ("status",     DbString (pack (status x)))
                  ])
-
-  return ()
+    return $ Right EmptyRes
 
 main = runApp testDBPath prodSchema $ do
   -- forM_ [0..100] $ \x -> do
@@ -85,12 +83,12 @@ main = runApp testDBPath prodSchema $ do
 
 
   before <- liftIO $ getPOSIXTime
-  a <- parallelScan
+  a <- parallelScan "testdb"
   after <- liftIO $ getPOSIXTime
   liftIO $ putStrLn $ show a
   liftIO $ putStrLn $ show (after - before)
 
-  return ()
+  return $ Right EmptyRes
 
-cleanup :: IO ()
-cleanup = system ("rm -fr " ++ testDBPath) >> return ()
+-- cleanup :: IO ()
+-- cleanup = system ("rm -fr " ++ testDBPath) >> return ()
