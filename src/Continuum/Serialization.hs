@@ -26,8 +26,8 @@ import           Control.Monad.Except(forM_, throwError)
 
 data Success = Success
 
-validate :: DbSchema -> DbRecord -> Either String Success
-validate = error "Not Implemented"
+-- validate :: DbSchema -> DbRecord -> Either String Success
+-- validate = error "Not Implemented"
 
 -- |
 -- | ENCODING
@@ -55,11 +55,11 @@ encodeEndTimestamp timestamp =
   BS.concat [(packWord64 timestamp), (packWord64 999999)]
 
 decodeSchema :: (ByteString, ByteString)
-                -> Either DbError (ByteString, DbSchema)
+                -> DbErrorMonad (ByteString, DbSchema)
 decodeSchema (dbName, encodedSchema) =
   case (decode encodedSchema) of
-    (Left err)     -> Left  $ SchemaDecodingError err
-    (Right schema) -> Right $ (dbName, schema)
+    (Left err)     -> throwError $ SchemaDecodingError err
+    (Right schema) -> return (dbName, schema)
 
 -- |
 -- | DECODING
@@ -68,7 +68,7 @@ decodeSchema (dbName, encodedSchema) =
 decodeRecord :: Decoding
              -> DbSchema
              -> (ByteString, ByteString)
-             -> Either DbError DbResult
+             -> DbErrorMonad DbResult
 
 decodeRecord (Field field) schema !(k, bs) = do
   decodedK      <- decodeKey k
@@ -99,8 +99,8 @@ decodeRecord (Fields flds) schema (k, bs) = do
 -- | DECODING Utility Functions
 -- |
 
-decodeKey :: ByteString -> Either DbError Integer
-decodeKey x = return $ unpackWord64 (BS.take 8 x)
+decodeKey :: ByteString -> DbErrorMonad Integer
+decodeKey x = unpackWord64 (BS.take 8 x)
 {-# INLINE decodeKey #-}
 
 decodeIndexes :: DbSchema -> ByteString -> [Int]
@@ -112,7 +112,7 @@ slide :: [a] -> [(a, a)]
 slide (f:s:xs) = (f,s) : slide (s:xs)
 slide _ = []
 
-decodeValues :: DbSchema -> ByteString -> Either DbError [DbValue]
+decodeValues :: DbSchema -> ByteString -> DbErrorMonad [DbValue]
 decodeValues schema bs = mapM (\(t, s) -> fastDecodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
     indices                  = decodeIndexes schema bs
@@ -124,7 +124,7 @@ decodeFieldByIndex :: DbSchema
                       -> [Int]
                       -> Int
                       -> ByteString
-                      -> Either DbError DbValue
+                      -> DbErrorMonad DbValue
 decodeFieldByIndex schema indices idx bs = fastDecodeValue ((schemaTypes schema) !! idx) bytestring
   where
     {-# INLINE bytestring #-}
@@ -142,8 +142,8 @@ fastEncodeValue :: DbValue -> ByteString
 fastEncodeValue (DbInt    value) = packWord64 value
 fastEncodeValue (DbString value) = value
 
-fastDecodeValue :: DbType -> ByteString -> Either DbError DbValue
-fastDecodeValue DbtInt bs    = return $ DbInt $ unpackWord64 bs
+fastDecodeValue :: DbType -> ByteString -> DbErrorMonad DbValue
+fastDecodeValue DbtInt bs    = DbInt <$> unpackWord64 bs
 fastDecodeValue DbtString bs = return $ DbString bs
 
 packWord64 :: Integer -> ByteString
@@ -159,8 +159,8 @@ packWord64 i =
              , (fromIntegral (w)             :: Word8)]
 {-# INLINE packWord64 #-}
 
-unpackWord64 :: ByteString -> Integer
-unpackWord64 s =
+unpackWord64 :: ByteString -> Either DbError Integer
+unpackWord64 s = return $
     (fromIntegral (s `BS.index` 0) `shiftL` 56) .|.
     (fromIntegral (s `BS.index` 1) `shiftL` 48) .|.
     (fromIntegral (s `BS.index` 2) `shiftL` 40) .|.
