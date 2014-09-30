@@ -3,16 +3,17 @@
 
 module Storage.Test where
 
-import Control.Monad (forM_)
-import Continuum.Aggregation
-import Continuum.Folds
-import Continuum.Serialization
-import Continuum.Storage
-import Continuum.Types
-import Control.Monad.IO.Class
+import           Data.ByteString (ByteString)
+import           Control.Monad (forM_)
+import           Continuum.Aggregation
+import           Continuum.Folds
+import           Continuum.Serialization
+import           Continuum.Storage
+import           Continuum.Types
+import           Control.Monad.IO.Class
 
-import System.Process(system)
-import Test.Hspec
+import           System.Process(system)
+import           Test.Hspec
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
@@ -26,9 +27,12 @@ main =  hspec $ do
 
     it "should put items into the database and retrieve them" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)),
+            createDatabase testDBName testSchema
+
+            putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
                                         ("b", (DbString "1"))]
-            scan (TsSingleKey 123) Record appendFold
+
+            scantdb (TsSingleKey 123) Record appendFold
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
                                                 ("b", DbString "1")]]
@@ -36,21 +40,23 @@ main =  hspec $ do
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should retrieve items by given timestamp" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", DbInt 1),
+            createDatabase testDBName testSchema
+
+            putRecordTdb $ makeRecord 123 [("a", DbInt 1),
                                         ("b", DbString "1")]
-            putRecord $ makeRecord 123 [("a", DbInt 2),
+            putRecordTdb $ makeRecord 123 [("a", DbInt 2),
                                         ("b", DbString "2")]
-            putRecord $ makeRecord 123 [("a", DbInt 3),
+            putRecordTdb $ makeRecord 123 [("a", DbInt 3),
                                         ("b", DbString "3")]
 
-            putRecord $ makeRecord 456 [("a", DbInt 1),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 1),
                                         ("b", DbString "1")]
-            putRecord $ makeRecord 456 [("a", DbInt 2),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 2),
                                         ("b", DbString "2")]
-            putRecord $ makeRecord 456 [("a", DbInt 3),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 3),
                                         ("b", DbString "3")]
 
-            scan (TsSingleKey 123) Record appendFold
+            scantdb (TsSingleKey 123) Record appendFold
 
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
@@ -63,26 +69,29 @@ main =  hspec $ do
                                                 ("b", DbString "3")]]
 
     it "setup" $ cleanup >>= shouldReturn (return())
+
     it "should return inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", (DbInt 1)),
-                                        ("b", (DbString "1"))]
-            putRecord $ makeRecord 124 [("a", (DbInt 2)),
-                                        ("b", (DbString "2"))]
-            putRecord $ makeRecord 125 [("a", (DbInt 3)),
-                                        ("b", (DbString "3"))]
+            createDatabase testDBName testSchema
 
-            putRecord $ makeRecord 456 [("a", (DbInt 1)),
-                                        ("b", (DbString "1"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 2)),
-                                        ("b", (DbString "2"))]
-            putRecord $ makeRecord 456 [("a", (DbInt 3)),
-                                        ("b", (DbString "3"))]
+            putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
+                                           ("b", (DbString "1"))]
+            putRecordTdb $ makeRecord 124 [("a", (DbInt 2)),
+                                           ("b", (DbString "2"))]
+            putRecordTdb $ makeRecord 125 [("a", (DbInt 3)),
+                                           ("b", (DbString "3"))]
 
-            putRecord $ makeRecord 555 [("a", (DbInt 3)),
-                                        ("b", (DbString "3"))]
+            putRecordTdb $ makeRecord 456 [("a", (DbInt 1)),
+                                           ("b", (DbString "1"))]
+            putRecordTdb $ makeRecord 456 [("a", (DbInt 2)),
+                                           ("b", (DbString "2"))]
+            putRecordTdb $ makeRecord 456 [("a", (DbInt 3)),
+                                           ("b", (DbString "3"))]
 
-            scan (TsKeyRange 123 456) Record appendFold
+            putRecordTdb $ makeRecord 555 [("a", (DbInt 3)),
+                                           ("b", (DbString "3"))]
+
+            scantdb (TsKeyRange 123 456) Record appendFold
 
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
@@ -104,26 +113,29 @@ main =  hspec $ do
                                                 ("b", DbString "3")]]
 
     it "setup" $ cleanup >>= shouldReturn (return())
-    it "should scan a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
+
+    it "should scantdb a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
       let res = runApp testDBPath testSchema $ do
-            putRecord $ makeRecord 123 [("a", DbInt 1),
+            createDatabase testDBName testSchema
+
+            putRecordTdb $ makeRecord 123 [("a", DbInt 1),
                                         ("b", DbString "1")]
-            putRecord $ makeRecord 124 [("a", DbInt 2),
+            putRecordTdb $ makeRecord 124 [("a", DbInt 2),
                                         ("b", DbString "2")]
-            putRecord $ makeRecord 125 [("a", DbInt 3),
+            putRecordTdb $ makeRecord 125 [("a", DbInt 3),
                                         ("b", DbString "3")]
 
-            putRecord $ makeRecord 456 [("a", DbInt 1),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 1),
                                         ("b", DbString "1")]
-            putRecord $ makeRecord 456 [("a", DbInt 2),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 2),
                                         ("b", DbString "2")]
-            putRecord $ makeRecord 456 [("a", DbInt 3),
+            putRecordTdb $ makeRecord 456 [("a", DbInt 3),
                                         ("b", DbString "3")]
 
-            putRecord $ makeRecord 700 [("a", DbInt 3),
+            putRecordTdb $ makeRecord 700 [("a", DbInt 3),
                                         ("b", DbString "3")]
 
-            scan (TsKeyRange 300 456) Record appendFold
+            scantdb (TsKeyRange 300 456) Record appendFold
 
       res `shouldReturn` (Right [RecordRes $
                                  makeRecord 456 [("a", DbInt 1),
@@ -140,12 +152,15 @@ main =  hspec $ do
     it "setup" $ cleanup >>= shouldReturn (return())
     it "should iterate over a large amount of records" $  do
       let res = runApp testDBPath testSchema $ do
+            createDatabase testDBName testSchema
+
             forM_ [1..1000000]
-              (\i -> putRecord $ makeRecord i [("a", DbInt 1),
+              (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
                                                ("b", DbString "1")])
-            scan EntireKeyspace (Field "a") countFold
+            scantdb EntireKeyspace (Field "a") countFold
       res `shouldReturn` (Right 1000000)
 
+    it "setup" $ cleanup >>= shouldReturn (return())
 
     -- it "should iterate " $  do
     --   let res = runApp testDBPath testSchema $ do
@@ -153,9 +168,13 @@ main =  hspec $ do
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"
 
+testDBName :: ByteString
+testDBName = "testdb"
+
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDBPath) >> system ("mkdir " ++ testDBPath) >> return ()
 
-
+putRecordTdb = putRecord testDBName
+scantdb = scan testDBName
 -- TODO: port tests to quickcheck
 ---
