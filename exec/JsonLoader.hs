@@ -62,6 +62,8 @@ main2 = do
   -- putStrLn $ show decoded
 
   runApp testDBPath prodSchema $ do
+    createDatabase "testdb" prodSchema
+
     forM_ decoded $ \x ->
 
       putRecord "testdb" (makeRecord (date x)
@@ -80,7 +82,6 @@ main = runApp testDBPath prodSchema $ do
   --         after <- liftIO $ getPOSIXTime
   --         liftIO $ putStrLn $ show a
   --         liftIO $ putStrLn $ show (after - before)
-
 
   before <- liftIO $ getPOSIXTime
   a <- parallelScan "testdb"
