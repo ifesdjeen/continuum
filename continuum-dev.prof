@@ -1,130 +1,100 @@
-	Sun Sep  7 00:17 2014 Time and Allocation Profiling Report  (Final)
+	Mon Sep 22 22:54 2014 Time and Allocation Profiling Report  (Final)
 
 	   continuum-dev +RTS -p -RTS
 
-	total time  =        0.62 secs   (618 ticks @ 1000 us, 1 processor)
-	total alloc = 364,736,104 bytes  (excludes profiling overheads)
+	total time  =        3.12 secs   (3118 ticks @ 1000 us, 1 processor)
+	total alloc = 2,599,611,696 bytes  (excludes profiling overheads)
 
-COST CENTRE        MODULE                         %time %alloc
+COST CENTRE  MODULE                         %time %alloc
 
-iterNext           Database.LevelDB.Iterator       21.8    9.7
-iterEntry          Database.LevelDB.MonadResource  15.2   17.1
-gaplessScan.\.\    Continuum.Storage               11.3   23.7
-iterString         Database.LevelDB.Iterator        9.5    3.9
-iterKey            Database.LevelDB.Iterator        9.4   11.6
-iterString.\       Database.LevelDB.Iterator        9.1    7.7
-iterValue          Database.LevelDB.Iterator        8.9   11.6
-scanIntern         Continuum.Storage                6.8    7.5
-groupFold.step     Continuum.Folds                  2.4    4.6
-compare            Continuum.Serialization          1.8    0.0
-groupFold.updateFn Continuum.Folds                  0.3    1.5
+withIterator Database.LevelDB.MonadResource  39.0   53.3
+iterString.\ Database.LevelDB.Iterator       15.6   10.7
+iterString   Database.LevelDB.Iterator       14.9    5.5
+iterNext     Database.LevelDB.Iterator       14.8   10.1
+iterKey      Database.LevelDB.Iterator        9.1   10.1
+iterValue    Database.LevelDB.Iterator        6.1   10.1
 
 
-                                                                                     individual     inherited
-COST CENTRE                       MODULE                           no.     entries  %time %alloc   %time %alloc
+                                                                                          individual     inherited
+COST CENTRE                      MODULE                                 no.     entries  %time %alloc   %time %alloc
 
-MAIN                              MAIN                             179           0    0.0    0.0   100.0  100.0
- main                             Main                             360           0    0.0    0.0   100.0  100.0
-  groupFold                       Continuum.Folds                  434           0    0.0    0.0     5.8    7.2
-   groupFold.step                 Continuum.Folds                  436      100000    2.4    4.6     5.8    7.2
-    compare                       Continuum.Serialization          441      198314    1.8    0.0     1.8    0.0
-    groupFold.updateFn            Continuum.Folds                  440      100000    0.3    1.5     1.3    2.0
-     countFold.step               Continuum.Folds                  444       99993    1.0    0.4     1.0    0.4
-    groupFold.step.k              Continuum.Folds                  439      100000    0.0    0.0     0.0    0.0
-    groupFold.step.(...)          Continuum.Folds                  437      100000    0.3    0.7     0.3    0.7
-     main.\                       Main                             438      100000    0.0    0.0     0.0    0.0
-   groupFold.rewrap               Continuum.Folds                  435           1    0.0    0.0     0.0    0.0
-  aggregateAllByField             Continuum.Aggregation            383           0    0.0    0.0     0.0    0.0
-   gaplessScan                    Continuum.Storage                384           0    0.0    0.0     0.0    0.0
-  runApp                          Continuum.Storage                361           0    0.0    0.0    94.2   92.8
-   showsPrec                      Continuum.Serialization          442           7    0.0    0.0     0.0    0.0
-   runApp.ctx                     Continuum.Storage                397           1    0.0    0.0     0.0    0.0
-    makeContext                   Continuum.Storage                398           1    0.0    0.0     0.0    0.0
-   aggregateAllByField            Continuum.Aggregation            385           0    0.0    0.0    93.7   92.8
-    gaplessScan                   Continuum.Storage                386           0    0.0    0.0    93.7   92.8
-     gaplessScan.\                Continuum.Storage                433           1    0.0    0.0     0.0    0.0
-     schema                       Continuum.Storage                420           0    0.0    0.0     0.0    0.0
-      ctxSchema                   Continuum.Types                  421           1    0.0    0.0     0.0    0.0
-     db                           Continuum.Storage                395           0    0.0    0.0     0.0    0.0
-      ctxDb                       Continuum.Types                  396           1    0.0    0.0     0.0    0.0
-     withIterator                 Database.LevelDB.MonadResource   393           1    0.0    0.0    93.7   92.8
-      gaplessScan.\               Continuum.Storage                405           1    0.0    0.0    93.7   92.8
-       scanIntern                 Continuum.Storage                408      100001    6.8    7.5    93.7   92.8
-        iterNext                  Database.LevelDB.MonadResource   429      100000    0.2    0.0    22.0    9.7
-         iterNext                 Database.LevelDB.Iterator        430      100000   21.8    9.7    21.8    9.7
-        gaplessScan.\.\           Continuum.Storage                418      100000   11.3   23.7    12.1   23.7
-         gaplessScan.\.\.\        Continuum.Storage                428      100000    0.0    0.0     0.0    0.0
-         schemaTypes              Continuum.Types                  426      100000    0.3    0.0     0.3    0.0
-         fastDecodeValue          Continuum.Serialization          425      100000    0.0    0.0     0.0    0.0
-         fields                   Continuum.Types                  419      200000    0.5    0.0     0.5    0.0
-        iterEntry                 Database.LevelDB.MonadResource   409      100001   15.2   17.1    52.8   52.0
-         iterValue                Database.LevelDB.MonadResource   414      100001    0.3    0.0    17.6   18.0
-          iterValue               Database.LevelDB.Iterator        415      100001    8.9   11.6    17.3   18.0
-           iterString             Database.LevelDB.Iterator        416      100001    3.9    2.0     8.4    6.3
-            iterString.\          Database.LevelDB.Iterator        417      100000    4.5    4.4     4.5    4.4
-         iterKey                  Database.LevelDB.MonadResource   410      100001    0.3    0.0    19.9   16.9
-          iterKey                 Database.LevelDB.Iterator        411      100001    9.4   11.6    19.6   16.9
-           iterString             Database.LevelDB.Iterator        412      100001    5.7    2.0    10.2    5.3
-            iterString.\          Database.LevelDB.Iterator        413      100000    4.5    3.3     4.5    3.3
-       iterFirst                  Database.LevelDB.MonadResource   406           1    0.0    0.0     0.0    0.0
-        iterFirst                 Database.LevelDB.Iterator        407           1    0.0    0.0     0.0    0.0
-      iterOpen'                   Database.LevelDB.MonadResource   394           1    0.0    0.0     0.0    0.0
-       releaseIter                Database.LevelDB.Iterator        431           1    0.0    0.0     0.0    0.0
-       createIter                 Database.LevelDB.Iterator        399           1    0.0    0.0     0.0    0.0
-        mkCReadOpts               Database.LevelDB.Internal        404           1    0.0    0.0     0.0    0.0
-     ro                           Continuum.Storage                389           1    0.0    0.0     0.0    0.0
-      rwOptions                   Continuum.Storage                400           0    0.0    0.0     0.0    0.0
-       ctxRwOptions               Continuum.Types                  401           1    0.0    0.0     0.0    0.0
-   open                           Database.LevelDB.MonadResource   363           0    0.0    0.0     0.5    0.0
-    close                         Database.LevelDB.Base            445           1    0.0    0.0     0.2    0.0
-     freeOpts                     Database.LevelDB.Internal        446           1    0.2    0.0     0.2    0.0
-    open                          Database.LevelDB.Base            365           0    0.0    0.0     0.3    0.0
-     open.mkDB                    Database.LevelDB.Base            374           1    0.0    0.0     0.3    0.0
-      open.mkDB.\                 Database.LevelDB.Base            376           1    0.0    0.0     0.3    0.0
-       throwIfErr                 Database.LevelDB.Internal        377           1    0.0    0.0     0.3    0.0
-        throwIfErr.\              Database.LevelDB.Internal        378           1    0.3    0.0     0.3    0.0
-     mkOpts                       Database.LevelDB.Internal        366           1    0.0    0.0     0.0    0.0
-      mkOpts.maybeSetFilterPolicy Database.LevelDB.Internal        373           1    0.0    0.0     0.0    0.0
-      mkOpts.maybeSetCmp          Database.LevelDB.Internal        372           1    0.0    0.0     0.0    0.0
-      mkOpts.maybeSetCache        Database.LevelDB.Internal        371           1    0.0    0.0     0.0    0.0
-      mkOpts.ccompression         Database.LevelDB.Internal        369           1    0.0    0.0     0.0    0.0
- CAF                              Main                             357           0    0.0    0.0     0.0    0.0
-  prodSchema                      Main                             422           1    0.0    0.0     0.0    0.0
-   makeSchema                     Continuum.Types                  423           1    0.0    0.0     0.0    0.0
-    makeSchema.schemaTypes'       Continuum.Types                  427           1    0.0    0.0     0.0    0.0
-    makeSchema.fields'            Continuum.Types                  424           1    0.0    0.0     0.0    0.0
-  testDBPath                      Main                             375           1    0.0    0.0     0.0    0.0
-  main                            Main                             358           1    0.0    0.0     0.0    0.0
-   groupFold                      Continuum.Folds                  381           1    0.0    0.0     0.0    0.0
-   aggregateAllByField            Continuum.Aggregation            379           1    0.0    0.0     0.0    0.0
-    gaplessScan                   Continuum.Storage                380           1    0.0    0.0     0.0    0.0
-   runApp                         Continuum.Storage                359           1    0.0    0.0     0.0    0.0
-    open                          Database.LevelDB.MonadResource   362           1    0.0    0.0     0.0    0.0
-     open                         Database.LevelDB.Base            364           1    0.0    0.0     0.0    0.0
- CAF                              Continuum.Storage                356           0    0.0    0.0     0.0    0.0
-  gaplessScan                     Continuum.Storage                387           0    0.0    0.0     0.0    0.0
-   schema                         Continuum.Storage                392           1    0.0    0.0     0.0    0.0
-   ro                             Continuum.Storage                390           0    0.0    0.0     0.0    0.0
-    rwOptions                     Continuum.Storage                391           1    0.0    0.0     0.0    0.0
-   db                             Continuum.Storage                388           1    0.0    0.0     0.0    0.0
- CAF                              Continuum.Serialization          355           0    0.0    0.0     0.0    0.0
-  showsPrec                       Continuum.Serialization          443           0    0.0    0.0     0.0    0.0
- CAF                              Continuum.Options                353           0    0.0    0.0     0.0    0.0
-  readOpts                        Continuum.Options                402           1    0.0    0.0     0.0    0.0
-  opts                            Continuum.Options                367           1    0.0    0.0     0.0    0.0
- CAF                              Continuum.Folds                  351           0    0.0    0.0     0.0    0.0
-  countFold                       Continuum.Folds                  382           1    0.0    0.0     0.0    0.0
- CAF                              Database.LevelDB.C               349           0    0.0    0.0     0.0    0.0
-  snappyCompression               Database.LevelDB.C               370           1    0.0    0.0     0.0    0.0
- CAF                              Database.LevelDB.Internal        348           0    0.0    0.0     0.0    0.0
-  freeCReadOpts                   Database.LevelDB.Internal        432           1    0.0    0.0     0.0    0.0
- CAF                              Database.LevelDB.Types           345           0    0.0    0.0     0.0    0.0
-  defaultReadOptions              Database.LevelDB.Types           403           1    0.0    0.0     0.0    0.0
-  defaultOptions                  Database.LevelDB.Types           368           1    0.0    0.0     0.0    0.0
- CAF                              Data.Time.Clock.CTimeval         297           0    0.0    0.0     0.0    0.0
- CAF                              Data.Map.Base                    243           0    0.0    0.0     0.0    0.0
- CAF                              GHC.Conc.Signal                  234           0    0.0    0.0     0.0    0.0
- CAF                              GHC.IO.Encoding                  225           0    0.0    0.0     0.0    0.0
- CAF                              GHC.IO.Encoding.Iconv            223           0    0.0    0.0     0.0    0.0
- CAF                              GHC.IO.Handle.FD                 216           0    0.0    0.0     0.0    0.0
- CAF                              Data.Either                      204           0    0.0    0.0     0.0    0.0
+MAIN                             MAIN                                   164           0    0.1    0.0   100.0  100.0
+ withIterator                    Database.LevelDB.MonadResource         371           4   39.0   53.3    99.6  100.0
+  iterNext                       Database.LevelDB.MonadResource         387           4    0.0    0.0    14.8   10.1
+   iterNext                      Database.LevelDB.Iterator              388           4   14.8   10.1    14.8   10.1
+  iterValue                      Database.LevelDB.MonadResource         382           4    0.0    0.0    19.8   19.0
+   iterValue                     Database.LevelDB.Iterator              383           4    6.1   10.1    19.8   19.0
+    iterString                   Database.LevelDB.Iterator              384           4    6.3    2.8    13.7    8.9
+     iterString.\                Database.LevelDB.Iterator              385      999211    7.4    6.1     7.4    6.1
+  iterKey                        Database.LevelDB.MonadResource         378           4    0.0    0.0    26.0   17.5
+   iterKey                       Database.LevelDB.Iterator              379           4    9.1   10.1    26.0   17.5
+    iterString                   Database.LevelDB.Iterator              380           4    8.6    2.8    16.9    7.4
+     iterString.\                Database.LevelDB.Iterator              381      999211    8.2    4.6     8.2    4.6
+  iterSeek                       Database.LevelDB.MonadResource         375           4    0.0    0.0     0.0    0.0
+   iterSeek                      Database.LevelDB.Iterator              376           4    0.0    0.0     0.0    0.0
+    iterSeek.\                   Database.LevelDB.Iterator              377           4    0.0    0.0     0.0    0.0
+  iterOpen'                      Database.LevelDB.MonadResource         372           4    0.0    0.0     0.0    0.0
+   releaseIter                   Database.LevelDB.Iterator              390           4    0.0    0.0     0.0    0.0
+   createIter                    Database.LevelDB.Iterator              373           4    0.0    0.0     0.0    0.0
+    mkCReadOpts                  Database.LevelDB.Internal              374           4    0.0    0.0     0.0    0.0
+ main                            Main                                   329           0    0.0    0.0     0.0    0.0
+  iterKeys                       Database.LevelDB.MonadResource         354           1    0.0    0.0     0.0    0.0
+  iterFirst                      Database.LevelDB.MonadResource         351           1    0.0    0.0     0.0    0.0
+  withIterator                   Database.LevelDB.MonadResource         346           1    0.0    0.0     0.0    0.0
+   iterKeys                      Database.LevelDB.MonadResource         355           0    0.0    0.0     0.0    0.0
+    iterKeys                     Database.LevelDB.Iterator              356           1    0.0    0.0     0.0    0.0
+     iterKey                     Database.LevelDB.Iterator              363           0    0.0    0.0     0.0    0.0
+      iterString                 Database.LevelDB.Iterator              365           1    0.0    0.0     0.0    0.0
+     mapIter                     Database.LevelDB.Iterator              357           1    0.0    0.0     0.0    0.0
+      mapIter.go                 Database.LevelDB.Iterator              358           5    0.0    0.0     0.0    0.0
+       iterKey                   Database.LevelDB.Iterator              364           0    0.0    0.0     0.0    0.0
+        iterString               Database.LevelDB.Iterator              366           0    0.0    0.0     0.0    0.0
+         iterString.\            Database.LevelDB.Iterator              367           4    0.0    0.0     0.0    0.0
+   iterFirst                     Database.LevelDB.MonadResource         352           0    0.0    0.0     0.0    0.0
+    iterFirst                    Database.LevelDB.Iterator              353           1    0.0    0.0     0.0    0.0
+   iterOpen'                     Database.LevelDB.MonadResource         347           1    0.0    0.0     0.0    0.0
+    releaseIter                  Database.LevelDB.Iterator              369           1    0.0    0.0     0.0    0.0
+    createIter                   Database.LevelDB.Iterator              348           1    0.0    0.0     0.0    0.0
+     mkCReadOpts                 Database.LevelDB.Internal              350           1    0.0    0.0     0.0    0.0
+  open                           Database.LevelDB.MonadResource         331           0    0.0    0.0     0.0    0.0
+   close                         Database.LevelDB.Base                  391           2    0.0    0.0     0.0    0.0
+    freeOpts                     Database.LevelDB.Internal              392           2    0.0    0.0     0.0    0.0
+   open                          Database.LevelDB.Base                  333           0    0.0    0.0     0.0    0.0
+    open.mkDB                    Database.LevelDB.Base                  341           2    0.0    0.0     0.0    0.0
+     open.mkDB.\                 Database.LevelDB.Base                  343           2    0.0    0.0     0.0    0.0
+      throwIfErr                 Database.LevelDB.Internal              344           2    0.0    0.0     0.0    0.0
+       throwIfErr.\              Database.LevelDB.Internal              345           2    0.0    0.0     0.0    0.0
+    mkOpts                       Database.LevelDB.Internal              335           2    0.0    0.0     0.0    0.0
+     mkOpts.maybeSetFilterPolicy Database.LevelDB.Internal              340           2    0.0    0.0     0.0    0.0
+     mkOpts.maybeSetCmp          Database.LevelDB.Internal              339           2    0.0    0.0     0.0    0.0
+     mkOpts.maybeSetCache        Database.LevelDB.Internal              338           2    0.0    0.0     0.0    0.0
+     mkOpts.ccompression         Database.LevelDB.Internal              336           2    0.0    0.0     0.0    0.0
+ CAF                             Main                                   327           0    0.0    0.0     0.0    0.0
+  prodSchema                     Main                                   389           1    0.0    0.0     0.0    0.0
+  testDBPath                     Main                                   342           1    0.0    0.0     0.0    0.0
+  main                           Main                                   328           1    0.0    0.0     0.0    0.0
+   open                          Database.LevelDB.MonadResource         330           2    0.0    0.0     0.0    0.0
+    open                         Database.LevelDB.Base                  332           2    0.0    0.0     0.0    0.0
+ CAF                             Continuum.Storage                      326           0    0.0    0.0     0.0    0.0
+  withIterator                   Database.LevelDB.MonadResource         359           0    0.0    0.0     0.0    0.0
+   iterKeys                      Database.LevelDB.MonadResource         360           0    0.0    0.0     0.0    0.0
+    iterKeys                     Database.LevelDB.Iterator              361           0    0.0    0.0     0.0    0.0
+     iterKey                     Database.LevelDB.Iterator              362           1    0.0    0.0     0.0    0.0
+ CAF                             Continuum.Serialization                325           0    0.0    0.0     0.0    0.0
+ CAF                             Continuum.Options                      324           0    0.0    0.0     0.0    0.0
+ CAF                             Continuum.Types                        323           0    0.0    0.0     0.0    0.0
+ CAF                             Control.Concurrent.ParallelIO.Global   322           0    0.0    0.0     0.0    0.0
+ CAF                             Database.LevelDB.C                     319           0    0.0    0.0     0.0    0.0
+  snappyCompression              Database.LevelDB.C                     337           1    0.0    0.0     0.0    0.0
+ CAF                             Database.LevelDB.Internal              318           0    0.0    0.0     0.0    0.0
+  freeCReadOpts                  Database.LevelDB.Internal              370           1    0.0    0.0     0.0    0.0
+ CAF                             Database.LevelDB.Types                 315           0    0.0    0.0     0.0    0.0
+  defaultReadOptions             Database.LevelDB.Types                 349           1    0.0    0.0     0.0    0.0
+  defaultOptions                 Database.LevelDB.Types                 334           1    0.0    0.0     0.0    0.0
+ CAF                             Data.Map.Base                          226           0    0.2    0.0     0.2    0.0
+ CAF                             GHC.Conc.Signal                        213           0    0.0    0.0     0.0    0.0
+ CAF                             GHC.Conc.Sync                          212           0    0.0    0.0     0.0    0.0
+ CAF                             GHC.IO.Encoding                        204           0    0.0    0.0     0.0    0.0
+ CAF                             GHC.IO.Encoding.Iconv                  202           0    0.0    0.0     0.0    0.0
+ CAF                             GHC.IO.Handle.FD                       195           0    0.0    0.0     0.0    0.0
+ CAF                             GHC.Event.Thread                       174           0    0.0    0.0     0.0    0.0
