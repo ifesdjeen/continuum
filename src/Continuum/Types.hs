@@ -48,6 +48,7 @@ type RWOptions = (ReadOptions, WriteOptions)
 data DBContext = DBContext { ctxSystemDb       :: DB
                            , ctxDbs            :: Map.Map ByteString (DbSchema, DB)
                            , ctxChunksDb       :: DB
+                           , ctxPath           :: String
                            , ctxSchema         :: DbSchema
                            , sequenceNumber    :: Integer
                            , lastSnapshot      :: Integer
