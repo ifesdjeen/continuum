@@ -5,15 +5,9 @@ module Serialization.Test where
 
 import Continuum.Serialization
 import Continuum.Types
-
 import Test.Hspec
-import Test.Hspec.Expectations
 
-import Control.Monad (liftM, void)
-import Control.Monad.IO.Class (MonadIO (liftIO))
-
-import Control.Monad.Reader
-
+testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)
                         , ("c", DbtString) ]

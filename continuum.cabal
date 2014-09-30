@@ -31,8 +31,8 @@ library
   extra-libraries:      hyperleveldb
   other-extensions:     CPP, MagicHash
   exposed-modules:       Continuum.Storage
+                       , Continuum.ParallelStorage
                        , Continuum.Serialization
-                       , Continuum.Aggregation
                        , Continuum.Cluster
                        , Continuum.Tryout
                        , Continuum.Options

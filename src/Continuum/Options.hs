@@ -1,6 +1,7 @@
 module Continuum.Options where
 
-import Database.LevelDB
+import           Database.LevelDB
+
 
 opts :: Options
 opts = defaultOptions{ createIfMissing = True
@@ -11,5 +12,8 @@ opts = defaultOptions{ createIfMissing = True
                      -- , comparator = Just customComparator
                         }
 
+readOpts :: ReadOptions
 readOpts = defaultReadOptions
+
+writeOpts :: WriteOptions
 writeOpts = defaultWriteOptions

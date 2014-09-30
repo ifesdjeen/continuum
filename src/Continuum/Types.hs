@@ -4,20 +4,20 @@ module Continuum.Types where
 
 import qualified Data.Map as Map
 
-import           Control.Monad.Except
 import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
-import           GHC.Generics           (Generic)
 import           Control.Monad.Trans.Resource
-import           Database.LevelDB.MonadResource (DB, WriteOptions, ReadOptions)
-import qualified Data.Map as Map
+import           Database.LevelDB.MonadResource (DB,
+                                                 WriteOptions,
+                                                 ReadOptions)
+import           Data.Map (Map)
 import qualified Data.Serialize as S
 import           GHC.Generics           (Generic)
 
 -- type DbErrorMonadT = ExceptT DbError IO
 type DbErrorMonad  = Either  DbError
 
-type SchemaMap     = Map.Map ByteString (DbSchema, DB)
+type SchemaMap     = Map ByteString (DbSchema, DB)
 
 type AppState a = StateT DBContext (ResourceT IO) (DbErrorMonad a)
 
@@ -46,10 +46,9 @@ type RWOptions = (ReadOptions, WriteOptions)
 -- |
 
 data DBContext = DBContext { ctxSystemDb       :: DB
-                           , ctxDbs            :: Map.Map ByteString (DbSchema, DB)
+                           , ctxDbs            :: Map ByteString (DbSchema, DB)
                            , ctxChunksDb       :: DB
                            , ctxPath           :: String
-                           , ctxSchema         :: DbSchema
                            , sequenceNumber    :: Integer
                            , lastSnapshot      :: Integer
                              -- , ctxKeyspace  :: ByteString
@@ -60,10 +59,10 @@ data DBContext = DBContext { ctxSystemDb       :: DB
 -- | DB SCHEMA
 -- |
 
-data DbSchema = DbSchema { fieldMappings    :: Map.Map ByteString Int
+data DbSchema = DbSchema { fieldMappings    :: Map ByteString Int
                            , fields         :: [ByteString]
-                           , indexMappings  :: Map.Map Int ByteString
-                           , schemaMappings :: Map.Map ByteString DbType
+                           , indexMappings  :: Map Int ByteString
+                           , schemaMappings :: Map ByteString DbType
                            , schemaTypes    :: [DbType]
                            }
               deriving (Generic)
@@ -97,8 +96,7 @@ data DbValue = EmptyValue
              -- | DbMap [(DbValue, DbValue)]
              deriving (Show, Eq, Ord, Generic)
 
-data DbRecord = DbRecord Integer (Map.Map ByteString DbValue) |
-                DbPlaceholder Integer
+data DbRecord = DbRecord Integer (Map ByteString DbValue)
                 deriving(Show, Eq)
 
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
@@ -114,9 +112,9 @@ data DbResult = EmptyRes
               | FieldRes     (Integer, DbValue)
               | FieldsRes    (Integer, [DbValue])
 
-              | CountStep  Integer
-              | CountRes   Integer
-              | GroupRes   (Map.Map DbValue DbResult)
+              | CountStep    Integer
+              | CountRes     Integer
+              | GroupRes     (Map DbValue DbResult)
 
               deriving(Show, Eq)
 
@@ -139,3 +137,14 @@ data KeyRange = OpenEnd          ByteString
 data Decoding = Field  ByteString
               | Fields [ByteString]
               | Record
+
+-- |
+-- | QUERIES
+-- |
+
+data Query = Count
+           | Distinct
+           | Min
+           | Max
+           | Group Query
+           deriving (Show)

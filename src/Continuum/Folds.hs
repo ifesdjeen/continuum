@@ -3,12 +3,13 @@
 
 module Continuum.Folds (countFold
                        , appendFold
-                       , groupFold)
+                       , groupFold
+                       , countStepFold
+                       , countMergeFold)
        where
 
-import           Data.ByteString                (ByteString)
-import Continuum.Types
-import Debug.Trace
+import           Continuum.Types
+-- import           Debug.Trace
 import qualified Data.Map.Strict as Map
 import qualified Control.Foldl as L
 
@@ -17,15 +18,15 @@ import qualified Control.Foldl as L
 -- | Count Fold
 countFold :: L.Fold a Int
 countFold = L.Fold step 0 id
-  where step acc i = acc + 1
+  where step acc _ = acc + 1
 
 countStepFold :: L.Fold a Int
 countStepFold = L.Fold step 0 id
-  where step acc i = acc + 1
+  where step acc _ = acc + 1
 
 countMergeFold :: L.Fold a Int
 countMergeFold = L.Fold step 0 id
-  where step acc i = acc + 1
+  where step acc _ = acc + 1
 
 
 -- | Append Fold

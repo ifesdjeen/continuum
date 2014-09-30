@@ -1,26 +1,23 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main (main) where
+module Main (loadData, processData, main) where
 
-import qualified Data.Map as Map
 import           Data.ByteString.Char8 (pack)
-import Data.Time.Clock.POSIX
-import System.Process(system)
-import           Data.List (elemIndex)
-import Control.Applicative ((<$>), (<*>), empty)
-import Data.Aeson
-import Data.Maybe
-import Control.Monad
-import qualified Data.ByteString.Lazy.Char8 as BL
-import Control.Monad.IO.Class
+import           Continuum.ParallelStorage
+import           Data.Time.Clock.POSIX
+import           System.Process (system)
+import           Control.Applicative ((<$>), (<*>), empty)
+import           Data.Aeson
+import           Data.Maybe
+import           Control.Monad
+import           Control.Monad.IO.Class
 
-import Continuum.Storage
-import Continuum.Serialization
-import Continuum.Types
-import Continuum.Folds
-import Continuum.Aggregation
-import qualified Control.Foldl as L
+import qualified Data.ByteString.Lazy.Char8 as BL
+
+import           Continuum.Storage
+import           Continuum.Types
+
 
 
 data Entry = Entry { request_ip :: String
@@ -51,8 +48,8 @@ testDBPath :: String
 testDBPath = "/tmp/production-data"
 
 
-main2 :: IO (DbErrorMonad DbResult)
-main2 = do
+loadData :: IO (DbErrorMonad DbResult)
+loadData = do
   -- liftIO $ cleanup
 
   content <- readFile "/Users/ifesdjeen/hackage/continuum/data.json"
@@ -61,7 +58,7 @@ main2 = do
 
   -- putStrLn $ show decoded
 
-  runApp testDBPath prodSchema $ do
+  runApp testDBPath $ do
     createDatabase "testdb" prodSchema
 
     forM_ decoded $ \x ->
@@ -74,15 +71,8 @@ main2 = do
                  ])
     return $ Right EmptyRes
 
-main = runApp testDBPath prodSchema $ do
-  -- forM_ [0..100] $ \x -> do
-  --         before <- liftIO $ getPOSIXTime
-  --         a <- aggregateAllByField "status" (groupFold (\ (DbFieldResult (_, x)) -> (x, 0)) countFold)
-  --         -- a <- aggregateAllByField "status" countFold
-  --         after <- liftIO $ getPOSIXTime
-  --         liftIO $ putStrLn $ show a
-  --         liftIO $ putStrLn $ show (after - before)
-
+processData :: IO (DbErrorMonad DbResult)
+processData = runApp testDBPath $ do
   before <- liftIO $ getPOSIXTime
   a <- parallelScan "testdb"
   after <- liftIO $ getPOSIXTime
@@ -91,5 +81,8 @@ main = runApp testDBPath prodSchema $ do
 
   return $ Right EmptyRes
 
--- cleanup :: IO ()
--- cleanup = system ("rm -fr " ++ testDBPath) >> return ()
+cleanup :: IO ()
+cleanup = system ("rm -fr " ++ testDBPath) >> return ()
+
+main :: IO (DbErrorMonad DbResult)
+main = processData

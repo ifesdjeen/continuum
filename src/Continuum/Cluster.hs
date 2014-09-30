@@ -4,7 +4,6 @@
 
 module Continuum.Cluster where
 
-import qualified Continuum.Storage as Storage
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad
@@ -18,11 +17,6 @@ import qualified Control.Concurrent.Suspend.Lifted as Delay
 import qualified Control.Concurrent.Timer as Timer
 
 import qualified Nanomsg as N
-import qualified Data.ByteString.Char8 as C
-import qualified Network.Socket as Socket
-
-import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad (replicateM_)
 
 data Node = Node String String
           deriving(Generic, Show, Eq, Ord)
@@ -39,25 +33,29 @@ processRequest :: Node
                   -> TVar ClusterNodes
                   -> Request
                   -> IO ()
-processRequest self socket shared (ImUp node) = do
+processRequest _ socket shared (ImUp node) = do
   nodes <- atomRead shared
-  N.send socket (encode $ NodeList (Map.keys nodes))
-  time <- Clock.getPOSIXTime
-  swap (\nodes -> Map.insert node (NodeStatus time) nodes) shared
+  _     <- N.send socket (encode $ NodeList (Map.keys nodes))
+  time  <- Clock.getPOSIXTime
+  _     <- swap (updateNodeList time) shared
   return ()
+  where updateNodeList time nodes = Map.insert node (NodeStatus time) nodes
 
-processRequest self socket shared (Heartbeat node) = do
+processRequest _ _ shared (Heartbeat node) = do
   time <- Clock.getPOSIXTime
-  swap (\nodes -> Map.update (updateNodeTime time) node nodes) shared
-  where updateNodeTime time nodeStatus = Just $ nodeStatus { lastHeartbeat = time }
-
-processRequest self socket shared (Introduction node) = do
-  time <- Clock.getPOSIXTime
-  swap (\nodes -> Map.insert node (NodeStatus time) nodes) shared
+  _    <- swap (updateNodeList time) shared
   return ()
+  where updateNodeList time nodes = Map.update (updateNodeTime time) node nodes
+        updateNodeTime time nodeStatus = Just $ nodeStatus { lastHeartbeat = time }
+
+processRequest _ _ shared (Introduction node) = do
+  time <- Clock.getPOSIXTime
+  swap (updateNodeList time) shared
+  return ()
+  where updateNodeList time nodes = Map.insert node (NodeStatus time) nodes
 
 processRequest self socket nodes (NodeList nodeList) = do
-  forM nodeList connectToCluster
+  forM_ nodeList connectToCluster
   return ()
   where connectToCluster node = do
           connectTo socket node self nodes
@@ -70,13 +68,14 @@ connectTo :: N.Socket N.Bus
              -> IO ()
 connectTo socket other@(Node host port) self shared | other /= self = do
   time <- Clock.getPOSIXTime
-  swap (\nodes -> Map.insert other (NodeStatus time) nodes) shared
-  N.connect socket ("tcp://" ++ host ++ ":" ++ port)
-  Timer.repeatedTimer introduce (Delay.msDelay 1000)
+  _    <- swap (updateNodeList time) shared
+  _    <- N.connect socket ("tcp://" ++ host ++ ":" ++ port)
+  _    <- Timer.repeatedTimer introduce (Delay.msDelay 1000)
   return ()
   where introduce = N.send socket (encode $ Introduction self)
+        updateNodeList time nodes = Map.insert other (NodeStatus time) nodes
+connectTo _ _ _ _ = return ()
 
-connectTo socket other@(Node host port) self shared = return ()
 initializeNode :: N.Socket N.Bus
                   -> Node
                   -> Node
@@ -84,14 +83,16 @@ initializeNode :: N.Socket N.Bus
                   -> IO ()
 initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= do
   _ <- N.bind socket ("tcp://*:" ++ port)
-  when (seedHost == "127.0.0.1") init
-  where init = do
-          N.connect socket ("tcp://" ++ seedHost ++ ":" ++ seedPort)
+  when (seedHost == "127.0.0.1") initialize
+  where initialize = do
+          _    <- N.connect socket ("tcp://" ++ seedHost ++ ":" ++ seedPort)
           time <- Clock.getPOSIXTime
-          swap (\nodes -> Map.insert seed (NodeStatus time) nodes) shared
-          N.send socket (encode $ ImUp self)
+          _    <- swap (updateNodeList time) shared
+          _    <- N.send socket (encode $ ImUp self)
           return ()
+        updateNodeList time nodes = Map.insert seed (NodeStatus time) nodes
 
+startNode :: IO ()
 startNode = do
   done <- newEmptyMVar
 
@@ -106,7 +107,7 @@ startNode = do
 
   initializeNode serverSocket seed self shared
 
-  forkIO $ do
+  _ <- forkIO $ do
     let receiveop = do
           received <- N.recv serverSocket
           case (decode received :: Either String Request) of
@@ -115,9 +116,9 @@ startNode = do
           receiveop
     receiveop
 
-  forkIO $ do
-    Timer.repeatedTimer (printClusterStatus shared) (Delay.msDelay 1000)
-    Timer.repeatedTimer (sendHeartbeat serverSocket self) (Delay.msDelay 1000)
+  _ <- forkIO $ do
+    _ <- Timer.repeatedTimer (printClusterStatus shared) (Delay.msDelay 1000)
+    _ <- Timer.repeatedTimer (sendHeartbeat serverSocket self) (Delay.msDelay 1000)
     return ()
 
   takeMVar done
@@ -131,15 +132,15 @@ sendHeartbeat socket node = N.send socket (encode $ Heartbeat node)
 -- Server socket may be also used to broadcase messages to all the nodes
 -- Client socket is udes to push responses back messages from any other node (one at a time)
 
+atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
-dispVar x = atomRead x >>= print
 
 printClusterStatus :: TVar ClusterNodes -> IO ()
 printClusterStatus cluster = do
   val <- atomRead cluster
   time <- Clock.getPOSIXTime
   print $ map (\(k,v) -> (k, showNodeStatus v time)) (Map.toList val)
-  print "------------"
+  print ("------------" :: String)
 
 showNodeStatus :: NodeStatus -> Clock.POSIXTime -> String
 showNodeStatus nst currentTime =
@@ -147,6 +148,7 @@ showNodeStatus nst currentTime =
   then "active"
   else "down"
 
+swap :: (b -> b) -> TVar b -> IO ()
 swap fn x = atomically $ readTVar x >>= writeTVar x . fn
 
 --- Protocol Specofication

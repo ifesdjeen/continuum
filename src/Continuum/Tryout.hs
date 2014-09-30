@@ -3,10 +3,8 @@
 
 module Continuum.Tryout where
 
-import           Control.Monad.State
 import           Data.ByteString (ByteString)
 import           Continuum.Storage
-import           Continuum.Serialization
 import           Continuum.Types
 -- import           Continuum.Aggregation
 import           Continuum.Folds
@@ -23,15 +21,17 @@ testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
 
 main :: IO (Either DbError [DbResult])
-main = runApp testDbPath testSchema $ do
+main = runApp testDbPath $ do
 
-  createDatabase testDbName testSchema
+  _ <- createDatabase testDbName testSchema
 
-  putRecord testDbName $ makeRecord 123 [("a", (DbInt 1)), ("b", (DbString "a"))]
-  putRecord testDbName $ makeRecord 128 [("a", (DbInt 2)), ("b", (DbString "a"))]
+  _ <- putRecord testDbName $ makeRecord 123 [("a", DbInt 1),
+                                              ("b", DbString "a")]
+  _ <- putRecord testDbName $ makeRecord 128 [("a", DbInt 2),
+                                              ("b", DbString "a")]
 
-  a <- scan testDbName (TsSingleKey 123)    Record appendFold
-  a <- scan testDbName (TsOpenEnd 123)      Record appendFold
+  _ <- scan testDbName (TsSingleKey 123)    Record appendFold
+  _ <- scan testDbName (TsOpenEnd 123)      Record appendFold
   a <- scan testDbName (TsKeyRange 123 300) Record appendFold
 
   return a

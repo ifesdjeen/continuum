@@ -36,8 +36,6 @@ data Success = Success
 encodeRecord :: DbSchema -> DbRecord -> Integer -> (ByteString, ByteString)
 encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
   where encodeKey = BS.concat [(packWord64 timestamp), (packWord64 sid)]
-        -- encode (timestamp, sid)
-        -- encodedVals = fmap encode $ catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
         encodedParts = fmap fastEncodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
         lengths = BS.length <$> encodedParts
         encodeValue = runPut $ do
@@ -179,14 +177,14 @@ unpackWord64 s = return $
 
 
 
-
+-- Group Queries
 byField :: ByteString -> DbRecord -> DbValue
 byField f (DbRecord _ m) = fromJust $ Map.lookup f m
 byField _ _ = DbInt 1 -- WTF
 
 byFieldMaybe :: ByteString -> DbRecord -> Maybe DbValue
 byFieldMaybe f (DbRecord _ m) = Map.lookup f m
-byFieldMaybe _ _ = Just $ DbInt 1 -- WTF
+byFieldMaybe _ _              = Just $ DbInt 1 -- WTF
 
 byTime :: Integer -> DbRecord -> Integer
 byTime interval (DbRecord t _) = interval * (t `quot` interval)
