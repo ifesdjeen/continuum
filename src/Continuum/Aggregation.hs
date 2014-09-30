@@ -9,18 +9,18 @@ import           Continuum.Serialization
 import           Continuum.Types
 
 
-aggregateRangeByFields :: Integer
-                          -> Integer
-                          -> [ByteString]
-                          -> L.Fold DbResult acc
-                          -> AppState (Either DbError acc)
+-- aggregateRangeByFields :: Integer
+--                           -> Integer
+--                           -> [ByteString]
+--                           -> L.Fold DbResult acc
+--                           -> AppState (Either DbError acc)
 
-aggregateRangeByFields rangeBegin rangeEnd fields =
-  scan (TsKeyRange rangeBegin rangeEnd) (Fields fields)
+-- aggregateRangeByFields rangeBegin rangeEnd fields =
+--   scan (TsKeyRange rangeBegin rangeEnd) (Fields fields)
 
-aggregateAllByField :: ByteString
-                       -> L.Fold DbResult acc
-                       -> AppState (Either DbError acc)
+-- aggregateAllByField :: ByteString
+--                        -> L.Fold DbResult acc
+--                        -> AppState (Either DbError acc)
 
-aggregateAllByField field =
-  scan EntireKeyspace (Field field)
+-- aggregateAllByField field =
+--   scan EntireKeyspace (Field field)
