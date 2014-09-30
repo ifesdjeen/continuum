@@ -7,7 +7,9 @@
 module Continuum.Storage
        (DB, DBContext,
         runApp, putRecord,
-        alwaysTrue, scan, parallelScan)
+        alwaysTrue, scan,
+        parallelScan,
+        createDatabase)
        where
 
 -- import           Debug.Trace
@@ -36,14 +38,16 @@ import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
 
-makeContext :: DB
+makeContext :: String
+            -> DB
             -> Map.Map ByteString (DbSchema, DB)
             -> DB
             -> DbSchema
             -> RWOptions
             -> DBContext
-makeContext systemDb dbs chunksDb dbSchema rwOptions' =
-  DBContext {ctxSystemDb       = systemDb,
+makeContext path systemDb dbs chunksDb dbSchema rwOptions' =
+  DBContext {ctxPath           = path,
+             ctxSystemDb       = systemDb,
              ctxDbs            = dbs,
              ctxChunksDb       = chunksDb,
              sequenceNumber    = 1,
@@ -59,6 +63,12 @@ db k = do
 
 chunks :: MonadState DBContext m => m DB
 chunks = gets ctxChunksDb
+
+getSystemDb :: MonadState DBContext m => m DB
+getSystemDb = gets ctxSystemDb
+
+getPath :: MonadState DBContext m => m String
+getPath = gets ctxPath
 
 getAndincrementSequence :: MonadState DBContext m => m Integer
 getAndincrementSequence = do
@@ -97,6 +107,13 @@ putRecord dbName record = do
   schema' <- schema
   storagePut dbName (encodeRecord schema' record sid)
 
+putSchema :: ByteString -> DbSchema -> AppState DbResult
+putSchema dbName schema = do
+  sysDb   <- getSystemDb
+  wo'     <- wo
+  Base.put (sysDb) wo' dbName (encodeSchema schema)
+  return $ Right EmptyRes
+
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
 
@@ -111,7 +128,7 @@ runApp path dbSchema actions = do
     systemDb  <- Base.open (path ++ "/system") opts
     chunksDb  <- Base.open (path ++ "/chunksDb") opts
     eitherDbs <- initializeDbs path systemDb
-    let run dbs = evalStateT actions (makeContext systemDb dbs chunksDb dbSchema (readOpts, writeOpts))
+    let run dbs = evalStateT actions (makeContext path systemDb dbs chunksDb dbSchema (readOpts, writeOpts))
     join <$> traverse run eitherDbs
 
 liftDbError :: (a -> b -> c)
@@ -267,7 +284,8 @@ addDbInit path coll =
   Map.fromList <$> mapM initDb coll
 
   where initDb (dbName, schema) = do
-          db <- Base.open (path ++ (C8.unpack dbName)) opts
+          -- TODO: abstract path finding
+          db <- Base.open (path ++ "/" ++ (C8.unpack dbName)) opts
           return (dbName, (schema, db))
 
 makeRanges :: [Integer]
@@ -343,5 +361,13 @@ finalize a = a
 
 --
 
-
--- createDb
+createDatabase :: ByteString
+                  -> DbSchema
+                  -> AppState DbResult
+createDatabase dbName schema = do
+  path <- getPath
+  -- Add uniqueness check
+  db   <- Base.open (path ++ "/" ++ (C8.unpack dbName)) opts
+  _    <- putSchema dbName schema
+  modify (\a -> a {ctxDbs = Map.insert dbName (schema, db) (ctxDbs a)})
+  return $ Right $ EmptyRes
