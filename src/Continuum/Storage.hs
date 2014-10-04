@@ -11,8 +11,9 @@ module Continuum.Storage
         alwaysTrue,
         scan,
         createDatabase,
-        getReadOptions,
-        getChunks)
+        runAppState,
+        initializeDbs
+        )
        where
 
 -- import           Debug.Trace
@@ -20,14 +21,12 @@ module Continuum.Storage
 import           Continuum.Options
 import           Continuum.Serialization
 import           Continuum.Types
-import           Control.Applicative ((<$>), (<*>))
+import           Control.Applicative (Applicative, (<$>), (<*>))
 import           Control.Monad.Except
 import qualified Data.Map.Strict as Map
 import           Data.Traversable (traverse)
 import qualified Database.LevelDB.MonadResource as LDB
 import           Database.LevelDB.MonadResource (DB,
-                                                 WriteOptions,
-                                                 ReadOptions,
                                                  Iterator)
 import           Data.ByteString                (ByteString)
 import qualified Data.ByteString.Char8 as C8
@@ -36,51 +35,6 @@ import           Control.Monad.State.Strict
 import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
 import qualified Control.Foldl as L
-
-makeContext :: String
-            -> DB
-            -> Map.Map ByteString (DbSchema, DB)
-            -> DB
-            -> RWOptions
-            -> DBContext
-makeContext path systemDb dbs chunksDb rwOptions' =
-  DBContext {ctxPath           = path,
-             ctxSystemDb       = systemDb,
-             ctxDbs            = dbs,
-             ctxChunksDb       = chunksDb,
-             sequenceNumber    = 1,
-             lastSnapshot      = 1,
-             ctxRwOptions      = rwOptions'}
-
-
-getDb :: MonadState DBContext m => ByteString -> m (Maybe (DbSchema, DB))
-getDb k = do
-  dbs <- gets ctxDbs
-  return $ Map.lookup k dbs
-
-getChunks :: MonadState DBContext m => m DB
-getChunks = gets ctxChunksDb
-
-getSystemDb :: MonadState DBContext m => m DB
-getSystemDb = gets ctxSystemDb
-
-getPath :: MonadState DBContext m => m String
-getPath = gets ctxPath
-
-getAndincrementSequence :: MonadState DBContext m => m Integer
-getAndincrementSequence = do
-  old <- get
-  modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
-  return $ sequenceNumber old
-
-rwOptions :: MonadState DBContext m => m RWOptions
-rwOptions = gets ctxRwOptions
-
-getReadOptions :: MonadState DBContext m => m ReadOptions
-getReadOptions = liftM fst rwOptions
-
-getWriteOptions :: MonadState DBContext m => m WriteOptions
-getWriteOptions = liftM snd rwOptions
 
 putRecord :: ByteString -> DbRecord -> AppState DbResult
 putRecord dbName record = do
@@ -119,6 +73,9 @@ runApp path actions = do
     eitherDbs <- initializeDbs path systemDb
     let run dbs = evalStateT actions (makeContext path systemDb dbs chunksDb (readOpts, writeOpts))
     join <$> traverse run eitherDbs
+
+runAppState :: DBContext -> AppState a -> IO (Either DbError a)
+runAppState  st op = runResourceT . evalStateT op $ st
 
 liftDbError :: (a -> b -> c)
               -> DbErrorMonad a

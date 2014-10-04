@@ -1,9 +1,10 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Continuum.Types where
 
 import qualified Data.Map as Map
-
 import           Control.Monad.State.Strict
 import           Data.ByteString        (ByteString)
 import           Control.Monad.Trans.Resource
@@ -13,6 +14,7 @@ import           Database.LevelDB.MonadResource (DB,
 import           Data.Map (Map)
 import qualified Data.Serialize as S
 import           GHC.Generics           (Generic)
+import qualified Data.Time.Clock.POSIX as Clock
 
 -- type DbErrorMonadT = ExceptT DbError IO
 type DbErrorMonad  = Either  DbError
@@ -47,6 +49,7 @@ type RWOptions = (ReadOptions, WriteOptions)
 
 data DBContext = DBContext { ctxSystemDb       :: DB
                            , ctxDbs            :: Map ByteString (DbSchema, DB)
+                           , ctxNodes   :: ClusterNodes
                            , ctxChunksDb       :: DB
                            , ctxPath           :: String
                            , sequenceNumber    :: Integer
@@ -54,6 +57,68 @@ data DBContext = DBContext { ctxSystemDb       :: DB
                              -- , ctxKeyspace  :: ByteString
                            , ctxRwOptions      :: RWOptions
                            }
+
+makeContext :: String
+            -> DB
+            -> Map.Map ByteString (DbSchema, DB)
+            -> DB
+            -> RWOptions
+            -> DBContext
+makeContext path systemDb dbs chunksDb rwo =
+  DBContext {ctxPath           = path,
+             ctxSystemDb       = systemDb,
+             ctxNodes   = Map.empty,
+             ctxDbs            = dbs,
+             ctxChunksDb       = chunksDb,
+             sequenceNumber    = 1,
+             lastSnapshot      = 1,
+             ctxRwOptions      = rwo}
+
+#define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
+GETTER :: MonadState DBContext m => m FTYPE                     ; \
+GETTER = gets FIELD                                             ; \
+                                                                ; \
+MAPPER :: (FTYPE -> FTYPE) -> DBContext  -> DBContext           ; \
+MAPPER f a = a {FIELD = f (FIELD a) }                           ; \
+                                                                ; \
+MODIFIER :: MonadState DBContext m => (FTYPE -> FTYPE) ->  m () ; \
+MODIFIER f = do                                                 ; \
+  modify (MAPPER f)                                             ; \
+  return ()
+
+ACCESSORS(getNodes, fmapNodes, modifyNodes, ctxNodes, ClusterNodes)
+
+#undef ACCESSORS
+-- ACCESSORS(getChunks, fmapChunks, modifyChunks, ctxChunks, DB)
+
+getDb :: MonadState DBContext m => ByteString -> m (Maybe (DbSchema, DB))
+getDb k = do
+  dbs <- gets ctxDbs
+  return $ Map.lookup k dbs
+
+getChunks :: MonadState DBContext m => m DB
+getChunks = gets ctxChunksDb
+
+getSystemDb :: MonadState DBContext m => m DB
+getSystemDb = gets ctxSystemDb
+
+getPath :: MonadState DBContext m => m String
+getPath = gets ctxPath
+
+getAndincrementSequence :: MonadState DBContext m => m Integer
+getAndincrementSequence = do
+  old <- get
+  modify (\a -> a {sequenceNumber = (sequenceNumber a) + 1})
+  return $ sequenceNumber old
+
+rwOptions :: MonadState DBContext m => m RWOptions
+rwOptions = gets ctxRwOptions
+
+getReadOptions :: MonadState DBContext m => m ReadOptions
+getReadOptions = liftM fst rwOptions
+
+getWriteOptions :: MonadState DBContext m => m WriteOptions
+getWriteOptions = liftM snd rwOptions
 
 -- |
 -- | DB SCHEMA
@@ -65,7 +130,7 @@ data DbSchema = DbSchema { fieldMappings    :: Map ByteString Int
                            , schemaMappings :: Map ByteString DbType
                            , schemaTypes    :: [DbType]
                            }
-              deriving (Generic)
+              deriving (Generic, Show)
 instance S.Serialize DbSchema
 
 
@@ -137,6 +202,9 @@ data KeyRange = OpenEnd          ByteString
 data Decoding = Field  ByteString
               | Fields [ByteString]
               | Record
+              deriving(Generic, Show)
+
+instance S.Serialize Decoding
 
 -- |
 -- | QUERIES
@@ -147,4 +215,37 @@ data Query = Count
            | Min
            | Max
            | Group Query
-           deriving (Show)
+           | Insert       ByteString ByteString
+           | CreateDb     ByteString DbSchema
+           | RunQuery     ByteString Decoding Query
+           deriving (Generic, Show)
+
+
+instance S.Serialize Query
+
+-- |
+-- | External Protocol Specification
+-- |
+
+data Request = ImUp Node
+             | Introduction Node
+             | NodeList     [Node]
+             | Heartbeat    Node
+             | Query        Query
+             deriving(Generic, Show)
+
+instance S.Serialize Request
+
+-- |
+-- | Cluster Related Data Types
+-- |
+
+data Node = Node String String
+          deriving(Generic, Show, Eq, Ord)
+
+data NodeStatus = NodeStatus {lastHeartbeat :: Clock.POSIXTime}
+                deriving(Generic, Eq, Ord)
+
+type ClusterNodes = Map.Map Node NodeStatus
+
+instance S.Serialize Node

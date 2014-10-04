@@ -172,12 +172,8 @@ unpackWord64 s = return $
     (fromIntegral (s `BS.index` 7) )
 {-# INLINE unpackWord64 #-}
 
-
-
-
-
-
 -- Group Queries
+
 byField :: ByteString -> DbRecord -> DbValue
 byField f (DbRecord _ m) = fromJust $ Map.lookup f m
 byField _ _ = DbInt 1 -- WTF
