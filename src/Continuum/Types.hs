@@ -36,6 +36,8 @@ data DbError = IndexesDecodeError      String
              | OtherError
              deriving (Show, Eq, Ord, Generic)
 
+instance S.Serialize DbError
+
 data DbType = DbtInt | DbtString
                        deriving(Show, Generic)
 
@@ -49,7 +51,8 @@ type RWOptions = (ReadOptions, WriteOptions)
 
 data DBContext = DBContext { ctxSystemDb       :: DB
                            , ctxDbs            :: Map ByteString (DbSchema, DB)
-                           , ctxNodes   :: ClusterNodes
+                           , ctxNodes          :: ClusterNodes
+                           , ctxSelfNode       :: Node
                            , ctxChunksDb       :: DB
                            , ctxPath           :: String
                            , sequenceNumber    :: Integer
@@ -57,22 +60,6 @@ data DBContext = DBContext { ctxSystemDb       :: DB
                              -- , ctxKeyspace  :: ByteString
                            , ctxRwOptions      :: RWOptions
                            }
-
-makeContext :: String
-            -> DB
-            -> Map.Map ByteString (DbSchema, DB)
-            -> DB
-            -> RWOptions
-            -> DBContext
-makeContext path systemDb dbs chunksDb rwo =
-  DBContext {ctxPath           = path,
-             ctxSystemDb       = systemDb,
-             ctxNodes   = Map.empty,
-             ctxDbs            = dbs,
-             ctxChunksDb       = chunksDb,
-             sequenceNumber    = 1,
-             lastSnapshot      = 1,
-             ctxRwOptions      = rwo}
 
 #define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
 GETTER :: MonadState DBContext m => m FTYPE                     ; \
@@ -87,7 +74,6 @@ MODIFIER f = do                                                 ; \
   return ()
 
 ACCESSORS(getNodes, fmapNodes, modifyNodes, ctxNodes, ClusterNodes)
-
 #undef ACCESSORS
 -- ACCESSORS(getChunks, fmapChunks, modifyChunks, ctxChunks, DB)
 
@@ -162,7 +148,7 @@ data DbValue = EmptyValue
              deriving (Show, Eq, Ord, Generic)
 
 data DbRecord = DbRecord Integer (Map ByteString DbValue)
-                deriving(Show, Eq)
+              deriving(Generic, Show, Eq)
 
 makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
 makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
@@ -181,7 +167,11 @@ data DbResult = EmptyRes
               | CountRes     Integer
               | GroupRes     (Map DbValue DbResult)
 
-              deriving(Show, Eq)
+              deriving(Generic, Show, Eq)
+
+instance S.Serialize DbResult
+instance S.Serialize DbRecord
+instance S.Serialize DbValue
 
 -- |
 -- | RANGE

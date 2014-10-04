@@ -71,11 +71,23 @@ runApp path actions = do
     systemDb  <- LDB.open (path ++ "/system") opts
     chunksDb  <- LDB.open (path ++ "/chunksDb") opts
     eitherDbs <- initializeDbs path systemDb
-    let run dbs = evalStateT actions (makeContext path systemDb dbs chunksDb (readOpts, writeOpts))
+    let host    = "127.0.0.1"
+        port    = "4444"
+        context dbs =   DBContext {ctxPath           = path,
+                               ctxSystemDb       = systemDb,
+                               ctxNodes          = Map.empty,
+                               ctxSelfNode       = Node host port,
+                               ctxDbs            = dbs,
+                               ctxChunksDb       = chunksDb,
+                               sequenceNumber    = 1,
+                               lastSnapshot      = 1,
+                               ctxRwOptions      = (readOpts, writeOpts)}
+    let run dbs = evalStateT actions (context dbs)
     join <$> traverse run eitherDbs
 
-runAppState :: DBContext -> AppState a -> IO (Either DbError a)
-runAppState  st op = runResourceT . evalStateT op $ st
+runAppState :: DBContext -> AppState a -> IO (DbErrorMonad a,
+                                              DBContext)
+runAppState  st op = runResourceT . runStateT op $ st
 
 liftDbError :: (a -> b -> c)
               -> DbErrorMonad a
