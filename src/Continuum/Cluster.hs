@@ -28,65 +28,65 @@ import qualified Nanomsg as N
 
 
 
-processRequest :: Node
-                  -> N.Socket N.Bus
+processRequest :: N.Socket N.Bus
                   -> TVar DBContext
                   -> Request
                   -> IO ()
-processRequest _ socket shared (ImUp node) = do
+processRequest socket shared (ImUp node) = do
   nodes <- ctxNodes <$> atomRead shared
   _     <- N.send socket (encode $ NodeList (Map.keys nodes))
   time  <- Clock.getPOSIXTime
   _     <- swap (fmapNodes $ insertNode time node) shared
   return ()
 
-processRequest _ socket shared (ImUp node) = do
+processRequest socket shared (ImUp node) = do
   nodes <- ctxNodes <$> atomRead shared
   _     <- N.send socket (encode $ NodeList (Map.keys nodes))
   time  <- Clock.getPOSIXTime
   _     <- swap (fmapNodes $ insertNode time node) shared
   return ()
 
-processRequest _ _ shared (Heartbeat node) = do
+processRequest _ shared (Heartbeat node) = do
   time  <- Clock.getPOSIXTime
   _     <- swap (fmapNodes $ insertNode time node) shared
   return ()
   where updateNodeTime time nodeStatus = Just $ nodeStatus { lastHeartbeat = time }
 
-processRequest _ _ shared (Introduction node) = do
+processRequest _ shared (Introduction node) = do
   time <- Clock.getPOSIXTime
   _    <- swap (fmapNodes $ insertNode time node) shared
   return ()
 
-processRequest self socket nodes (NodeList nodeList) = do
-  forM_ nodeList connectToCluster
+processRequest socket shared (NodeList nodeList) = do
+  self <- ctxSelfNode <$> atomRead shared
+  forM_ nodeList (connectTo socket self shared >> return)
   return ()
-  where connectToCluster node = do
-          connectTo socket node self nodes
-          return ()
 
 -- Migrate processrequest to its own typeclass
--- processRequest _ socket shared val@(Query q) = do
---   nodes <- atomRead shared
---   _     <- N.send socket (encode $ NodeList (Map.keys nodes))
---   time  <- Clock.getPOSIXTime
---   _     <- swap (updateNodeList time) shared
---   return ()
---   where updateNodeList time nodes = Map.insert node (NodeStatus time) nodes
+processRequest socket shared (Query query) = do
+  resp <- runQuery shared query
+  _     <- N.send socket (encode $ resp)
+  return ()
+
+runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
+runQuery shared (CreateDb name schema) = do
+  ctx <- atomRead shared
+  (res, newst) <- runAppState ctx (createDatabase name schema)
+  reset newst shared
+  return res
 
 connectTo :: N.Socket N.Bus
              -> Node
-             -> Node
              -> TVar DBContext
+             -> Node
              -> IO ()
-connectTo socket other@(Node host port) self shared | other /= self = do
+connectTo socket self shared other@(Node host port) | other /= self = do
   time <- Clock.getPOSIXTime
-  _     <- swap (fmapNodes $ insertNode time other) shared
-  _     <- N.connect socket ("tcp://" ++ host ++ ":" ++ port)
-  _     <- Timer.repeatedTimer introduce (Delay.msDelay 1000)
+  _    <- swap (fmapNodes $ insertNode time other) shared
+  _    <- N.connect socket ("tcp://" ++ host ++ ":" ++ port)
+  _    <- Timer.repeatedTimer introduce (Delay.msDelay 1000)
   return ()
   where introduce = N.send socket (encode $ Introduction self)
-
 connectTo _ _ _ _ = return ()
 
 initializeNode :: N.Socket N.Bus
@@ -104,12 +104,6 @@ initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= d
           _    <- N.send socket (encode $ ImUp self)
           return ()
 
-runCommand :: TVar DBContext -> AppState a -> IO (Either DbError a)
-runCommand shared op = do
-  st <- atomRead shared
-  runAppState st op
-
-
 -- startNode2 :: (LDB.MonadResource m) => m ()
 startNode :: IO ()
 startNode = runResourceT $ do
@@ -121,7 +115,16 @@ startNode = runResourceT $ do
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
   (Right dbs) <- initializeDbs path systemDb
 
-  let context = makeContext path systemDb dbs chunksDb (Opts.readOpts, Opts.writeOpts)
+  let context = DBContext {ctxPath           = path,
+                           ctxSystemDb       = systemDb,
+                           ctxNodes          = Map.empty,
+                           ctxSelfNode       = Node host port,
+                           ctxDbs            = dbs,
+                           ctxChunksDb       = chunksDb,
+                           sequenceNumber    = 1,
+                           lastSnapshot      = 1,
+                           ctxRwOptions      = (Opts.readOpts,
+                                                Opts.writeOpts)}
 
   shared <- liftIO $ atomically $ newTVar context
 
@@ -129,9 +132,13 @@ startNode = runResourceT $ do
 
   let seed         = (Node seedHost seedPort)
       self         = (Node host port)
-      boundRequest = processRequest self serverSocket
+      boundRequest = processRequest serverSocket
 
   liftIO $ initializeNode serverSocket seed self shared
+
+  -- |
+  -- | Receive Loop
+  -- |
 
   _ <- liftIO . forkIO $ do
     let receiveop = do
@@ -141,6 +148,10 @@ startNode = runResourceT $ do
             (Right request) -> boundRequest shared request
           receiveop
     receiveop
+
+  -- |
+  -- | Hearbeat loop
+  -- |
 
   _ <- liftIO . forkIO $ do
     _ <- Timer.repeatedTimer (printClusterStatus shared) (Delay.msDelay 1000)
@@ -176,6 +187,9 @@ showNodeStatus nst currentTime =
 
 swap :: (b -> b) -> TVar b -> IO ()
 swap fn x = atomically $ readTVar x >>= writeTVar x . fn
+
+reset :: b -> TVar b -> IO ()
+reset newv x = atomically $ writeTVar x newv
 
 nodeTimeout :: Clock.POSIXTime
 nodeTimeout = 5
