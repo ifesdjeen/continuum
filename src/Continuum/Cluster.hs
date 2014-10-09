@@ -24,24 +24,26 @@ import           System.Environment
 import qualified Control.Concurrent.Suspend.Lifted as Delay
 import qualified Control.Concurrent.Timer as Timer
 
-import qualified Nanomsg as N
+import qualified System.ZMQ4 as Zmq
 
 
+data Sockets = Sockets  { pubSocket :: Zmq.Socket Zmq.Dealer,
+                          subSocket :: Zmq.Socket Zmq.Router }
 
-processRequest :: N.Socket N.Bus
+processRequest :: Sockets
                   -> TVar DBContext
                   -> Request
                   -> IO ()
-processRequest socket shared (ImUp node) = do
+processRequest sockets shared (ImUp node) = do
   nodes <- ctxNodes <$> atomRead shared
-  _     <- N.send socket (encode $ NodeList (Map.keys nodes))
+  _     <- send sockets (encode $ NodeList (Map.keys nodes))
   time  <- Clock.getPOSIXTime
   _     <- swap (fmapNodes $ insertNode time node) shared
   return ()
 
-processRequest socket shared (ImUp node) = do
+processRequest sockets shared (ImUp node) = do
   nodes <- ctxNodes <$> atomRead shared
-  _     <- N.send socket (encode $ NodeList (Map.keys nodes))
+  _     <- send sockets (encode $ NodeList (Map.keys nodes))
   time  <- Clock.getPOSIXTime
   _     <- swap (fmapNodes $ insertNode time node) shared
   return ()
@@ -57,15 +59,15 @@ processRequest _ shared (Introduction node) = do
   _    <- swap (fmapNodes $ insertNode time node) shared
   return ()
 
-processRequest socket shared (NodeList nodeList) = do
+processRequest sockets shared (NodeList nodeList) = do
   self <- ctxSelfNode <$> atomRead shared
-  forM_ nodeList (connectTo socket self shared >> return)
+  forM_ nodeList (connectTo sockets self shared >> return)
   return ()
 
 -- Migrate processrequest to its own typeclass
-processRequest socket shared (Query query) = do
+processRequest sockets shared (Query query) = do
   resp <- runQuery shared query
-  _     <- N.send socket (encode $ resp)
+  _     <- send sockets (encode $ resp)
   return ()
 
 runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
@@ -75,36 +77,37 @@ runQuery shared (CreateDb name schema) = do
   reset newst shared
   return res
 
-connectTo :: N.Socket N.Bus
+connectTo :: Sockets
              -> Node
              -> TVar DBContext
              -> Node
              -> IO ()
-connectTo socket self shared other@(Node host port) | other /= self = do
+connectTo sockets self shared other@(Node host port) | other /= self = do
   time <- Clock.getPOSIXTime
   _    <- swap (fmapNodes $ insertNode time other) shared
-  _    <- N.connect socket ("tcp://" ++ host ++ ":" ++ port)
+  _    <- Zmq.connect (subSocket sockets) ("tcp://" ++ host ++ ":" ++ port)
   _    <- Timer.repeatedTimer introduce (Delay.msDelay 1000)
   return ()
-  where introduce = N.send socket (encode $ Introduction self)
+  where introduce = send sockets (encode $ Introduction self)
+
 connectTo _ _ _ _ = return ()
 
-initializeNode :: N.Socket N.Bus
+initializeNode :: Sockets
                   -> Node
                   -> Node
                   -> TVar DBContext
                   -> IO ()
-initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= do
-  _ <- N.bind socket ("tcp://*:" ++ port)
+initializeNode sockets seed@(Node seedHost seedPort) self@(Node _ port) shared= do
+  _ <- Zmq.bind (pubSocket sockets) ("tcp://*:" ++ port)
   when (seedHost == "127.0.0.1") initialize
   where initialize = do
-          _    <- N.connect socket ("tcp://" ++ seedHost ++ ":" ++ seedPort)
+          _    <- Zmq.connect (subSocket sockets) ("tcp://" ++ seedHost ++ ":" ++ seedPort)
           time <- Clock.getPOSIXTime
           _    <- swap (fmapNodes $ insertNode time seed) shared
-          _    <- N.send socket (encode $ ImUp self)
+          _    <- send sockets (encode $ ImUp self)
           return ()
 
--- startNode2 :: (LDB.MonadResource m) => m ()
+-- -- startNode2 :: (LDB.MonadResource m) => m ()
 startNode :: IO ()
 startNode = runResourceT $ do
   done <- liftIO newEmptyMVar
@@ -128,13 +131,16 @@ startNode = runResourceT $ do
 
   shared <- liftIO $ atomically $ newTVar context
 
-  serverSocket <- liftIO $ N.socket N.Bus
+  zmqContext <- liftIO $ Zmq.context
+  pubSocket' <- liftIO $ Zmq.socket zmqContext Zmq.Dealer
+  subSocket' <- liftIO $ Zmq.socket zmqContext Zmq.Router
 
-  let seed         = (Node seedHost seedPort)
+  let sockets      = Sockets {pubSocket = pubSocket', subSocket = subSocket'}
+      seed         = (Node seedHost seedPort)
       self         = (Node host port)
-      boundRequest = processRequest serverSocket
+      boundRequest = processRequest sockets
 
-  liftIO $ initializeNode serverSocket seed self shared
+  liftIO $ initializeNode sockets seed self shared
 
   -- |
   -- | Receive Loop
@@ -142,7 +148,7 @@ startNode = runResourceT $ do
 
   _ <- liftIO . forkIO $ do
     let receiveop = do
-          received <- N.recv serverSocket
+          received <- receive sockets
           case (decode received :: Either String Request) of
             (Left _)  -> putMVar done ()
             (Right request) -> boundRequest shared request
@@ -155,19 +161,19 @@ startNode = runResourceT $ do
 
   _ <- liftIO . forkIO $ do
     _ <- Timer.repeatedTimer (printClusterStatus shared) (Delay.msDelay 1000)
-    _ <- Timer.repeatedTimer (sendHeartbeat serverSocket self) (Delay.msDelay 1000)
+    _ <- Timer.repeatedTimer (sendHeartbeat sockets self) (Delay.msDelay 1000)
     return ()
 
   liftIO $ takeMVar done
 
   return ()
 
-sendHeartbeat :: N.Socket N.Bus -> Node -> IO ()
-sendHeartbeat socket node = N.send socket (encode $ Heartbeat node)
+sendHeartbeat :: Sockets -> Node -> IO ()
+sendHeartbeat sockets node = send sockets (encode $ Heartbeat node)
 
--- Server Socket is used to recevie messages from all the nodes
--- Server socket may be also used to broadcase messages to all the nodes
--- Client socket is udes to push responses back messages from any other node (one at a time)
+-- -- Server Socket is used to recevie messages from all the nodes
+-- -- Server socket may be also used to broadcase messages to all the nodes
+-- -- Client socket is udes to push responses back messages from any other node (one at a time)
 
 atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
@@ -196,3 +202,12 @@ nodeTimeout = 5
 
 insertNode :: Clock.POSIXTime -> Node -> ClusterNodes -> ClusterNodes
 insertNode time node = Map.insert node (NodeStatus time)
+
+send :: Sockets
+        -> ByteString
+        -> IO ()
+send sockets msg = Zmq.send (pubSocket sockets) [] msg
+
+receive :: Sockets
+           -> IO ByteString
+receive sockets = Zmq.receive (subSocket sockets)
