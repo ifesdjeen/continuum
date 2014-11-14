@@ -34,11 +34,12 @@ library
                        , Continuum.ParallelStorage
                        , Continuum.Serialization
                        , Continuum.Cluster
+                       , Continuum.Client
                        , Continuum.Tryout
                        , Continuum.Options
                        , Continuum.Types
                        , Continuum.Folds
-
+  other-modules:       Continuum.Internal.Directory
   build-depends:          base                   >= 4 && < 5
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
@@ -56,7 +57,6 @@ library
                         , transformers           >= 0.4.1.0
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
-                        , network                >= 2.2.1.7
 
 executable continuum-dev
   Default-Language:     Haskell2010
