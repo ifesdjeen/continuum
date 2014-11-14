@@ -1,34 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 module Continuum.Cluster where
 
-import           Control.Applicative ((<$>))
-import           Data.ByteString (ByteString)
-import qualified Database.LevelDB.MonadResource as LDB
-import           Control.Monad.Trans.Resource (runResourceT)
 import           Continuum.Types
 import           Continuum.Storage
-import qualified Continuum.Options as Opts
+
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Monad.IO.Class
 import           Control.Monad
-import           Data.Serialize (encode, decode)
-import qualified Data.Map as Map
-import qualified Data.Time.Clock.POSIX as Clock
-import           GHC.Generics           (Generic)
+
 import           System.Environment
 
-import qualified Control.Concurrent.Suspend.Lifted as Delay
-import qualified Control.Concurrent.Timer as Timer
+import           Control.Monad.Trans.Resource   ( runResourceT )
+import           Data.Serialize                 ( encode, decode )
+import           Continuum.Internal.Directory   ( mkdir )
+import           Control.Applicative            ( (<$>) )
+
+import qualified Database.LevelDB.MonadResource      as LDB
+import qualified Continuum.Options                   as Opts
+import qualified Data.Map                            as Map
+import qualified Data.Time.Clock.POSIX               as Clock
+import qualified Control.Concurrent.Suspend.Lifted   as Delay
+import qualified Control.Concurrent.Timer            as Timer
 
 import qualified Nanomsg as N
 
+type Socket = N.Socket N.Bus
 
+-- |
+-- | Reuqest Processing
+-- |
 
-processRequest :: N.Socket N.Bus
+processRequest :: Socket
                   -> TVar DBContext
                   -> Request
                   -> IO ()
