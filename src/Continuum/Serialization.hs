@@ -62,6 +62,21 @@ decodeSchema (dbName, encodedSchema) =
     (Left err)     -> throwError $ SchemaDecodingError err
     (Right schema) -> return (dbName, schema)
 
+decodeQuery :: ByteString
+               -> DbErrorMonad Query
+decodeQuery encodedQuery =
+  case (decode encodedQuery) of
+    (Left err)     -> throwError $ SchemaDecodingError err
+    (Right query)  -> return query
+
+decodeDbResult :: ByteString
+               -> DbErrorMonad DbResult
+decodeDbResult encodedDbResult =
+  case (decode encodedDbResult) of
+    (Left err)     -> throwError $ SchemaDecodingError err
+    (Right query)  -> return query
+
+
 -- |
 -- | DECODING
 -- |
