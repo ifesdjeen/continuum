@@ -56,7 +56,7 @@ putSchema :: ByteString -> DbSchema -> AppState DbResult
 putSchema dbName sch = do
   sysDb   <- getSystemDb
   wo      <- getWriteOptions
-  LDB.put (sysDb) wo dbName (encodeSchema sch)
+  _       <- LDB.put sysDb wo dbName (encodeSchema sch)
   return $ Right EmptyRes
 
 alwaysTrue :: a -> b -> Bool
@@ -72,18 +72,19 @@ runApp path actions = do
     -- TODO: add indexes
     systemDb  <- LDB.open (path ++ "/system") opts
     chunksDb  <- LDB.open (path ++ "/chunksDb") opts
+
     eitherDbs <- initializeDbs path systemDb
-    let host    = "127.0.0.1"
-        port    = "4444"
-        context dbs =   DBContext {ctxPath           = path,
-                               ctxSystemDb       = systemDb,
-                               ctxNodes          = Map.empty,
-                               ctxSelfNode       = Node host port,
-                               ctxDbs            = dbs,
-                               ctxChunksDb       = chunksDb,
-                               sequenceNumber    = 1,
-                               lastSnapshot      = 1,
-                               ctxRwOptions      = (readOpts, writeOpts)}
+    let host        = "127.0.0.1"
+        port        = "4444"
+        context dbs = DBContext {ctxPath           = path,
+                                 ctxSystemDb       = systemDb,
+                                 ctxNodes          = Map.empty,
+                                 ctxSelfNode       = Node host port,
+                                 ctxDbs            = dbs,
+                                 ctxChunksDb       = chunksDb,
+                                 sequenceNumber    = 1,
+                                 lastSnapshot      = 1,
+                                 ctxRwOptions      = (readOpts, writeOpts)}
     let run dbs = evalStateT actions (context dbs)
     join <$> traverse run eitherDbs
 
@@ -160,7 +161,7 @@ advanceIterator iter (TsKeyRange _ rangeEnd) =
 advanceIterator iter (SingleKey singleKey) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
-  LDB.iterNext iter
+  _    <- LDB.iterNext iter
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
   where maybeInterrupt k = k >>= interruptCondition
         interruptCondition resKey = if resKey == singleKey
@@ -170,7 +171,7 @@ advanceIterator iter (SingleKey singleKey) = do
 advanceIterator iter (TsSingleKey intKey) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
-  LDB.iterNext iter
+  _    <- LDB.iterNext iter
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
   where maybeInterrupt k = k >>= interruptCondition
         encodedKey = packWord64 intKey
