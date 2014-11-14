@@ -3,16 +3,16 @@
 
 module Main (loadData, processData, main) where
 
-import           Data.ByteString.Char8 (pack)
 import           Continuum.ParallelStorage
 import           Data.Time.Clock.POSIX
-import           System.Process (system)
-import           Control.Applicative ((<$>), (<*>), empty)
 import           Data.Aeson
 import           Data.Maybe
 import           Control.Monad
 import           Control.Monad.IO.Class
 
+import           Data.ByteString.Char8     ( pack )
+import           System.Process            ( system )
+import           Control.Applicative       ( (<$>), (<*>), empty )
 import qualified Data.ByteString.Lazy.Char8 as BL
 
 import           Continuum.Storage
