@@ -73,6 +73,10 @@ processRequest socket shared (Query query) = do
   _     <- N.send socket (encode $ resp)
   return ()
 
+-- |
+-- | Query
+-- |
+
 runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
 runQuery shared (CreateDb name schema) = do
   ctx <- atomRead shared
@@ -80,7 +84,7 @@ runQuery shared (CreateDb name schema) = do
   reset newst shared
   return res
 
-connectTo :: N.Socket N.Bus
+connectTo :: Socket
              -> Node
              -> TVar DBContext
              -> Node
@@ -94,7 +98,7 @@ connectTo socket self shared other@(Node host port) | other /= self = do
   where introduce = N.send socket (encode $ Introduction self)
 connectTo _ _ _ _ = return ()
 
-initializeNode :: N.Socket N.Bus
+initializeNode :: Socket
                   -> Node
                   -> Node
                   -> TVar DBContext
@@ -114,8 +118,10 @@ startNode :: IO ()
 startNode = runResourceT $ do
   done <- liftIO newEmptyMVar
 
+  -- TODO: add proper argument parsing
   [path, host, port, seedHost, seedPort] <- liftIO getArgs
 
+  _         <- liftIO $ mkdir path (755)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
   (Right dbs) <- initializeDbs path systemDb
@@ -149,8 +155,13 @@ startNode = runResourceT $ do
     let receiveop = do
           received <- N.recv serverSocket
           case (decode received :: Either String Request) of
-            (Left _)  -> putMVar done ()
+            (Left err)  -> do
+              print received
+              if (err == "YOYO")
+                then putMVar done ()
+                else print "-"
             (Right request) -> boundRequest shared request
+              --
           receiveop
     receiveop
 
@@ -167,7 +178,7 @@ startNode = runResourceT $ do
 
   return ()
 
-sendHeartbeat :: N.Socket N.Bus -> Node -> IO ()
+sendHeartbeat :: Socket -> Node -> IO ()
 sendHeartbeat socket node = N.send socket (encode $ Heartbeat node)
 
 -- Server Socket is used to recevie messages from all the nodes
