@@ -217,7 +217,7 @@ instance S.Serialize Query
 -- | External Protocol Specification
 -- |
 
-data Request = ImUp Node
+data Request = ImUp         Node
              | Introduction Node
              | NodeList     [Node]
              | Heartbeat    Node

@@ -21,20 +21,22 @@ module Continuum.Storage
 import           Continuum.Options
 import           Continuum.Serialization
 import           Continuum.Types
-import           Control.Applicative (Applicative, (<$>), (<*>))
+
 import           Control.Monad.Except
-import qualified Data.Map.Strict as Map
-import           Data.Traversable (traverse)
-import qualified Database.LevelDB.MonadResource as LDB
-import           Database.LevelDB.MonadResource (DB,
-                                                 Iterator)
-import           Data.ByteString                (ByteString)
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString as BS
 import           Control.Monad.State.Strict
-import           Data.Maybe                     (isJust, fromJust)
 import           Control.Monad.Trans.Resource
-import qualified Control.Foldl as L
+
+import qualified Database.LevelDB.MonadResource as LDB
+import qualified Data.ByteString.Char8          as C8
+import qualified Data.ByteString                as BS
+import qualified Data.Map.Strict                as Map
+import qualified Control.Foldl                  as L
+
+import           Data.Traversable               ( traverse )
+import           Data.Maybe                     ( isJust, fromJust )
+import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
+import           Database.LevelDB.MonadResource ( DB, Iterator )
+import           Data.ByteString                ( ByteString )
 
 putRecord :: ByteString -> DbRecord -> AppState DbResult
 putRecord dbName record = do
