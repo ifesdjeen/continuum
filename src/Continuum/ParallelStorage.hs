@@ -7,6 +7,7 @@ import           Data.Monoid
 import           Control.Concurrent.ParallelIO.Global
 import           Continuum.Types
 import           Continuum.Storage
+
 import           Data.ByteString (ByteString)
 import           Control.Monad.State.Strict (get)
 import           Control.Applicative ((<$>))
