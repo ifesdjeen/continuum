@@ -4,7 +4,7 @@ module Main where
 
 import           Criterion.Main
 import           Continuum.Types
-import           Continuum.Serialization
+import           Continuum.Common.Serialization
 
 main :: IO ()
 main = defaultMain [
