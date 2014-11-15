@@ -19,9 +19,6 @@ import qualified Data.Map                       as Map
 import qualified Data.Serialize                 as S
 import qualified Data.Time.Clock.POSIX          as Clock
 
--- type DbErrorMonadT = ExceptT DbError IO
-type DbErrorMonad  = Either  DbError
-
 type SchemaMap     = Map.Map ByteString (DbSchema, DB)
 
 type AppState a    = StateT DBContext (ResourceT IO) (DbErrorMonad a)
@@ -89,35 +86,6 @@ getReadOptions = liftM fst rwOptions
 
 getWriteOptions :: MonadState DBContext m => m WriteOptions
 getWriteOptions = liftM snd rwOptions
-
--- |
--- | DB SCHEMA
--- |
-
-makeSchema :: [(ByteString, DbType)] -> DbSchema
-makeSchema stringTypeList = DbSchema { fieldMappings  = fMappings
-                                     , fields         = fields'
-                                     , schemaMappings = Map.fromList stringTypeList
-                                     , indexMappings  = iMappings
-                                     , schemaTypes    = schemaTypes'}
-  where fields'      = fmap fst stringTypeList
-        schemaTypes' = fmap snd stringTypeList
-        fMappings    = Map.fromList $ zip fields' iterateFrom0
-        iMappings    = Map.fromList $ zip iterateFrom0 fields'
-        iterateFrom0 = (iterate (1+) 0)
-
--- |
--- | DB VALUE
--- |
-
-
-makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
-makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
-
-
-
-
-
 
 -- |
 -- | Cluster Related Data Types

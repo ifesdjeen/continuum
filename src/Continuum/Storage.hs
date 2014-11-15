@@ -19,7 +19,7 @@ module Continuum.Storage
 -- import           Debug.Trace
 
 import           Continuum.Options
-import           Continuum.Serialization
+import           Continuum.Common.Serialization
 import           Continuum.Types
 
 import           Control.Monad.Except

@@ -7,12 +7,21 @@ import           GHC.Generics                   ( Generic )
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
+-- |
+-- | INTERNAL DB TYPES
+-- |
+
 data DbType =
   DbtInt
+  | DbtDouble
   | DbtString
   deriving(Show, Generic)
 
 instance S.Serialize DbType
+
+-- |
+-- | DB Error
+-- |
 
 data DbError =
   IndexesDecodeError        String
@@ -29,6 +38,13 @@ data DbError =
   deriving (Show, Eq, Ord, Generic)
 
 instance S.Serialize DbError
+
+type DbErrorMonad  = Either  DbError
+
+
+-- |
+-- | DB VALUE
+-- |
 
 data DbValue =
   EmptyValue
@@ -50,6 +66,11 @@ data DbRecord =
 
 instance S.Serialize DbRecord
 
+-- | Creates a DbRecord from Timestamp and Key/Value pairs
+--
+makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
+makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
+
 -- |
 -- | DB RESULT
 -- |
@@ -63,6 +84,7 @@ data DbResult =
   | CountStep              Integer
   | CountRes               Integer
   | GroupRes               (Map.Map DbValue DbResult)
+  | DbResults              [DbResult]
   deriving(Generic, Show, Eq)
 
 instance S.Serialize DbResult
@@ -80,6 +102,7 @@ data KeyRange =
   | TsKeyRange             Integer Integer
   | EntireKeyspace
   deriving(Show)
+
 -- |
 -- | AGGREGATES
 -- |
@@ -93,7 +116,7 @@ data Decoding =
 instance S.Serialize Decoding
 
 -- |
--- |
+-- | DB SCHEMA
 -- |
 
 data DbSchema = DbSchema
@@ -106,6 +129,21 @@ data DbSchema = DbSchema
 
 instance S.Serialize DbSchema
 
+-- | Creates a DbSchema out of Schema Definition (name/type pairs)
+--
+makeSchema :: [(ByteString, DbType)] -> DbSchema
+makeSchema stringTypeList =
+  DbSchema { fieldMappings  = fMappings
+           , fields         = fields'
+           , schemaMappings = Map.fromList stringTypeList
+           , indexMappings  = iMappings
+           , schemaTypes    = schemaTypes'}
+  where fields'      = fmap fst stringTypeList
+        schemaTypes' = fmap snd stringTypeList
+        fMappings    = Map.fromList $ zip fields' iterateFrom0
+        iMappings    = Map.fromList $ zip iterateFrom0 fields'
+        iterateFrom0 = (iterate (1+) 0)
+
 -- |
 -- | QUERIES
 -- |
@@ -115,8 +153,9 @@ data Query =
   | Distinct
   | Min
   | Max
+  | FetchAll              ByteString
   | Group                 Query
-  | Insert                ByteString ByteString
+  | Insert                ByteString DbRecord
   | CreateDb              ByteString DbSchema
   | RunQuery              ByteString Decoding Query
   deriving (Generic, Show)

@@ -7,18 +7,18 @@ import           Data.Monoid
 import           Control.Concurrent.ParallelIO.Global
 import           Continuum.Types
 import           Continuum.Storage
+import           Continuum.Common.Serialization
 
-import           Data.ByteString (ByteString)
-import           Control.Monad.State.Strict (get)
-import           Control.Applicative ((<$>))
 import           Control.Monad.Trans.Resource
-import           Control.Monad.State.Strict (liftIO, evalStateT)
+import           Control.Monad.State.Strict     ( get )
+import           Control.Monad.State.Strict     ( liftIO, evalStateT )
+import           Control.Applicative            ( (<$>) )
+import           Database.LevelDB.MonadResource ( DB(..), Iterator )
+import           Data.ByteString                ( ByteString )
+
 import qualified Database.LevelDB.MonadResource as LDB
-import           Database.LevelDB.MonadResource (DB,
-                                                 Iterator)
-import           Continuum.Serialization
-import qualified Control.Foldl as Fold
-import qualified Data.Map.Strict as Map
+import qualified Control.Foldl                  as Fold
+import qualified Data.Map.Strict                as Map
 
 parallelScan :: ByteString -> AppState DbResult
 parallelScan dbName = do
