@@ -1,7 +1,7 @@
 name:                continuum
 stability:           experimental
 description:         Continuum Database Client
-version:             0.1.0.7
+version:             0.1.0.8
 license:             MIT
 license-file:        LICENSE
 author:              Alex Petrov
@@ -25,48 +25,25 @@ source-repository head
 
 library
   default-language:     Haskell2010
-  exposed-modules:      Continuum.Client.Base
-                        , Continuum.Common.Types
-  other-modules:        Continuum.Common.Serialization
   if flag(Profiling)
     ghc-options:        -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
     ghc-options:        -Wall -O2 -threaded -threaded -rtsopts
-  hs-source-dirs:       src
-  build-depends:          base                   >= 4 && < 5
-                        , containers             >0.5
-                        , bytestring             >= 0.10.4.0
-                        , cereal                 >= 0.4.0.1
-                        , nanomsg-haskell        >= 0.2.2
-                        , time                   >=1.4.2
-                        , mtl                    >2.1
 
-executable continuum-client
-  hs-source-dirs:      src
-  default-language:    Haskell2010
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-  build-depends:          base                   >= 4 && < 5
-                        , containers             >0.5
-                        , bytestring             >= 0.10.4.0
-                        , cereal                 >= 0.4.0.1
-                        , nanomsg-haskell        >= 0.2.2
-                        , time                   >=1.4.2
-                        , mtl                    >2.1
-
-  main-is:              Continuum/Client/Tryout.hs
-executable continuum-server
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-  Default-Language:     Haskell2010
   hs-source-dirs:       src
-  other-extensions:     CPP, MagicHash
   extra-libraries:      hyperleveldb
+  other-extensions:     CPP, MagicHash
+
+  exposed-modules:        Continuum.Storage
+                        , Continuum.ParallelStorage
+                        , Continuum.Cluster
+                        , Continuum.Tryout
+                        , Continuum.Options
+                        , Continuum.Types
+                        , Continuum.Folds
+
   build-depends:          base                   >= 4 && < 5
+                        , continuum-client       >= 0.1.0.0
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
                         , containers             >0.5
@@ -79,14 +56,66 @@ executable continuum-server
                         , bytestring             >= 0.10.4.0
                         , parallel-io            >= 0.3.3
                         , cereal                 >= 0.4.0.1
-                        , data-default
+                        , data-default           >= 0.5.3
                         , transformers           >= 0.4.1.0
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
+                        , network                >= 2.2.1.7
+
+
+test-suite tests
+  default-language:       Haskell2010
+  type:                   exitcode-stdio-1.0
+  ghc-options:            -Wall
+  main-is:                Main.hs
+  hs-source-dirs:         tests
+
+  other-modules:          Serialization.Test
+                        , Storage.Test
+
+  build-depends:          base                   >= 3 && < 5
+                        , continuum
+                        , continuum-client       >= 0.1.0.0
+                        , hspec                  >= 1.8
+                        , process                >= 1.1.0.2
+                        , bytestring             >= 0.10.4.0
+                        , mtl                    > 2.1
+                        , transformers           >= 0.4.1.0
+                        , QuickCheck             >= 2.7.6
+                        , hspec-expectations     >= 0.6.0.1
+
+executable continuum-server
+  default-language:       Haskell2010
+  hs-source-dirs:         src
+
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
 
   if flag(Profiling)
-    ghc-options:          -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
+    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
     ghc-options:          -Wall -rtsopts -O2 -threaded
 
-  main-is:              Continuum/Server/Base.hs
+  main-is:                Continuum/Server/Base.hs
+
+  build-depends:          base                   >= 4 && < 5
+                        , continuum-client       >= 0.1.0.0
+                        , foldl                  >= 1.0.5
+                        , mtl                    >2.1
+                        , containers             >0.5
+                        , time                   >=1.4.2
+                        , timers                 >=0.2.0.0
+                        , stm                    >=2.4.3
+                        , suspend                >=0.1.0.1
+                        , leveldb-haskell-fork   >= 0.3.4.1
+                        , resourcet              >= 1.1.2.2
+                        , bytestring             >= 0.10.4.0
+                        , parallel-io            >= 0.3.3
+                        , cereal                 >= 0.4.0.1
+                        , data-default           >= 0.5.3
+                        , transformers           >= 0.4.1.0
+                        , transformers-base      >= 0.4.1 && < 0.5
+                        , nanomsg-haskell        >= 0.2.2
+                        , network                >= 2.2.1.7
