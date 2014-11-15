@@ -5,6 +5,7 @@ module Continuum.Cluster where
 
 import           Continuum.Types
 import           Continuum.Storage
+import           Continuum.Folds
 
 import           Control.Concurrent
 import           Control.Concurrent.STM
@@ -80,9 +81,30 @@ processRequest socket shared (Query query) = do
 runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
 runQuery shared (CreateDb name schema) = do
   ctx <- atomRead shared
+  print "creating a new db"
   (res, newst) <- runAppState ctx (createDatabase name schema)
   reset newst shared
+  print $ res
   return res
+
+runQuery shared (Insert name record) = do
+  print $ record
+  ctx <- atomRead shared
+  (res, newst) <- runAppState ctx (putRecord name record)
+  reset newst shared
+  print $ res
+  return res
+
+runQuery shared (FetchAll name) = do
+  print "fetching all"
+  ctx <- atomRead shared
+  (res, newst) <- runAppState ctx (scan name EntireKeyspace Record appendFold)
+  reset newst shared
+  return (DbResults <$> res)
+
+runQuery shared other = do
+  _ <- print $ other
+  return (Right EmptyRes)
 
 connectTo :: Socket
              -> Node
@@ -113,7 +135,6 @@ initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= d
           _    <- N.send socket (encode $ ImUp self)
           return ()
 
--- startNode2 :: (LDB.MonadResource m) => m ()
 startNode :: IO ()
 startNode = runResourceT $ do
   done <- liftIO newEmptyMVar
@@ -121,7 +142,7 @@ startNode = runResourceT $ do
   -- TODO: add proper argument parsing
   [path, host, port, seedHost, seedPort] <- liftIO getArgs
 
-  _         <- liftIO $ mkdir path (755)
+  _           <- liftIO $ mkdir path (755)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
   (Right dbs) <- initializeDbs path systemDb
@@ -136,6 +157,9 @@ startNode = runResourceT $ do
                            lastSnapshot      = 1,
                            ctxRwOptions      = (Opts.readOpts,
                                                 Opts.writeOpts)}
+
+  (a, _) <- liftIO $ runAppState context (scan "memory" EntireKeyspace Record appendFold)
+  liftIO $ print a
 
   shared <- liftIO $ atomically $ newTVar context
 
@@ -156,12 +180,11 @@ startNode = runResourceT $ do
           received <- N.recv serverSocket
           case (decode received :: Either String Request) of
             (Left err)  -> do
-              print received
               if (err == "YOYO")
                 then putMVar done ()
-                else print "-"
+                else print err
             (Right request) -> boundRequest shared request
-              --
+                               --
           receiveop
     receiveop
 
