@@ -3,7 +3,7 @@
 
 module Serialization.Test where
 
-import Continuum.Serialization
+import Continuum.Common.Serialization
 import Continuum.Types
 import Test.Hspec
 

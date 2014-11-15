@@ -3,8 +3,8 @@
 
 module Main where
 
-import qualified Serialization.Test as Storage
-import qualified Storage.Test as Serialization
+import qualified Serialization.Test as Serialization
+import qualified Storage.Test       as Storage
 
 main :: IO ()
 main = do
