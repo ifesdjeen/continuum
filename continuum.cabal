@@ -1,5 +1,7 @@
 name:                continuum
-version:             0.1.0.0
+stability:           experimental
+description:         Continuum Database Client
+version:             0.1.0.7
 license:             MIT
 license-file:        LICENSE
 author:              Alex Petrov
@@ -22,24 +24,48 @@ source-repository head
   location: https://github.com/ifesdjeen/continuum.git
 
 library
-  Default-Language:     Haskell2010
+  default-language:     Haskell2010
+  exposed-modules:      Continuum.Client.Base
+                        , Continuum.Common.Types
+  other-modules:        Continuum.Common.Serialization
   if flag(Profiling)
     ghc-options:        -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
     ghc-options:        -Wall -O2 -threaded -threaded -rtsopts
   hs-source-dirs:       src
-  extra-libraries:      hyperleveldb
+  build-depends:          base                   >= 4 && < 5
+                        , containers             >0.5
+                        , bytestring             >= 0.10.4.0
+                        , cereal                 >= 0.4.0.1
+                        , nanomsg-haskell        >= 0.2.2
+                        , time                   >=1.4.2
+                        , mtl                    >2.1
+
+executable continuum-client
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
+  build-depends:          base                   >= 4 && < 5
+                        , containers             >0.5
+                        , bytestring             >= 0.10.4.0
+                        , cereal                 >= 0.4.0.1
+                        , nanomsg-haskell        >= 0.2.2
+                        , time                   >=1.4.2
+                        , mtl                    >2.1
+
+  main-is:              Continuum/Client/Tryout.hs
+executable continuum-server
+  if flag(Binaries)
+    buildable:      True
+  else
+    buildable:      False
+  Default-Language:     Haskell2010
+  hs-source-dirs:       src
   other-extensions:     CPP, MagicHash
-  exposed-modules:       Continuum.Storage
-                       , Continuum.ParallelStorage
-                       , Continuum.Serialization
-                       , Continuum.Cluster
-                       , Continuum.Client
-                       , Continuum.Tryout
-                       , Continuum.Options
-                       , Continuum.Types
-                       , Continuum.Folds
-  other-modules:       Continuum.Internal.Directory
+  extra-libraries:      hyperleveldb
   build-depends:          base                   >= 4 && < 5
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
@@ -58,94 +84,9 @@ library
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
 
-executable continuum-dev
-  Default-Language:     Haskell2010
-  hs-source-dirs:       exec
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-
   if flag(Profiling)
     ghc-options:          -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
   else
     ghc-options:          -Wall -rtsopts -O2 -threaded
 
-  main-is:              JsonLoader.hs
-  build-depends:        continuum
-                        , base                   >= 4 && < 5
-                        , aeson                  >= 0.8.0.0
-                        , process                >= 1.1.0.2
-                        , transformers           >= 0.4.1.0
-                        , bytestring             >= 0.10.4.0
-                        , time                   >= 1.4.2 && < 1.5
-                        , containers             >0.5
-                        , foldl                  >= 1.0.5
-
--- executable continuum-bench
---   Default-Language:     Haskell2010
---   hs-source-dirs:       exec
---   -- ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2
---   main-is:              Benchmarks.hs
---   build-depends:        continuum
---                         , base                   >= 4 && < 5
---                         , containers             >0.5
---                         , transformers           >= 0.4.1.0
---                         , criterion              >= 1.0.1.0
---                         , cereal                 >= 0.4.0.1
---                         , bytestring             >= 0.10.4.0
---   ghc-options:          -Wall -O2
---   if flag(Binaries)
---     buildable:      True
---   else
---     buildable:      False
-
--- cabal run realtra-benchmark -- +RTS -p
-
-test-suite tests
-  ghc-options:          -Wall
-  main-is:              Main.hs
-  type:                 exitcode-stdio-1.0
-  hs-source-dirs:       tests
-  other-modules:        Serialization.Test, Storage.Test
-  build-depends:        base >= 3 && < 5
-                      , continuum
-                      , hspec >= 1.8
-                      , process >= 1.1.0.2
-                      , bytestring >= 0.10.4.0
-                      , mtl >2.1
-                      , transformers
-                      , QuickCheck >= 2.7.6
-                      , hspec-expectations >= 0.6.0.1
-  default-language:     Haskell2010
-
-
-
-
-
-
-
-executable continuum-nanomsg
-  Default-Language:     Haskell2010
-  hs-source-dirs:       exec
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-
-  if flag(Profiling)
-    ghc-options:          -prof -fprof-auto -rtsopts -rtsopts -O2 -Wall -threaded
-  else
-    ghc-options:          -Wall -rtsopts -O2 -threaded
-
-  -- ghc-options:          -Wall -O2
-  main-is:              NanoMsgExamples.hs
-  build-depends:        continuum
-                        , base                   >= 4 && < 5
-                        , aeson                  >= 0.8.0.0
-                        , process                >= 1.1.0.2
-                        , transformers           >= 0.4.1.0
-                        , bytestring             >= 0.10.4.0
-                        , time                   >= 1.4.2 && < 1.5
-                        , containers             >0.5
-                        , foldl                  >= 1.0.5
+  main-is:              Continuum/Server/Base.hs
