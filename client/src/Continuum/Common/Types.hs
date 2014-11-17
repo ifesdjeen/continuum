@@ -157,7 +157,6 @@ data Query =
   | Group                 Query
   | Insert                ByteString DbRecord
   | CreateDb              ByteString DbSchema
-  | RunQuery              ByteString Decoding Query
   deriving (Generic, Show)
 
 instance S.Serialize Query
@@ -174,11 +173,12 @@ data Node = Node String String
 instance S.Serialize Node
 
 data Request =
-  ImUp                    Node
+  Shutdown
+  | ImUp                  Node
   | Introduction          Node
   | NodeList              [Node]
   | Heartbeat             Node
-  | Query                 Query
+  | RunQuery              Query
   deriving(Generic, Show)
 
 instance S.Serialize Request
