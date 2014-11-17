@@ -5,13 +5,14 @@
 {-# LANGUAGE DataKinds #-}
 
 module Continuum.Storage
-       (DB, DBContext,
+       (LDB.DB, DBContext,
         runApp,
         putRecord,
         alwaysTrue,
         scan,
         createDatabase,
         runAppState,
+        tryingout,
         initializeDbs
         )
        where
@@ -26,7 +27,8 @@ import           Control.Monad.Except
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 
-import qualified Database.LevelDB.MonadResource as LDB
+-- import qualified Database.LevelDB.MonadIO as LDB
+import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
@@ -35,7 +37,7 @@ import qualified Control.Foldl                  as L
 import           Data.Traversable               ( traverse )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
-import           Database.LevelDB.MonadResource ( DB, Iterator )
+-- import           Database.LevelDB.MonadRe ( DB, Iterator )
 import           Data.ByteString                ( ByteString )
 
 putRecord :: ByteString -> DbRecord -> AppState DbResult
@@ -68,29 +70,33 @@ runApp :: String
           -> AppState a
           -> IO (Either DbError a)
 runApp path actions = do
-  runResourceT $ do
-    -- TODO: add indexes
-    systemDb  <- LDB.open (path ++ "/system") opts
-    chunksDb  <- LDB.open (path ++ "/chunksDb") opts
+  -- TODO: add indexes
+  systemDb  <- LDB.open (path ++ "/system") opts
+  chunksDb  <- LDB.open (path ++ "/chunksDb") opts
 
-    eitherDbs <- initializeDbs path systemDb
-    let host        = "127.0.0.1"
-        port        = "4444"
-        context dbs = DBContext {ctxPath           = path,
-                                 ctxSystemDb       = systemDb,
-                                 ctxNodes          = Map.empty,
-                                 ctxSelfNode       = Node host port,
-                                 ctxDbs            = dbs,
-                                 ctxChunksDb       = chunksDb,
-                                 sequenceNumber    = 1,
-                                 lastSnapshot      = 1,
-                                 ctxRwOptions      = (readOpts, writeOpts)}
-    let run dbs = evalStateT actions (context dbs)
-    join <$> traverse run eitherDbs
+  eitherDbs <- initializeDbs path systemDb
+  let host        = "127.0.0.1"
+      port        = "4444"
+      context dbs = DBContext {ctxPath           = path,
+                               ctxSystemDb       = systemDb,
+                               ctxNodes          = Map.empty,
+                               ctxSelfNode       = Node host port,
+                               ctxDbs            = dbs,
+                               ctxChunksDb       = chunksDb,
+                               sequenceNumber    = 1,
+                               lastSnapshot      = 1,
+                               ctxRwOptions      = (readOpts, writeOpts)}
+      run dbs = evalStateT actions (context dbs)
+  join <$> traverse run eitherDbs
+
+
+tryingout :: DBContext -> AppState a -> IO (DbErrorMonad a,
+                                              DBContext)
+tryingout  st op = runStateT op $ st
 
 runAppState :: DBContext -> AppState a -> IO (DbErrorMonad a,
                                               DBContext)
-runAppState  st op = runResourceT . runStateT op $ st
+runAppState  st op = runStateT op $ st
 
 liftDbError :: (a -> b -> c)
               -> DbErrorMonad a
@@ -116,7 +122,7 @@ scan dbName keyRange decoding (L.Fold foldop acc done) = do
     then do
     ro <- getReadOptions
     let (schema, db) = fromJust maybeDb
-    records <- LDB.withIterator db ro $ \iter -> do
+    records <- LDB.withIter db ro $ \iter -> do
       let mapop        = decodeRecord decoding schema
           getNext      = advanceIterator iter keyRange
           step !a !x   = liftDbError foldop a (mapop x)
@@ -126,7 +132,7 @@ scan dbName keyRange decoding (L.Fold foldop acc done) = do
     else do
     return $ Left NoSuchDatabaseError
 
-scanStep :: (MonadResource m) =>
+scanStep :: (MonadIO m) =>
             m (Maybe (ByteString, ByteString))
             -> (acc -> (ByteString, ByteString) -> acc)
             -> acc
@@ -141,8 +147,8 @@ scanStep getNext op orig = s orig
 
 -- | Advances iterator to a single entry, exits and returns nothing in case there's either nothing
 -- more to read or we've reached the end of Key Range
-advanceIterator :: MonadResource m =>
-                   Iterator
+advanceIterator :: MonadIO m =>
+                   LDB.Iterator
                    -> KeyRange
                    -> m (Maybe (ByteString, ByteString))
 advanceIterator iter (KeyRange _ rangeEnd) = do
@@ -186,8 +192,8 @@ advanceIterator iter _ = do
   LDB.iterNext iter
   return $ (,) <$> mkey <*> mval
 
-setStartPosition :: MonadResource m =>
-                    Iterator
+setStartPosition :: MonadIO m =>
+                    LDB.Iterator
                     -> KeyRange
                     -> m ()
 
@@ -226,20 +232,18 @@ maybeWriteChunk sid (DbRecord time _) = do
   return $ return $ EmptyRes
 maybeWriteChunk _ _ = return $ throwError OtherError
 
-initializeDbs :: MonadResource m =>
-                 String
-                 -> DB
-                 -> m (DbErrorMonad SchemaMap)
+initializeDbs :: String
+                 -> LDB.DB
+                 -> IO (DbErrorMonad SchemaMap)
 initializeDbs path systemDb = do
-  schemas <- LDB.withIterator systemDb readOpts $ readSchemas
+  schemas <- LDB.withIter systemDb readOpts $ readSchemas
   traverse (addDbInit path) (sequence schemas)
   where
     readSchemas i  = map decodeSchema <$> (LDB.iterFirst i >> LDB.iterItems i)
 
-addDbInit :: MonadResource m =>
-             String
+addDbInit :: String
              -> [(ByteString, DbSchema)]
-             -> m SchemaMap
+             -> IO SchemaMap
 addDbInit path coll =
   Map.fromList <$> mapM initDb coll
 
@@ -257,4 +261,4 @@ createDatabase dbName sch = do
   ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
   _    <- putSchema dbName sch
   modify (\a -> a {ctxDbs = Map.insert dbName (sch, ldb) (ctxDbs a)})
-  return $ Right $ EmptyRes
+  return $ Right EmptyRes
