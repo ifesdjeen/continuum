@@ -13,10 +13,11 @@ import           Control.Monad.Trans.Resource
 import           Control.Monad.State.Strict     ( get )
 import           Control.Monad.State.Strict     ( liftIO, evalStateT )
 import           Control.Applicative            ( (<$>) )
-import           Database.LevelDB.MonadResource ( DB(..), Iterator )
+-- import           Database.LevelDB.MonadResource ( DB(..), Iterator )
+import           Database.LevelDB.Base          ( DB(..), Iterator )
 import           Data.ByteString                ( ByteString )
 
-import qualified Database.LevelDB.MonadResource as LDB
+import qualified Database.LevelDB.Base          as LDB
 import qualified Control.Foldl                  as Fold
 import qualified Data.Map.Strict                as Map
 
@@ -41,13 +42,13 @@ parallelRangeScan (Right ranges) op = do
 
 
 execAsyncIO :: DBContext -> AppState a -> IO (Either DbError a)
-execAsyncIO  st op = runResourceT . evalStateT op $ st
+execAsyncIO  st op = evalStateT op $ st
 
 readChunks :: AppState [Integer]
 readChunks = do
   db  <- getChunks
   ro  <- getReadOptions
-  LDB.withIterator db ro iter
+  LDB.withIter db ro iter
   where iter i = mapM unpackWord64 <$> (LDB.iterFirst i >> LDB.iterKeys i)
 
 makeRanges :: [Integer]
