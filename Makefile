@@ -40,3 +40,7 @@ $(LIBHYPERLEVELDB) :
 
 $(CONFIGURED): cabal.sandbox.config deps $(NAME).cabal
 	cabal configure --enable-test --enable-bench
+
+reconf:
+	cabal install -fBinaries --enable-tests --only-dependencies && \
+	cabal configure -fBinaries --enable-tests
