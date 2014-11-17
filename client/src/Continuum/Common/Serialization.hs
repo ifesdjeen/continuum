@@ -18,6 +18,7 @@ import           Control.Applicative  ( (<$>) )
 import           Data.List            ( elemIndex )
 import           Data.Maybe           ( isJust, fromJust, catMaybes )
 import           Control.Monad.Except ( forM_, throwError )
+import           Control.Monad        ( join )
 
 -- import Debug.Trace
 
@@ -71,7 +72,7 @@ decodeDbResult :: B.ByteString
 decodeDbResult encodedDbResult =
   case (decode encodedDbResult) of
     (Left err)     -> throwError $ SchemaDecodingError err
-    (Right query)  -> return query
+    (Right query)  -> join $ return query
 
 
 -- |
