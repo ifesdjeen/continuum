@@ -3,20 +3,21 @@
 
 module Storage.Test where
 
-import           Data.ByteString (ByteString)
-import           Control.Monad (forM_)
+import           Data.ByteString  ( ByteString )
+import           Control.Monad    ( forM_ )
+import           System.Process   ( system )
 import           Continuum.Folds
 import           Continuum.Storage
 import           Continuum.Types
-import           System.Process(system)
+
 import           Test.Hspec
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
+
 main :: IO ()
 main =  hspec $ do
-
 
   describe "Basic DB Functionality" $ do
     it "setup" $ cleanup >>= shouldReturn (return())
