@@ -4,22 +4,23 @@
 module Continuum.Cluster where
 
 import           Continuum.Types
+import           Continuum.Common.Types
 import           Continuum.Storage
 import           Continuum.Folds
 
-import           Control.Concurrent
+import           System.Process                 ( system )
+import           Control.Concurrent             ( forkIO, newEmptyMVar, putMVar, takeMVar, MVar )
 import           Control.Concurrent.STM
-import           Control.Monad.IO.Class
+import           Control.Monad.IO.Class         ( liftIO )
 import           Control.Monad
 
-import           System.Environment
-
+import           Control.Exception.Base         ( bracket )
 import           Control.Monad.Trans.Resource   ( runResourceT )
 import           Data.Serialize                 ( encode, decode )
-import           Continuum.Internal.Directory   ( mkdir )
+-- import           Continuum.Internal.Directory   ( mkdir )
 import           Control.Applicative            ( (<$>) )
 
-import qualified Database.LevelDB.MonadResource      as LDB
+import qualified Database.LevelDB.Base               as LDB
 import qualified Continuum.Options                   as Opts
 import qualified Data.Map                            as Map
 import qualified Data.Time.Clock.POSIX               as Clock
@@ -28,7 +29,9 @@ import qualified Control.Concurrent.Timer            as Timer
 
 import qualified Nanomsg as N
 
-type Socket = N.Socket N.Bus
+import           Debug.Trace                    ( trace )
+
+type Socket = N.Socket N.Rep
 
 -- |
 -- | Reuqest Processing
@@ -38,39 +41,9 @@ processRequest :: Socket
                   -> TVar DBContext
                   -> Request
                   -> IO ()
-processRequest socket shared (ImUp node) = do
-  nodes <- ctxNodes <$> atomRead shared
-  _     <- N.send socket (encode $ NodeList (Map.keys nodes))
-  time  <- Clock.getPOSIXTime
-  _     <- swap (fmapNodes $ insertNode time node) shared
-  return ()
 
-processRequest socket shared (ImUp node) = do
-  nodes <- ctxNodes <$> atomRead shared
-  _     <- N.send socket (encode $ NodeList (Map.keys nodes))
-  time  <- Clock.getPOSIXTime
-  _     <- swap (fmapNodes $ insertNode time node) shared
-  return ()
-
-processRequest _ shared (Heartbeat node) = do
-  time  <- Clock.getPOSIXTime
-  _     <- swap (fmapNodes $ insertNode time node) shared
-  return ()
-  where updateNodeTime time nodeStatus = Just $ nodeStatus { lastHeartbeat = time }
-
-processRequest _ shared (Introduction node) = do
-  time <- Clock.getPOSIXTime
-  _    <- swap (fmapNodes $ insertNode time node) shared
-  return ()
-
-processRequest socket shared (NodeList nodeList) = do
-  self <- ctxSelfNode <$> atomRead shared
-  forM_ nodeList (connectTo socket self shared >> return)
-  return ()
-
--- Migrate processrequest to its own typeclass
-processRequest socket shared (Query query) = do
-  resp <- runQuery shared query
+processRequest socket shared (RunQuery query) = do
+  resp  <- runQuery shared query
   _     <- N.send socket (encode $ resp)
   return ()
 
@@ -78,73 +51,44 @@ processRequest socket shared (Query query) = do
 -- | Query
 -- |
 
+
 runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
 runQuery shared (CreateDb name schema) = do
   ctx <- atomRead shared
-  print "creating a new db"
   (res, newst) <- runAppState ctx (createDatabase name schema)
-  reset newst shared
-  print $ res
+  atomReset newst shared
   return res
 
 runQuery shared (Insert name record) = do
-  print $ record
   ctx <- atomRead shared
   (res, newst) <- runAppState ctx (putRecord name record)
-  reset newst shared
-  print $ res
+  atomReset newst shared
+  print "INSERTING"
   return res
 
 runQuery shared (FetchAll name) = do
-  print "fetching all"
   ctx <- atomRead shared
   (res, newst) <- runAppState ctx (scan name EntireKeyspace Record appendFold)
-  reset newst shared
+  atomReset newst shared
   return (DbResults <$> res)
 
-runQuery shared other = do
+runQuery _ other = do
   _ <- print $ other
   return (Right EmptyRes)
 
-connectTo :: Socket
-             -> Node
-             -> TVar DBContext
-             -> Node
-             -> IO ()
-connectTo socket self shared other@(Node host port) | other /= self = do
-  time <- Clock.getPOSIXTime
-  _    <- swap (fmapNodes $ insertNode time other) shared
-  _    <- N.connect socket ("tcp://" ++ host ++ ":" ++ port)
-  _    <- Timer.repeatedTimer introduce (Delay.msDelay 1000)
-  return ()
-  where introduce = N.send socket (encode $ Introduction self)
-connectTo _ _ _ _ = return ()
+-- | Started MVar should be used byany
 
-initializeNode :: Socket
-                  -> Node
-                  -> Node
-                  -> TVar DBContext
-                  -> IO ()
-initializeNode socket seed@(Node seedHost seedPort) self@(Node _ port) shared= do
-  _ <- N.bind socket ("tcp://*:" ++ port)
-  when (seedHost == "127.0.0.1") initialize
-  where initialize = do
-          _    <- N.connect socket ("tcp://" ++ seedHost ++ ":" ++ seedPort)
-          time <- Clock.getPOSIXTime
-          _    <- swap (fmapNodes $ insertNode time seed) shared
-          _    <- N.send socket (encode $ ImUp self)
-          return ()
+startNode :: MVar ()
+             -> MVar ()
+             -> String -> String
+             -> String -> String
+             -> String -> IO ()
+startNode startedVar doneVar path host port seedHost seedPort = do
 
-startNode :: IO ()
-startNode = runResourceT $ do
-  done <- liftIO newEmptyMVar
-
-  -- TODO: add proper argument parsing
-  [path, host, port, seedHost, seedPort] <- liftIO getArgs
-
-  _           <- liftIO $ mkdir path (755)
+  _           <- liftIO $ system ("mkdir " ++ path)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
+
   (Right dbs) <- initializeDbs path systemDb
 
   let context = DBContext {ctxPath           = path,
@@ -158,51 +102,54 @@ startNode = runResourceT $ do
                            ctxRwOptions      = (Opts.readOpts,
                                                 Opts.writeOpts)}
 
-  (a, _) <- liftIO $ runAppState context (scan "memory" EntireKeyspace Record appendFold)
-  liftIO $ print a
-
   shared <- liftIO $ atomically $ newTVar context
 
-  serverSocket <- liftIO $ N.socket N.Bus
+  -- Probably makes sense to combine all liftIOs into one
+  serverSocket <- liftIO $ N.socket N.Rep
+  endpoint     <- liftIO $ N.bind serverSocket ("tcp://*:" ++ port)
 
-  let seed         = (Node seedHost seedPort)
-      self         = (Node host port)
-      boundRequest = processRequest serverSocket
-
-  liftIO $ initializeNode serverSocket seed self shared
+  -- Notify waiting thread that startup has finished
+  liftIO $ putMVar startedVar ()
 
   -- |
   -- | Receive Loop
   -- |
 
-  _ <- liftIO . forkIO $ do
-    let receiveop = do
-          received <- N.recv serverSocket
-          case (decode received :: Either String Request) of
-            (Left err)  -> do
-              if (err == "YOYO")
-                then putMVar done ()
-                else print err
-            (Right request) -> boundRequest shared request
-                               --
-          receiveop
-    receiveop
+  -- Receive loop, synchronous. Just insert it after everything.
+  liftIO $ receiveLoop serverSocket shared
 
-  -- |
-  -- | Hearbeat loop
-  -- |
+  _    <- N.shutdown serverSocket endpoint
+  _    <- N.close serverSocket
 
-  _ <- liftIO . forkIO $ do
-    _ <- Timer.repeatedTimer (printClusterStatus shared) (Delay.msDelay 1000)
-    _ <- Timer.repeatedTimer (sendHeartbeat serverSocket self) (Delay.msDelay 1000)
-    return ()
+  _    <- LDB.close systemDb
+  _    <- LDB.close chunksDb
+  ctx <- atomRead shared
+  _    <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList (ctxDbs ctx))
 
-  liftIO $ takeMVar done
+  liftIO $ putMVar doneVar ()
 
   return ()
 
-sendHeartbeat :: Socket -> Node -> IO ()
-sendHeartbeat socket node = N.send socket (encode $ Heartbeat node)
+emptyResult :: DbErrorMonad DbResult
+emptyResult = Right EmptyRes
+
+receiveLoop serverSocket shared = do
+  received <- N.recv serverSocket
+
+  case (decode received :: Either String Request) of
+    (Right Shutdown) -> do
+      print "Received Shutdown"
+      N.send serverSocket (encode emptyResult)
+      return ()
+
+    (Left err)       -> do
+      print ("Can't decode message: " ++ (show err))
+      receiveLoop serverSocket shared
+
+    (Right request)  -> do
+      print ("Request received: " ++ (show request))
+      processRequest serverSocket shared request
+      receiveLoop serverSocket shared
 
 -- Server Socket is used to recevie messages from all the nodes
 -- Server socket may be also used to broadcase messages to all the nodes
@@ -227,8 +174,8 @@ showNodeStatus nst currentTime =
 swap :: (b -> b) -> TVar b -> IO ()
 swap fn x = atomically $ readTVar x >>= writeTVar x . fn
 
-reset :: b -> TVar b -> IO ()
-reset newv x = atomically $ writeTVar x newv
+atomReset :: b -> TVar b -> IO ()
+atomReset newv x = atomically $ writeTVar x newv
 
 nodeTimeout :: Clock.POSIXTime
 nodeTimeout = 5

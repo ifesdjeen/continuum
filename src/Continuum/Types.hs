@@ -4,15 +4,16 @@
 
 module Continuum.Types
        (module Continuum.Types
-        , module Continuum.Common.Types
-        )
+       , module Continuum.Common.Types
+       )
        where
 
 import           Continuum.Common.Types
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import           Data.ByteString                ( ByteString )
-import           Database.LevelDB.MonadResource ( DB, WriteOptions, ReadOptions )
+-- import           Database.LevelDB.MonadResource ( DB, WriteOptions, ReadOptions )
+import           Database.LevelDB.Base          ( DB, WriteOptions, ReadOptions )
 import           GHC.Generics                   ( Generic )
 
 import qualified Data.Map                       as Map
@@ -21,7 +22,7 @@ import qualified Data.Time.Clock.POSIX          as Clock
 
 type SchemaMap     = Map.Map ByteString (DbSchema, DB)
 
-type AppState a    = StateT DBContext (ResourceT IO) (DbErrorMonad a)
+type AppState a    = StateT DBContext IO (DbErrorMonad a)
 
 type RWOptions     = (ReadOptions, WriteOptions)
 
@@ -92,6 +93,6 @@ getWriteOptions = liftM snd rwOptions
 -- |
 
 data NodeStatus = NodeStatus {lastHeartbeat :: Clock.POSIXTime}
-                deriving(Generic, Eq, Ord)
+                deriving(Generic, Eq, Ord, Show)
 
 type ClusterNodes = Map.Map Node NodeStatus
