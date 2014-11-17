@@ -1,23 +1,23 @@
-name:                continuum
-stability:           experimental
-description:         Continuum Database Client
-version:             0.1.0.8
-license:             MIT
-license-file:        LICENSE
-author:              Alex Petrov
-maintainer:          alexp@coffeenco.de
-build-type:          Simple
-cabal-version:       >=1.10
+name:                   continuum
+stability:              experimental
+description:            Continuum Database Client
+version:                0.1.0.8
+license:                MIT
+license-file:           LICENSE
+author:                 Alex Petrov
+maintainer:             alexp@coffeenco.de
+build-type:             Simple
+cabal-version:          >=1.10
 
 Flag Binaries
-  description:      Build examples
-  default:          False
-  manual:           True
+  description:          Build examples
+  default:              False
+  manual:               True
 
 Flag Profiling
-  description:      Profiling mode
-  default:          False
-  manual:           True
+  description:          Profiling mode
+  default:              False
+  manual:               True
 
 source-repository head
   type:     git
@@ -44,6 +44,7 @@ library
 
   build-depends:          base                   >= 4 && < 5
                         , continuum-client       >= 0.1.0.0
+                        , process                >= 1.2.0.0
                         , foldl                  >= 1.0.5
                         , mtl                    >2.1
                         , containers             >0.5
@@ -76,8 +77,8 @@ test-suite tests
   build-depends:          base                   >= 3 && < 5
                         , continuum
                         , continuum-client       >= 0.1.0.0
-                        , hspec                  >= 1.8
-                        , process                >= 1.1.0.2
+                        , hspec                  >= 2.0.1
+                        , process                >= 1.2.0.0
                         , bytestring             >= 0.10.4.0
                         , mtl                    > 2.1
                         , transformers           >= 0.4.1.0
@@ -119,3 +120,4 @@ executable continuum-server
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
                         , network                >= 2.2.1.7
+                        , process                >= 1.2.0.0
