@@ -6,13 +6,10 @@
 
 module Continuum.Storage
        (LDB.DB, DBContext,
-        runApp,
         putRecord,
         alwaysTrue,
         scan,
         createDatabase,
-        runAppState,
-        tryingout,
         initializeDbs
         )
        where
@@ -24,8 +21,7 @@ import           Continuum.Common.Serialization
 import           Continuum.Types
 
 import           Control.Monad.Except
-import           Control.Monad.State.Strict
-import           Control.Monad.Trans.Resource
+import           Control.Monad.State.Strict        ( get, modify )
 
 -- import qualified Database.LevelDB.MonadIO as LDB
 import qualified Database.LevelDB.Base          as LDB
@@ -63,40 +59,6 @@ putSchema dbName sch = do
 
 alwaysTrue :: a -> b -> Bool
 alwaysTrue = \_ _ -> True
-
--- prepareContext path dbSchema =
-
-runApp :: String
-          -> AppState a
-          -> IO (Either DbError a)
-runApp path actions = do
-  -- TODO: add indexes
-  systemDb  <- LDB.open (path ++ "/system") opts
-  chunksDb  <- LDB.open (path ++ "/chunksDb") opts
-
-  eitherDbs <- initializeDbs path systemDb
-  let host        = "127.0.0.1"
-      port        = "4444"
-      context dbs = DBContext {ctxPath           = path,
-                               ctxSystemDb       = systemDb,
-                               ctxNodes          = Map.empty,
-                               ctxSelfNode       = Node host port,
-                               ctxDbs            = dbs,
-                               ctxChunksDb       = chunksDb,
-                               sequenceNumber    = 1,
-                               lastSnapshot      = 1,
-                               ctxRwOptions      = (readOpts, writeOpts)}
-      run dbs = evalStateT actions (context dbs)
-  join <$> traverse run eitherDbs
-
-
-tryingout :: DBContext -> AppState a -> IO (DbErrorMonad a,
-                                              DBContext)
-tryingout  st op = runStateT op $ st
-
-runAppState :: DBContext -> AppState a -> IO (DbErrorMonad a,
-                                              DBContext)
-runAppState  st op = runStateT op $ st
 
 liftDbError :: (a -> b -> c)
               -> DbErrorMonad a
