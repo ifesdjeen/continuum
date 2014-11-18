@@ -33,8 +33,8 @@ type RWOptions     = (ReadOptions, WriteOptions)
 data DBContext = DBContext
     { ctxSystemDb       :: DB
     , ctxDbs            :: Map.Map ByteString (DbSchema, DB)
-    , ctxNodes          :: ClusterNodes
-    , ctxSelfNode       :: Node
+    -- , ctxNodes          :: ClusterNodes
+    -- , ctxSelfNode       :: Node
     , ctxChunksDb       :: DB
     , ctxPath           :: String
     , sequenceNumber    :: Integer
@@ -55,9 +55,16 @@ MODIFIER f = do                                                 ; \
   modify (MAPPER f)                                             ; \
   return ()
 
-ACCESSORS(getNodes, fmapNodes, modifyNodes, ctxNodes, ClusterNodes)
 #undef ACCESSORS
 -- ACCESSORS(getChunks, fmapChunks, modifyChunks, ctxChunks, DB)
+
+dbExists :: MonadState DBContext m => ByteString -> m Bool
+dbExists k = do
+  db <- getDb k
+  return $ case db of
+    (Just _) ->  True
+    (Nothing) -> False
+
 
 getDb :: MonadState DBContext m => ByteString -> m (Maybe (DbSchema, DB))
 getDb k = do
