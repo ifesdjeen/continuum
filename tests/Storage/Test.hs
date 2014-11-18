@@ -3,40 +3,48 @@
 
 module Storage.Test where
 
-import           Data.ByteString  ( ByteString )
-import           Control.Monad    ( forM_ )
-import           System.Process   ( system )
+import qualified Continuum.Cluster as Server
+import           Data.ByteString      ( ByteString )
+import           Control.Monad        ( forM_ )
+import           System.Process       ( system )
 import           Continuum.Folds
 import           Continuum.Storage
 import           Continuum.Types
 
 import           Test.Hspec
+import           Control.Exception.Base         ( bracket )
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
 
+runner :: String -> AppState a -> IO (DbErrorMonad a)
+runner str op = Server.withTmpStorage str cleanup $ \shared -> do
+  ctx <- Server.atomRead shared
+  (res, newst) <- Server.runAppState ctx op
+  Server.atomReset newst shared
+  return res
+
 main :: IO ()
 main =  hspec $ do
 
   describe "Basic DB Functionality" $ do
-    it "setup" $ cleanup >>= shouldReturn (return())
-
     it "should put items into the database and retrieve them" $  do
-      let res = runApp testDBPath $ do
+      let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
             _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
                                                 ("b", (DbString "1"))]
 
             scantdb (TsSingleKey 123) Record appendFold
+
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
                                                 ("b", DbString "1")]]
 
-    it "setup" $ cleanup >>= shouldReturn (return())
+
     it "should retrieve items by given timestamp" $  do
-      let res = runApp testDBPath $ do
+      let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
             _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1),
@@ -65,10 +73,10 @@ main =  hspec $ do
                                 makeRecord 123 [("a", DbInt 3),
                                                 ("b", DbString "3")]]
 
-    it "setup" $ cleanup >>= shouldReturn (return())
+
 
     it "should return inclusive range of timestamps" $  do
-      let res = runApp testDBPath $ do
+      let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
             _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
@@ -109,10 +117,10 @@ main =  hspec $ do
                                 makeRecord 456 [("a", DbInt 3),
                                                 ("b", DbString "3")]]
 
-    it "setup" $ cleanup >>= shouldReturn (return())
+
 
     it "should scantdb a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
-      let res = runApp testDBPath $ do
+      let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
             _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1),
@@ -146,9 +154,9 @@ main =  hspec $ do
                                 ])
 
 
-    it "setup" $ cleanup >>= shouldReturn (return())
+
     it "should iterate over a large amount of records" $  do
-      let res = runApp testDBPath $ do
+      let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
             forM_ [1..1000000]
@@ -157,10 +165,10 @@ main =  hspec $ do
             scantdb EntireKeyspace (Field "a") countFold
       res `shouldReturn` (Right 1000000)
 
-    it "setup" $ cleanup >>= shouldReturn (return())
+
 
     -- it "should iterate " $  do
-    --   let res = runApp testDBPath testSchema $ do
+    --   let res = runner testDBPath testSchema $ do
 
 testDBPath :: String
 testDBPath = "/tmp/haskell-leveldb-tests"

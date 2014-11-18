@@ -9,6 +9,6 @@ import qualified Cluster.Test       as Cluster
 
 main :: IO ()
 main = do
-  -- Storage.main
-  -- Serialization.main
+  Storage.main
+  Serialization.main
   Cluster.main
