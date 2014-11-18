@@ -41,7 +41,7 @@ startServer :: IO (MVar ())
 startServer = do
   startedVar <- newEmptyMVar
   doneVar    <- newEmptyMVar
-  _          <- forkIO $ startNode startedVar doneVar testDBPath "127.0.0.1" testPort "-" "-"
+  _          <- forkIO $ startNode startedVar doneVar testDBPath testPort
   _          <- takeMVar startedVar
   return doneVar
 

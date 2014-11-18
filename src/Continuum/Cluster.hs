@@ -65,7 +65,6 @@ runQuery shared (Insert name record) = do
   ctx <- atomRead shared
   (res, newst) <- runAppState ctx (putRecord name record)
   atomReset newst shared
-  print "INSERTING"
   return res
 
 runQuery shared (FetchAll name) = do
@@ -78,15 +77,12 @@ runQuery _ other = do
   _ <- print $ other
   return (Right EmptyRes)
 
-runAppState :: DBContext -> AppState a -> IO (DbErrorMonad a,
-                                              DBContext)
-runAppState st op = runStateT op $ st
+runAppState :: DBContext
+               -> AppState a
+               -> IO (DbErrorMonad a,
+                      DBContext)
+runAppState = flip runStateT
 
--- | Started MVar should be used byany
-
-
-emptySubsystem :: TVar DBContext -> IO ()
-emptySubsystem _ = return ()
 
 startStorage :: String -> IO (TVar DBContext)
 startStorage path = do
@@ -130,64 +126,57 @@ withTmpStorage :: String
                -> IO ()
                -> (TVar DBContext -> IO a)
                -> IO a
-withTmpStorage path cleanup subsystem = do
+withTmpStorage path cleanup subsystem =
   bracket (startStorage path)
           (\i -> stopStorage i >> cleanup)
           subsystem
 
-startNode :: MVar ()
-             -> MVar ()
-             -> String -> String
-             -> String -> String
-             -> String -> IO ()
-startNode startedVar doneVar path host port seedHost seedPort = do
 
-  _           <- liftIO $ system ("mkdir " ++ path)
-  systemDb    <- LDB.open (path ++ "/system") Opts.opts
-  chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
+startClientAcceptor :: MVar ()
+                       -> String
+                       -> TVar DBContext
+                       -> IO (N.Socket N.Rep, N.Endpoint)
+startClientAcceptor startedMVar port shared = do
+  serverSocket <- N.socket N.Rep
+  endpoint     <- N.bind serverSocket ("tcp://*:" ++ port)
 
-  (Right dbs) <- initializeDbs path systemDb
+  _            <- putMVar startedMVar ()
 
-  let context = DBContext {ctxPath           = path,
-                           ctxSystemDb       = systemDb,
-                           ctxDbs            = dbs,
-                           ctxChunksDb       = chunksDb,
-                           sequenceNumber    = 1,
-                           lastSnapshot      = 1,
-                           ctxRwOptions      = (Opts.readOpts,
-                                                Opts.writeOpts)}
+  return (serverSocket, endpoint)
 
-  shared <- liftIO $ atomically $ newTVar context
-
-  -- Probably makes sense to combine all liftIOs into one
-  serverSocket <- liftIO $ N.socket N.Rep
-  endpoint     <- liftIO $ N.bind serverSocket ("tcp://*:" ++ port)
-
-  -- Notify waiting thread that startup has finished
-  liftIO $ putMVar startedVar ()
-
-  -- |
-  -- | Receive Loop
-  -- |
-
-  -- Receive loop, synchronous. Just insert it after everything.
-  liftIO $ receiveLoop serverSocket shared
-
+stopClientAcceptor :: MVar () -> (N.Socket N.Rep, N.Endpoint) -> IO ()
+stopClientAcceptor doneMVar (serverSocket, endpoint) = do
   _    <- N.shutdown serverSocket endpoint
   _    <- N.close serverSocket
 
-  _    <- LDB.close systemDb
-  _    <- LDB.close chunksDb
-  ctx <- atomRead shared
-  _    <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList (ctxDbs ctx))
-
-  liftIO $ putMVar doneVar ()
+  _    <- putMVar doneMVar ()
 
   return ()
+
+withClientAcceptor :: MVar ()
+                      -> MVar ()
+                      -> String
+                      -> TVar DBContext
+                      -> IO ()
+
+withClientAcceptor startedMVar doneMVar port shared =
+  bracket (startClientAcceptor startedMVar port shared)
+          (stopClientAcceptor doneMVar)
+          (\(serverSocket, _) -> receiveLoop serverSocket shared)
+
+startNode :: MVar ()
+             -> MVar ()
+             -> String -> String
+             -> IO ()
+startNode startedMVar doneMVar path port = do
+  withStorage path $
+    withClientAcceptor startedMVar doneMVar port
+
 
 emptyResult :: DbErrorMonad DbResult
 emptyResult = Right EmptyRes
 
+receiveLoop :: N.Socket N.Rep -> TVar DBContext -> IO ()
 receiveLoop serverSocket shared = do
   received <- N.recv serverSocket
 
