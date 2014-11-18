@@ -218,9 +218,14 @@ createDatabase :: ByteString
                   -> DbSchema
                   -> AppState DbResult
 createDatabase dbName sch = do
-  path <- getPath
-  -- Add uniqueness check
-  ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
-  _    <- putSchema dbName sch
-  modify (\a -> a {ctxDbs = Map.insert dbName (sch, ldb) (ctxDbs a)})
-  return $ Right EmptyRes
+  exists <- dbExists dbName
+  if (not exists)
+    then createDb
+    else return $ Right EmptyRes
+  where createDb = do
+          path <- getPath
+          -- Add uniqueness check
+          ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
+          _    <- putSchema dbName sch
+          modify (\a -> a {ctxDbs = Map.insert dbName (sch, ldb) (ctxDbs a)})
+          return $ Right EmptyRes
