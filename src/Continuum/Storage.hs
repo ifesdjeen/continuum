@@ -1,13 +1,13 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Continuum.Storage
        (LDB.DB, DBContext,
         putRecord,
-        alwaysTrue,
         scan,
         createDatabase,
         initializeDbs
@@ -21,63 +21,76 @@ import           Continuum.Common.Serialization
 import           Continuum.Types
 
 import           Control.Monad.Except
-import           Control.Monad.State.Strict        ( get, modify )
+import           Control.Monad.State.Strict        ( get )
 
--- import qualified Database.LevelDB.MonadIO as LDB
 import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
-import qualified Control.Foldl                  as L
+import           Control.Foldl                  ( Fold(..) )
 
 import           Data.Traversable               ( traverse )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
--- import           Database.LevelDB.MonadRe ( DB, Iterator )
 import           Data.ByteString                ( ByteString )
 
-putRecord :: ByteString -> DbRecord -> AppState DbResult
+-- |
+-- | OPERATIONS
+-- |
+
+-- |Insert Record into the Database by given name
+--
+putRecord :: DbName
+             -> DbRecord
+             -> AppState DbResult
 putRecord dbName record = do
   sid          <- getAndincrementSequence
   _            <- maybeWriteChunk sid record
   maybeDbDescr <- getDb dbName
+
   case maybeDbDescr of
     (Just (schema, db)) -> do
       wo <- getWriteOptions
-      -- TODO: read up about bracket
       let (key, value) = encodeRecord schema record sid
-      LDB.put db wo key value
+      _  <- LDB.put db wo key value
+
       return $ return $ EmptyRes
     Nothing             -> return $ Left NoSuchDatabaseError
 
-putSchema :: ByteString -> DbSchema -> AppState DbResult
+-- |Insert Schema Record of an existing database by
+-- given name. Databases are re-initialized on startup
+-- from System DB. Every registered database should have
+-- a corresponding record in System DB
+--
+putSchema :: DbName
+             -> DbSchema
+             -> AppState DbResult
 putSchema dbName sch = do
   sysDb   <- getSystemDb
   wo      <- getWriteOptions
   _       <- LDB.put sysDb wo dbName (encodeSchema sch)
+
   return $ Right EmptyRes
-
-alwaysTrue :: a -> b -> Bool
-alwaysTrue = \_ _ -> True
-
-liftDbError :: (a -> b -> c)
-              -> DbErrorMonad a
-              -> DbErrorMonad b
-              -> DbErrorMonad c
-liftDbError f (Right a) (Right b) = return $! f a b
-liftDbError _ (Left a)  _         = Left a
-liftDbError _ _         (Left b)  = Left b
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
 
-scan :: ByteString
+-- |Perform a Scan operation.
+--
+--   * @KeyRange@ specifies where the given scan should start, and until when
+--     it should be scanning.
+--   * @Decoding@ specifies what / how to deserialize (single @Field@, many
+--     @Fields@, or an entire @DbRecord@
+--   * @Fold@     specifies which Fold to use (Group, Append and so on, for
+--     complex querying)
+--
+scan :: DbName
         -> KeyRange
         -> Decoding
-        -> L.Fold DbResult acc
+        -> Fold DbResult acc
         -> AppState acc
 
-scan dbName keyRange decoding (L.Fold foldop acc done) = do
+scan dbName keyRange decoding (Fold foldop acc done) = do
   maybeDb <- getDb dbName
   -- TODO: generalize
   if (isJust maybeDb)
@@ -94,21 +107,31 @@ scan dbName keyRange decoding (L.Fold foldop acc done) = do
     else do
     return $ Left NoSuchDatabaseError
 
+-- |Perform a single step of the Scan Operation. Combines
+-- @decodeRecord@ and @advanceIterator@, prepared in @scan@,
+-- recurses into itself until @advanceIterator@ returns @Just@
+-- something.
+--
 scanStep :: (MonadIO m) =>
             m (Maybe (ByteString, ByteString))
             -> (acc -> (ByteString, ByteString) -> acc)
             -> acc
             -> m acc
 
-scanStep getNext op orig = s orig
-  where s !acc = do
+scanStep getNext op orig = recur orig
+  where recur !acc = do
           next <- getNext
           if isJust next
-            then s (op acc (fromJust next))
+            then recur (op acc (fromJust next))
             else return acc
 
--- | Advances iterator to a single entry, exits and returns nothing in case there's either nothing
--- more to read or we've reached the end of Key Range
+-- | Advances iterator for _just one_ step, exits and returns nothing in
+-- case there's either nothing more to read or we've reached the end of
+-- @KeyRange@.
+--
+-- Exit (interrupt) condition depends on the given @KeyRange@. For example,
+-- @OpenEnd@ doesn't exit until all the entries are read from database.
+--
 advanceIterator :: MonadIO m =>
                    LDB.Iterator
                    -> KeyRange
@@ -116,12 +139,14 @@ advanceIterator :: MonadIO m =>
 advanceIterator iter (KeyRange _ rangeEnd) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
-  LDB.iterNext iter
+  _    <- LDB.iterNext iter
+
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
-  where maybeInterrupt k = k >>= interruptCondition
-        interruptCondition resKey = if resKey <= rangeEnd
-                                    then Just resKey
-                                    else Nothing
+
+  where maybeInterrupt k = k >>= condition
+        condition resKey = if resKey <= rangeEnd
+                           then Just resKey
+                           else Nothing
 
 advanceIterator iter (TsKeyRange _ rangeEnd) =
   advanceIterator iter (KeyRange BS.empty (encodeEndTimestamp rangeEnd))
@@ -130,30 +155,37 @@ advanceIterator iter (SingleKey singleKey) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
   _    <- LDB.iterNext iter
+
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
-  where maybeInterrupt k = k >>= interruptCondition
-        interruptCondition resKey = if resKey == singleKey
-                                    then Just resKey
-                                    else Nothing
+
+  where maybeInterrupt k = k >>= condition
+        condition resKey = if resKey == singleKey
+                           then Just resKey
+                           else Nothing
 
 advanceIterator iter (TsSingleKey intKey) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
   _    <- LDB.iterNext iter
+
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
-  where maybeInterrupt k = k >>= interruptCondition
-        encodedKey = packWord64 intKey
-        interruptCondition resKey = if (BS.take 8 resKey) == encodedKey
-                                    then Just resKey
-                                    else Nothing
+
+  where maybeInterrupt k = k >>= condition
+        encodedKey       = packWord64 intKey
+        condition resKey = if (BS.take 8 resKey) == encodedKey
+                           then Just resKey
+                           else Nothing
 
 
 advanceIterator iter _ = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
-  LDB.iterNext iter
+  _    <- LDB.iterNext iter
   return $ (,) <$> mkey <*> mval
 
+-- |Sets start position of @Iterator@ depending on @KeyRange@ type.
+-- Every Range has some start position.
+--
 setStartPosition :: MonadIO m =>
                     LDB.Iterator
                     -> KeyRange
@@ -176,8 +208,6 @@ setStartPosition iter (TsKeyRange startPosition _) =
 
 setStartPosition iter EntireKeyspace = LDB.iterFirst iter
 
-
-
 -- |
 -- | Chunking / Query Parallelisation
 -- |
@@ -185,36 +215,46 @@ setStartPosition iter EntireKeyspace = LDB.iterFirst iter
 snapshotAfter :: Integer
 snapshotAfter = 250000
 
-maybeWriteChunk :: Integer -> DbRecord -> AppState DbResult
+maybeWriteChunk :: Integer
+                   -> DbRecord
+                   -> AppState DbResult
 maybeWriteChunk sid (DbRecord time _) = do
-  st <- get
-  when (sid >= (lastSnapshot st) + snapshotAfter || sid == 1) $ do
-    modify (\a -> a {lastSnapshot = sid})
-    LDB.put (ctxChunksDb st) (snd (ctxRwOptions st)) (packWord64 time) BS.empty
+  DBContext{..} <- get
+  when (sid >= lastSnapshot + snapshotAfter || sid == 1) $ do
+    modifyLastSnapshot $ const sid
+    LDB.put ctxChunksDb (snd ctxRwOptions) (packWord64 time) BS.empty
   return $ return $ EmptyRes
-maybeWriteChunk _ _ = return $ throwError OtherError
 
+-- |
+-- | DATABASE INITIALIZATION
+-- |
+
+-- |Initialize all the existing databases, registered in _systemdb_
+--
 initializeDbs :: String
                  -> LDB.DB
-                 -> IO (DbErrorMonad SchemaMap)
+                 -> IO (DbErrorMonad ContextDbsMap)
 initializeDbs path systemDb = do
-  schemas <- LDB.withIter systemDb readOpts $ readSchemas
-  traverse (addDbInit path) (sequence schemas)
+  schemas <- LDB.withIter systemDb readOpts readSchemas
+  traverse initAll (sequence schemas)
   where
-    readSchemas i  = map decodeSchema <$> (LDB.iterFirst i >> LDB.iterItems i)
+    readSchemas i = map decodeSchema <$> (LDB.iterFirst i >> LDB.iterItems i)
+    initAll coll  = Map.fromList <$> mapM (initializeDb path) coll
 
-addDbInit :: String
-             -> [(ByteString, DbSchema)]
-             -> IO SchemaMap
-addDbInit path coll =
-  Map.fromList <$> mapM initDb coll
+-- |Initialize (open) an instance of an _existing_ database.
+--
+initializeDb :: String
+                -> (DbName, DbSchema)
+                -> IO (DbName, (DbSchema, LDB.DB))
+initializeDb path (dbName, sch) = do
+  -- TODO: abstract path finding
+  ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
+  return (dbName, (sch, ldb))
 
-  where initDb (dbName, sch) = do
-          -- TODO: abstract path finding
-          ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
-          return (dbName, (sch, ldb))
-
-createDatabase :: ByteString
+-- |Create a database if it does not yet exist.
+-- Database is returned in an open state, ready for writes.
+--
+createDatabase :: DbName
                   -> DbSchema
                   -> AppState DbResult
 createDatabase dbName sch = do
@@ -224,8 +264,20 @@ createDatabase dbName sch = do
     else return $ Right EmptyRes
   where createDb = do
           path <- getPath
-          -- Add uniqueness check
           ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
           _    <- putSchema dbName sch
-          modify (\a -> a {ctxDbs = Map.insert dbName (sch, ldb) (ctxDbs a)})
+          _    <- modifyCtxDbs $ Map.insert dbName (sch, ldb)
           return $ Right EmptyRes
+
+
+-- |
+-- | AUXILITARY FUNCTIONS
+-- |
+
+liftDbError :: (a -> b -> c)
+              -> DbErrorMonad a
+              -> DbErrorMonad b
+              -> DbErrorMonad c
+liftDbError f (Right a) (Right b) = return $! f a b
+liftDbError _ (Left a)  _         = Left a
+liftDbError _ _         (Left b)  = Left b
