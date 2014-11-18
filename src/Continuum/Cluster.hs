@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Continuum.Cluster where
 
@@ -16,6 +17,7 @@ import           Control.Monad
 
 import           Control.Exception.Base         ( bracket )
 import           Control.Monad.Trans.Resource   ( runResourceT )
+import           Control.Monad.State.Strict     ( runStateT )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
 import           Control.Applicative            ( (<$>) )
@@ -76,7 +78,62 @@ runQuery _ other = do
   _ <- print $ other
   return (Right EmptyRes)
 
+runAppState :: DBContext -> AppState a -> IO (DbErrorMonad a,
+                                              DBContext)
+runAppState st op = runStateT op $ st
+
 -- | Started MVar should be used byany
+
+
+emptySubsystem :: TVar DBContext -> IO ()
+emptySubsystem _ = return ()
+
+startStorage :: String -> IO (TVar DBContext)
+startStorage path = do
+  _           <- system ("mkdir " ++ path)
+  systemDb    <- LDB.open (path ++ "/system") Opts.opts
+  chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
+
+  (Right dbs) <- initializeDbs path systemDb
+
+  let context = DBContext {ctxPath           = path,
+                           ctxSystemDb       = systemDb,
+                           ctxDbs            = dbs,
+                           ctxChunksDb       = chunksDb,
+                           sequenceNumber    = 1,
+                           lastSnapshot      = 1,
+                           ctxRwOptions      = (Opts.readOpts,
+                                                Opts.writeOpts)}
+
+  shared <- atomically $ newTVar context
+
+  return shared
+
+stopStorage :: TVar DBContext -> IO ()
+stopStorage shared = do
+  DBContext{..} <- atomRead shared
+  _             <- LDB.close ctxSystemDb
+  _             <- LDB.close ctxChunksDb
+  _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
+  return ()
+
+withStorage :: String
+               -> (TVar DBContext -> IO a)
+               -> IO a
+
+withStorage path subsystem = do
+  bracket (startStorage path)
+          stopStorage
+          subsystem
+
+withTmpStorage :: String
+               -> IO ()
+               -> (TVar DBContext -> IO a)
+               -> IO a
+withTmpStorage path cleanup subsystem = do
+  bracket (startStorage path)
+          (\i -> stopStorage i >> cleanup)
+          subsystem
 
 startNode :: MVar ()
              -> MVar ()
@@ -93,8 +150,6 @@ startNode startedVar doneVar path host port seedHost seedPort = do
 
   let context = DBContext {ctxPath           = path,
                            ctxSystemDb       = systemDb,
-                           ctxNodes          = Map.empty,
-                           ctxSelfNode       = Node host port,
                            ctxDbs            = dbs,
                            ctxChunksDb       = chunksDb,
                            sequenceNumber    = 1,
@@ -157,19 +212,6 @@ receiveLoop serverSocket shared = do
 
 atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
-
-printClusterStatus :: TVar DBContext -> IO ()
-printClusterStatus shared = do
-  val  <- ctxNodes <$> atomRead shared
-  time <- Clock.getPOSIXTime
-  print $ map (\(k,v) -> (k, showNodeStatus v time)) (Map.toList val)
-  print ("------------" :: String)
-
-showNodeStatus :: NodeStatus -> Clock.POSIXTime -> String
-showNodeStatus nst currentTime =
-  if (lastHeartbeat nst) >= (currentTime - nodeTimeout)
-  then "active"
-  else "down"
 
 swap :: (b -> b) -> TVar b -> IO ()
 swap fn x = atomically $ readTVar x >>= writeTVar x . fn
