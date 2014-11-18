@@ -5,18 +5,14 @@
 module Continuum.Cluster where
 
 import           Continuum.Types
-import           Continuum.Common.Types
 import           Continuum.Storage
 import           Continuum.Folds
 
 import           System.Process                 ( system )
-import           Control.Concurrent             ( forkIO, newEmptyMVar, putMVar, takeMVar, MVar )
+import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
-import           Control.Monad.IO.Class         ( liftIO )
-import           Control.Monad
 
 import           Control.Exception.Base         ( bracket )
-import           Control.Monad.Trans.Resource   ( runResourceT )
 import           Control.Monad.State.Strict     ( runStateT )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
@@ -25,13 +21,10 @@ import           Control.Applicative            ( (<$>) )
 import qualified Database.LevelDB.Base               as LDB
 import qualified Continuum.Options                   as Opts
 import qualified Data.Map                            as Map
-import qualified Data.Time.Clock.POSIX               as Clock
-import qualified Control.Concurrent.Suspend.Lifted   as Delay
-import qualified Control.Concurrent.Timer            as Timer
 
 import qualified Nanomsg as N
 
-import           Debug.Trace                    ( trace )
+-- import           Debug.Trace                    ( trace )
 
 type Socket = N.Socket N.Rep
 
@@ -43,17 +36,19 @@ processRequest :: Socket
                   -> TVar DBContext
                   -> Request
                   -> IO ()
-
+-- TODO: GET RID OF THAT
 processRequest socket shared (RunQuery query) = do
   resp  <- runQuery shared query
   _     <- N.send socket (encode $ resp)
   return ()
 
+processRequest _ _ Shutdown = return ()
 -- |
 -- | Query
 -- |
 
 
+-- TODO: REFACTOR THAT INTO A COMMON PATTERN
 runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
 runQuery shared (CreateDb name schema) = do
   ctx <- atomRead shared
@@ -116,7 +111,6 @@ stopStorage shared = do
 withStorage :: String
                -> (TVar DBContext -> IO a)
                -> IO a
-
 withStorage path subsystem = do
   bracket (startStorage path)
           stopStorage
@@ -136,7 +130,7 @@ startClientAcceptor :: MVar ()
                        -> String
                        -> TVar DBContext
                        -> IO (N.Socket N.Rep, N.Endpoint)
-startClientAcceptor startedMVar port shared = do
+startClientAcceptor startedMVar port _ = do
   serverSocket <- N.socket N.Rep
   endpoint     <- N.bind serverSocket ("tcp://*:" ++ port)
 
@@ -182,7 +176,6 @@ receiveLoop serverSocket shared = do
 
   case (decode received :: Either String Request) of
     (Right Shutdown) -> do
-      print "Received Shutdown"
       N.send serverSocket (encode emptyResult)
       return ()
 
@@ -195,10 +188,6 @@ receiveLoop serverSocket shared = do
       processRequest serverSocket shared request
       receiveLoop serverSocket shared
 
--- Server Socket is used to recevie messages from all the nodes
--- Server socket may be also used to broadcase messages to all the nodes
--- Client socket is udes to push responses back messages from any other node (one at a time)
-
 atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
 
@@ -207,9 +196,3 @@ swap fn x = atomically $ readTVar x >>= writeTVar x . fn
 
 atomReset :: b -> TVar b -> IO ()
 atomReset newv x = atomically $ writeTVar x newv
-
-nodeTimeout :: Clock.POSIXTime
-nodeTimeout = 5
-
-insertNode :: Clock.POSIXTime -> Node -> ClusterNodes -> ClusterNodes
-insertNode time node = Map.insert node (NodeStatus time)

@@ -14,21 +14,19 @@ module Continuum.Storage
         )
        where
 
--- import           Debug.Trace
-
+import           Continuum.Types
 import           Continuum.Options
 import           Continuum.Common.Serialization
-import           Continuum.Types
-
 import           Control.Monad.Except
-import           Control.Monad.State.Strict        ( get )
+
 
 import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
-import           Control.Foldl                  ( Fold(..) )
 
+import           Control.Foldl                  ( Fold(..) )
+import           Control.Monad.State.Strict     ( get )
 import           Data.Traversable               ( traverse )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
@@ -66,7 +64,7 @@ putSchema :: DbName
              -> DbSchema
              -> AppState DbResult
 putSchema dbName sch = do
-  sysDb   <- getSystemDb
+  sysDb   <- getCtxSystemDb
   wo      <- getWriteOptions
   _       <- LDB.put sysDb wo dbName (encodeSchema sch)
 
@@ -263,7 +261,7 @@ createDatabase dbName sch = do
     then createDb
     else return $ Right EmptyRes
   where createDb = do
-          path <- getPath
+          path <- getCtxPath
           ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
           _    <- putSchema dbName sch
           _    <- modifyCtxDbs $ Map.insert dbName (sch, ldb)

@@ -12,7 +12,6 @@ import           Continuum.Storage
 import           Continuum.Types
 
 import           Test.Hspec
-import           Control.Exception.Base         ( bracket )
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
@@ -27,7 +26,7 @@ runner str op = Server.withTmpStorage str cleanup $ \shared -> do
 
 main :: IO ()
 main =  hspec $ do
-
+  let scantdb = scan testDBName
   describe "Basic DB Functionality" $ do
     it "should put items into the database and retrieve them" $  do
       let res = runner testDBPath $ do
@@ -181,7 +180,3 @@ cleanup = system ("rm -fr " ++ testDBPath) >> system ("mkdir " ++ testDBPath) >>
 
 putRecordTdb :: DbRecord -> AppState DbResult
 putRecordTdb = putRecord testDBName
-
-scantdb = scan testDBName
--- TODO: port tests to quickcheck
----

@@ -1,41 +1,41 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
 module Cluster.Test where
 
+import           Continuum.Client.Base
 import           Continuum.Cluster
+
 import           Data.ByteString                ( ByteString )
 import           System.Process                 ( system )
-import           Control.Concurrent             ( forkIO, newEmptyMVar, putMVar, takeMVar, MVar )
-import           Control.Monad.IO.Class         ( liftIO )
+import           Control.Concurrent             ( forkIO, newEmptyMVar, takeMVar, MVar )
 import           Control.Exception.Base         ( bracket )
 import           Test.Hspec
-
-import qualified Continuum.Client.Base          as Client
-
-import           Debug.Trace                    ( trace )
-
-exec = Client.executeQuery
 
 main :: IO ()
 main = hspec $ around_ withRunningServer $ do
   describe "Insert and Query" $ do
+
     it "should insert and retrieve data" $ do
-      client  <- Client.connect "127.0.0.1" testPort
-      _       <- exec client (Client.CreateDb dbName dbSchema)
-      let mkRec ts i s =
-            Client.makeRecord ts [ ("intField",    Client.DbInt i)
-                                 , ("stringField", Client.DbString s)]
+      client  <- connect "127.0.0.1" testPort
+      _       <- exec client (CreateDb dbName dbSchema)
 
-      a  <- exec client (Client.Insert dbName (mkRec 112233 1 "one"))
-      b  <- exec client (Client.Insert dbName (mkRec 223344 2 "two"))
+      _       <- exec client (Insert dbName (mkRec 112233 1 "one"))
+      _       <- exec client (Insert dbName (mkRec 223344 2 "two"))
 
-      let res = exec client (Client.FetchAll dbName)
-      res `shouldReturn` (Right (Client.DbResults [Client.RecordRes $ mkRec 112233 1 "one"
-                                                  ,Client.RecordRes $ mkRec 223344 2 "two"]))
-      Client.disconnect client
+      res     <- exec client (FetchAll dbName)
+
+      res `shouldBe` (Right (DbResults [ RecordRes $ mkRec 112233 1 "one"
+                                       , RecordRes $ mkRec 223344 2 "two" ]))
+
+      _       <- disconnect client
       return ()
 
+  where mkRec ts i s = makeRecord ts [ ("intField",    DbInt i)
+                                     , ("stringField", DbString s)]
+
+
+-- auxilliary routines
+-- -------------------
 
 startServer :: IO (MVar ())
 startServer = do
@@ -47,11 +47,11 @@ startServer = do
 
 stopServer :: MVar () -> IO ()
 stopServer doneVar = do
-  client     <- Client.connect "127.0.0.1" testPort
-  a          <- Client.sendRequest client Client.Shutdown
+  client     <- connect "127.0.0.1" testPort
+  _          <- sendRequest client Shutdown
   _          <- takeMVar doneVar
   _          <- system ("rm -fr " ++ testDBPath) >> return ()
-  _          <- Client.disconnect client
+  _          <- disconnect client
   return ()
 
 withRunningServer :: IO () -> IO ()
@@ -70,9 +70,14 @@ dbName = "testdb"
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDBPath) >> return ()
 
-dbSchema :: Client.DbSchema
-dbSchema = Client.makeSchema [ ("intField",    Client.DbtInt)
-                               , ("stringField", Client.DbtString)]
+dbSchema :: DbSchema
+dbSchema = makeSchema [ ("intField",    DbtInt)
+                      , ("stringField", DbtString)]
 
 testPort :: String
 testPort = "5566"
+
+exec :: ContinuumClient
+        -> Query
+        -> IO (DbErrorMonad DbResult)
+exec = executeQuery

@@ -150,10 +150,12 @@ makeSchema stringTypeList =
 
 data Query =
   Count
-  | Distinct
-  | Min
-  | Max
+  -- | Distinct
+  -- | Min
+  -- | Max
   | FetchAll              ByteString
+  -- TODO: SEPARATE FETCH QUERIES FROM INSERT QUERIES,
+  -- MAYBE MAKES SENSE TO PUT OTHER ONES INTO COMMANDS.
   | Group                 Query
   | Insert                ByteString DbRecord
   | CreateDb              ByteString DbSchema
@@ -174,10 +176,6 @@ instance S.Serialize Node
 
 data Request =
   Shutdown
-  | ImUp                  Node
-  | Introduction          Node
-  | NodeList              [Node]
-  | Heartbeat             Node
   | RunQuery              Query
   deriving(Generic, Show)
 
