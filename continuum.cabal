@@ -37,7 +37,6 @@ library
   exposed-modules:        Continuum.Storage
                         , Continuum.ParallelStorage
                         , Continuum.Cluster
-                        , Continuum.Tryout
                         , Continuum.Options
                         , Continuum.Types
                         , Continuum.Folds
