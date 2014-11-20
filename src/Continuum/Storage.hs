@@ -295,6 +295,7 @@ startStorage path = do
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
 
+  -- TODO: add Error Handling!
   (Right dbs) <- initializeDbs path systemDb
 
   let context = DBContext {ctxPath           = path,

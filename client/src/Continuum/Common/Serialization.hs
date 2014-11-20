@@ -92,6 +92,10 @@ decodeRecord (Field field) schema !(k, bs) = do
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 
+decodeRecord Key schema !(k, _) = do
+  timestamp      <- decodeKey k
+  return $! KeyRes timestamp
+
 decodeRecord Record schema !(k, bs) = do
   timestamp      <- decodeKey k
   decodedValue   <- decodeValues schema bs

@@ -86,6 +86,7 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 data DbResult =
   EmptyRes
   | ErrorRes               DbError
+  | KeyRes                 Integer
   | RecordRes              DbRecord
   | FieldRes               (Integer, DbValue)
   | FieldsRes              (Integer, [DbValue])
@@ -119,6 +120,7 @@ data KeyRange =
 data Decoding =
   Field                    ByteString
   | Fields                 [ByteString]
+  | Key
   | Record
   deriving(Generic, Show)
 
