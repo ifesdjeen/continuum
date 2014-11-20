@@ -13,6 +13,8 @@ import qualified Data.Map                       as Map
 
 type DbName        = ByteString
 
+type Decoder       = (ByteString, ByteString) -> DbErrorMonad DbResult
+
 -- |
 -- | INTERNAL DB TYPES
 -- |

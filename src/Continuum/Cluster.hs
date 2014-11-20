@@ -8,7 +8,7 @@ import           Continuum.Types
 import           Continuum.Storage
 import           Continuum.Folds
 
-import           System.Process                 ( system )
+
 import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
 
@@ -17,10 +17,6 @@ import           Control.Monad.State.Strict     ( runStateT )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
 import           Control.Applicative            ( (<$>) )
-
-import qualified Database.LevelDB.Base               as LDB
-import qualified Continuum.Options                   as Opts
-import qualified Data.Map                            as Map
 
 import qualified Nanomsg as N
 
@@ -86,42 +82,7 @@ runAppState :: DBContext
 runAppState = flip runStateT
 
 
-startStorage :: String -> IO (TVar DBContext)
-startStorage path = do
-  _           <- system ("mkdir " ++ path)
-  systemDb    <- LDB.open (path ++ "/system") Opts.opts
-  chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
 
-  (Right dbs) <- initializeDbs path systemDb
-
-  let context = DBContext {ctxPath           = path,
-                           ctxSystemDb       = systemDb,
-                           ctxDbs            = dbs,
-                           ctxChunksDb       = chunksDb,
-                           sequenceNumber    = 1,
-                           lastSnapshot      = 1,
-                           ctxRwOptions      = (Opts.readOpts,
-                                                Opts.writeOpts)}
-
-  shared <- atomically $ newTVar context
-
-  return shared
-
-stopStorage :: TVar DBContext -> IO ()
-stopStorage shared = do
-  DBContext{..} <- atomRead shared
-  _             <- LDB.close ctxSystemDb
-  _             <- LDB.close ctxChunksDb
-  _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
-  return ()
-
-withStorage :: String
-               -> (TVar DBContext -> IO a)
-               -> IO a
-withStorage path subsystem = do
-  bracket (startStorage path)
-          stopStorage
-          subsystem
 
 withTmpStorage :: String
                -> IO ()

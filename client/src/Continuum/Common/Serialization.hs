@@ -81,8 +81,7 @@ decodeDbResult encodedDbResult =
 
 decodeRecord :: Decoding
              -> DbSchema
-             -> (B.ByteString, B.ByteString)
-             -> DbErrorMonad DbResult
+             -> Decoder
 
 decodeRecord (Field field) schema !(k, bs) = do
   decodedK      <- decodeKey k
@@ -189,11 +188,9 @@ unpackWord64 s = return $
 
 byField :: B.ByteString -> DbRecord -> DbValue
 byField f (DbRecord _ m) = fromJust $ Map.lookup f m
-byField _ _ = DbInt 1 -- WTF
 
 byFieldMaybe :: B.ByteString -> DbRecord -> Maybe DbValue
 byFieldMaybe f (DbRecord _ m) = Map.lookup f m
-byFieldMaybe _ _              = Just $ DbInt 1 -- WTF
 
 byTime :: Integer -> DbRecord -> Integer
 byTime interval (DbRecord t _) = interval * (t `quot` interval)

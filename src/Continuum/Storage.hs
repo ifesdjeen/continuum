@@ -6,12 +6,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 module Continuum.Storage
-       (LDB.DB, DBContext,
-        putRecord,
-        scan,
-        createDatabase,
-        initializeDbs
-        )
        where
 
 import           Continuum.Types
@@ -24,10 +18,14 @@ import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
+import qualified Continuum.Options              as Opts
 
+import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
+import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
 import           Control.Monad.State.Strict     ( get )
 import           Data.Traversable               ( traverse )
+import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
 import           Data.ByteString                ( ByteString )
@@ -67,11 +65,21 @@ putSchema dbName sch = do
   sysDb   <- getCtxSystemDb
   wo      <- getWriteOptions
   _       <- LDB.put sysDb wo dbName (encodeSchema sch)
-
   return $ Right EmptyRes
 
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
+
+scan :: DbName
+        -> KeyRange
+        -> Decoding
+        -> Fold DbResult acc
+        -> AppState acc
+scan dbName keyRange decoding foldOp = do
+  maybeDb <- getDb dbName
+  case maybeDb of
+    (Just (schema, db)) -> scanDb db keyRange (decodeRecord decoding schema) foldOp
+    Nothing             -> return $ Left NoSuchDatabaseError
 
 -- |Perform a Scan operation.
 --
@@ -82,28 +90,22 @@ putSchema dbName sch = do
 --   * @Fold@     specifies which Fold to use (Group, Append and so on, for
 --     complex querying)
 --
-scan :: DbName
-        -> KeyRange
-        -> Decoding
-        -> Fold DbResult acc
-        -> AppState acc
+scanDb :: LDB.DB
+          -> KeyRange
+          -> Decoder
+          -> Fold DbResult acc
+          -> AppState acc
 
-scan dbName keyRange decoding (Fold foldop acc done) = do
-  maybeDb <- getDb dbName
-  -- TODO: generalize
-  if (isJust maybeDb)
-    then do
-    ro <- getReadOptions
-    let (schema, db) = fromJust maybeDb
-    records <- LDB.withIter db ro $ \iter -> do
-      let mapop        = decodeRecord decoding schema
-          getNext      = advanceIterator iter keyRange
-          step !a !x   = liftDbError foldop a (mapop x)
-      setStartPosition iter keyRange
-      scanStep getNext step (Right acc)
-    return $! fmap done records
-    else do
-    return $ Left NoSuchDatabaseError
+scanDb db keyRange decoder (Fold foldop acc done) = do
+  ro <- getReadOptions
+  records <- LDB.withIter db ro $ \iter -> do
+    let getNext      = advanceIterator iter keyRange
+        step !a !x   = liftDbError foldop a (decoder x)
+    setStartPosition iter keyRange
+    scanStep getNext step (Right acc)
+  return $! fmap done records
+
+
 
 -- |Perform a single step of the Scan Operation. Combines
 -- @decodeRecord@ and @advanceIterator@, prepared in @scan@,
@@ -279,3 +281,47 @@ liftDbError :: (a -> b -> c)
 liftDbError f (Right a) (Right b) = return $! f a b
 liftDbError _ (Left a)  _         = Left a
 liftDbError _ _         (Left b)  = Left b
+
+
+-- |
+-- | Startup
+-- |
+
+
+startStorage :: String -> IO (TVar DBContext)
+startStorage path = do
+  _           <- system ("mkdir " ++ path)
+  systemDb    <- LDB.open (path ++ "/system") Opts.opts
+  chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
+
+  (Right dbs) <- initializeDbs path systemDb
+
+  let context = DBContext {ctxPath           = path,
+                           ctxSystemDb       = systemDb,
+                           ctxDbs            = dbs,
+                           ctxChunksDb       = chunksDb,
+                           sequenceNumber    = 1,
+                           lastSnapshot      = 1,
+                           ctxRwOptions      = (Opts.readOpts,
+                                                Opts.writeOpts)}
+
+  shared <- atomically $ newTVar context
+
+  return shared
+
+stopStorage :: TVar DBContext -> IO ()
+stopStorage shared = do
+  DBContext{..} <- atomRead shared
+  _             <- LDB.close ctxSystemDb
+  _             <- LDB.close ctxChunksDb
+  _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
+  return ()
+  where atomRead = atomically . readTVar
+
+withStorage :: String
+               -> (TVar DBContext -> IO a)
+               -> IO a
+withStorage path subsystem = do
+  bracket (startStorage path)
+          stopStorage
+          subsystem
