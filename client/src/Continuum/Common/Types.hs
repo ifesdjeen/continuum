@@ -148,20 +148,18 @@ makeSchema stringTypeList =
 -- | QUERIES
 -- |
 
-data Query =
+data SelectQuery =
   Count
   -- | Distinct
   -- | Min
   -- | Max
+  | Group                 SelectQuery
   | FetchAll              ByteString
   -- TODO: SEPARATE FETCH QUERIES FROM INSERT QUERIES,
   -- MAYBE MAKES SENSE TO PUT OTHER ONES INTO COMMANDS.
-  | Group                 Query
-  | Insert                ByteString DbRecord
-  | CreateDb              ByteString DbSchema
   deriving (Generic, Show)
 
-instance S.Serialize Query
+instance S.Serialize SelectQuery
 
 -- |
 -- | External Protocol Specification
@@ -176,7 +174,10 @@ instance S.Serialize Node
 
 data Request =
   Shutdown
-  | RunQuery              Query
+  | Insert                ByteString DbRecord
+  | CreateDb              ByteString DbSchema
+  -- TODO: Add ByteString here, never encode it inside of SelectQuery itself
+  | Select                SelectQuery
   deriving(Generic, Show)
 
 instance S.Serialize Request

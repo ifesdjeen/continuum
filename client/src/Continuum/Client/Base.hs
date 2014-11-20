@@ -34,11 +34,11 @@ disconnect client = do
   return ()
 
 executeQuery :: ContinuumClient
-             -> Query
+             -> SelectQuery
              -> IO (DbErrorMonad DbResult)
 executeQuery client query = do
   let sock = (clientSocket client)
-  _      <-  N.send sock (encode (RunQuery query))
+  _      <-  N.send sock (encode (Select query))
   bs     <-  N.recv sock
   return $ (S.decodeDbResult bs)
 

@@ -37,9 +37,24 @@ processRequest :: Socket
                   -> Request
                   -> IO ()
 -- TODO: GET RID OF THAT
-processRequest socket shared (RunQuery query) = do
+processRequest socket shared (Select query) = do
   resp  <- runQuery shared query
   _     <- N.send socket (encode $ resp)
+  return ()
+
+processRequest socket shared (CreateDb name schema) = do
+  ctx          <- atomRead shared
+  (res, newst) <- runAppState ctx (createDatabase name schema)
+  _            <- atomReset newst shared
+  _            <- N.send socket (encode $ res)
+  return ()
+
+
+processRequest socket shared (Insert name record) = do
+  ctx          <- atomRead shared
+  (res, newst) <- runAppState ctx (putRecord name record)
+  _            <- atomReset newst shared
+  _            <- N.send socket (encode $ res)
   return ()
 
 processRequest _ _ Shutdown = return ()
@@ -49,18 +64,7 @@ processRequest _ _ Shutdown = return ()
 
 
 -- TODO: REFACTOR THAT INTO A COMMON PATTERN
-runQuery :: TVar DBContext -> Query -> IO (DbErrorMonad DbResult)
-runQuery shared (CreateDb name schema) = do
-  ctx <- atomRead shared
-  (res, newst) <- runAppState ctx (createDatabase name schema)
-  atomReset newst shared
-  return res
-
-runQuery shared (Insert name record) = do
-  ctx <- atomRead shared
-  (res, newst) <- runAppState ctx (putRecord name record)
-  atomReset newst shared
-  return res
+runQuery :: TVar DBContext -> SelectQuery -> IO (DbErrorMonad DbResult)
 
 runQuery shared (FetchAll name) = do
   ctx <- atomRead shared

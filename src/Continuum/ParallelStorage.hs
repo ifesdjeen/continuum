@@ -65,7 +65,7 @@ makeRanges []       = []
 -- |Query Step is given as a Fold to every @Chunk@ processor that's
 -- being asynchronously executed. Results of @queryStep@ are then
 -- merged with @DbResult@ Monoid and finalized with a @Finalizer@
-queryStep :: Query
+queryStep :: SelectQuery
              -> Fold DbResult DbResult
 queryStep Count = Fold localStep (CountStep 0) id
   where

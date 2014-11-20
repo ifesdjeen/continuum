@@ -17,10 +17,10 @@ main = hspec $ around_ withRunningServer $ do
 
     it "should insert and retrieve data" $ do
       client  <- connect "127.0.0.1" testPort
-      _       <- exec client (CreateDb dbName dbSchema)
+      _       <- sendRequest client (CreateDb dbName dbSchema)
 
-      _       <- exec client (Insert dbName (mkRec 112233 1 "one"))
-      _       <- exec client (Insert dbName (mkRec 223344 2 "two"))
+      _       <- sendRequest client (Insert dbName (mkRec 112233 1 "one"))
+      _       <- sendRequest client (Insert dbName (mkRec 223344 2 "two"))
 
       res     <- exec client (FetchAll dbName)
 
@@ -78,6 +78,6 @@ testPort :: String
 testPort = "5566"
 
 exec :: ContinuumClient
-        -> Query
+        -> SelectQuery
         -> IO (DbErrorMonad DbResult)
 exec = executeQuery
