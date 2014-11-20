@@ -4,6 +4,7 @@
 module Storage.Test where
 
 import qualified Continuum.Cluster as Server
+import           Continuum.Storage    ( runAppState )
 import           Data.ByteString      ( ByteString )
 import           Control.Monad        ( forM_ )
 import           System.Process       ( system )
@@ -20,7 +21,7 @@ testSchema = makeSchema [ ("a", DbtInt)
 runner :: String -> AppState a -> IO (DbErrorMonad a)
 runner str op = Server.withTmpStorage str cleanup $ \shared -> do
   ctx <- Server.atomRead shared
-  (res, newst) <- Server.runAppState ctx op
+  (res, newst) <- runAppState ctx op
   Server.atomReset newst shared
   return res
 

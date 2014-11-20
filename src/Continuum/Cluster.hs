@@ -13,7 +13,6 @@ import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
 
 import           Control.Exception.Base         ( bracket )
-import           Control.Monad.State.Strict     ( runStateT )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
 import           Control.Applicative            ( (<$>) )
@@ -74,12 +73,6 @@ runQuery shared dbName FetchAll = do
 runQuery _ _ other = do
   _ <- print $ other
   return (Right EmptyRes)
-
-runAppState :: DBContext
-               -> AppState a
-               -> IO (DbErrorMonad a,
-                      DBContext)
-runAppState = flip runStateT
 
 
 

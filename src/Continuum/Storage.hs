@@ -20,6 +20,8 @@ import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
 
+import           Control.Monad.State.Strict     ( runStateT )
+import           Continuum.Folds                ( appendFold )
 import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
 import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
@@ -77,8 +79,9 @@ scan :: DbName
         -> AppState acc
 scan dbName keyRange decoding foldOp = do
   maybeDb <- getDb dbName
+  ro      <- getReadOptions
   case maybeDb of
-    (Just (schema, db)) -> scanDb db keyRange (decodeRecord decoding schema) foldOp
+    (Just (schema, db)) -> lift   $ scanDb db ro keyRange (decodeRecord decoding schema) foldOp
     Nothing             -> return $ Left NoSuchDatabaseError
 
 -- |Perform a Scan operation.
@@ -91,13 +94,13 @@ scan dbName keyRange decoding foldOp = do
 --     complex querying)
 --
 scanDb :: LDB.DB
-          -> KeyRange
-          -> Decoder
-          -> Fold DbResult acc
-          -> AppState acc
+           -> LDB.ReadOptions
+           -> KeyRange
+           -> Decoder
+           -> Fold DbResult acc
+           -> IO (DbErrorMonad acc)
 
-scanDb db keyRange decoder (Fold foldop acc done) = do
-  ro <- getReadOptions
+scanDb db ro keyRange decoder (Fold foldop acc done) = do
   records <- LDB.withIter db ro $ \iter -> do
     let getNext      = advanceIterator iter keyRange
         step !a !x   = liftDbError foldop a (decoder x)
@@ -325,3 +328,9 @@ withStorage path subsystem = do
   bracket (startStorage path)
           stopStorage
           subsystem
+
+runAppState :: DBContext
+               -> AppState a
+               -> IO (DbErrorMonad a,
+                      DBContext)
+runAppState = flip runStateT
