@@ -26,7 +26,7 @@ import           Control.Concurrent.STM         ( TVar, newTVar, atomically, rea
 import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
 import           Control.Monad.State.Strict     ( get )
-import           Data.Traversable               ( traverse )
+import           Data.Traversable               ( traverse, sequenceA )
 import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
@@ -236,11 +236,9 @@ initializeDbs :: String
                  -> LDB.DB
                  -> IO (DbErrorMonad ContextDbsMap)
 initializeDbs path systemDb = do
-  schemas <- LDB.withIter systemDb readOpts readSchemas
-  traverse initAll (sequence schemas)
-  where
-    readSchemas i = map decodeSchema <$> (LDB.iterFirst i >> LDB.iterItems i)
-    initAll coll  = Map.fromList <$> mapM (initializeDb path) coll
+  dbs <- scanDb systemDb readOpts EntireKeyspace decodeSchema appendFold
+  res <- traverse (mapM (initializeDb path)) dbs
+  return $ Map.fromList <$> res
 
 -- |Initialize (open) an instance of an _existing_ database.
 --
