@@ -1,17 +1,3 @@
-## Concurrency Model
-
-All incoming aggregations are being put into STM buffer, and reduced
-until they're flushed.
-
-All the data is stored in buckets, that are similar to virtual nodes.
-Each chunk is holding up to an hour worth of data points.
-
-## Cluster
-
-### Sharding
-
-Data is sharded based on the time.
-
 ## Building Hyperleveldb:
 
 ```
@@ -24,11 +10,7 @@ make install
 ldconfig
 ```
 
-## Protocol
-
-
-
-## Contributing
+## License
 
 Copyright (c) Alex Petrov
 
