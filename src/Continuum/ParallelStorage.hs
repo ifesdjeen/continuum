@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Continuum.ParallelStorage (parallelScan)
+module Continuum.ParallelStorage
        where
 
 import           Data.Monoid
@@ -19,8 +19,8 @@ import qualified Database.LevelDB.Base          as LDB
 import qualified Data.Map.Strict                as Map
 
 -- |Just a demonstration of how parallel scan works
-parallelScan :: ByteString -> AppState DbResult
-parallelScan dbName = do
+example :: ByteString -> AppState DbResult
+example dbName = do
   chunks <- readChunks
   st     <- get
   let ranges           = makeRanges <$> chunks
@@ -29,6 +29,21 @@ parallelScan dbName = do
 
   rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
   return $ (finalize . mconcat) <$> rangeResults
+
+parallelScan :: DbName
+                -> Decoding
+                -> SelectQuery
+                -> AppState DbResult
+parallelScan dbName decoding query = do
+  chunks <- readChunks
+  st     <- get
+  let ranges           = makeRanges <$> chunks
+      scanChunk r      = scan dbName r decoding (queryStep query)
+      asyncReadChunk i = execAsyncIO st (scanChunk i)
+
+  rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
+  return $ (finalize . mconcat) <$> rangeResults
+
 
 parallelRangeScan :: DbErrorMonad [KeyRange]
                   -> (KeyRange -> IO (DbErrorMonad DbResult))

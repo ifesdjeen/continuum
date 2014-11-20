@@ -105,8 +105,6 @@ scanDb db keyRange decoder (Fold foldop acc done) = do
     scanStep getNext step (Right acc)
   return $! fmap done records
 
-
-
 -- |Perform a single step of the Scan Operation. Combines
 -- @decodeRecord@ and @advanceIterator@, prepared in @scan@,
 -- recurses into itself until @advanceIterator@ returns @Just@
@@ -244,12 +242,14 @@ initializeDbs path systemDb = do
 -- |Initialize (open) an instance of an _existing_ database.
 --
 initializeDb :: String
-                -> (DbName, DbSchema)
+                -> DbResult
                 -> IO (DbName, (DbSchema, LDB.DB))
-initializeDb path (dbName, sch) = do
+initializeDb path (DbSchemaResult (dbName, sch)) = do
   -- TODO: abstract path finding
   ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
   return (dbName, (sch, ldb))
+
+initializeDb _ _ = error "can't initialize the database"
 
 -- |Create a database if it does not yet exist.
 -- Database is returned in an open state, ready for writes.

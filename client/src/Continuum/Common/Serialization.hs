@@ -53,12 +53,12 @@ encodeEndTimestamp timestamp =
 encodeSchema :: DbSchema -> B.ByteString
 encodeSchema = encode
 
-decodeSchema :: (B.ByteString, B.ByteString)
-                -> DbErrorMonad (B.ByteString, DbSchema)
+decodeSchema :: (DbName, B.ByteString)
+                -> DbErrorMonad DbResult
 decodeSchema (dbName, encodedSchema) =
   case (decode encodedSchema) of
     (Left err)     -> throwError $ SchemaDecodingError err
-    (Right schema) -> return (dbName, schema)
+    (Right schema) -> return $ DbSchemaResult (dbName, schema)
 
 decodeQuery :: B.ByteString
                -> DbErrorMonad SelectQuery

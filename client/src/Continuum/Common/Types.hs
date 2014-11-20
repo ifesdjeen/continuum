@@ -23,7 +23,7 @@ data DbType =
   DbtInt
   | DbtDouble
   | DbtString
-  deriving(Show, Generic)
+  deriving(Show, Generic, Eq)
 
 instance S.Serialize DbType
 
@@ -93,6 +93,7 @@ data DbResult =
   | CountRes               Integer
   | GroupRes               (Map.Map DbValue DbResult)
   | DbResults              [DbResult]
+  | DbSchemaResult         (DbName, DbSchema)
   deriving(Generic, Show, Eq)
 
 instance S.Serialize DbResult
@@ -133,7 +134,7 @@ data DbSchema = DbSchema
     , indexMappings  :: Map.Map Int ByteString
     , schemaMappings :: Map.Map ByteString DbType
     , schemaTypes    :: [DbType]
-    } deriving (Generic, Show)
+    } deriving (Generic, Show, Eq)
 
 instance S.Serialize DbSchema
 
