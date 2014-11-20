@@ -8,6 +8,12 @@ import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
 -- |
+-- | ALIASES
+-- |
+
+type DbName        = ByteString
+
+-- |
 -- | INTERNAL DB TYPES
 -- |
 
@@ -154,9 +160,7 @@ data SelectQuery =
   -- | Min
   -- | Max
   | Group                 SelectQuery
-  | FetchAll              ByteString
-  -- TODO: SEPARATE FETCH QUERIES FROM INSERT QUERIES,
-  -- MAYBE MAKES SENSE TO PUT OTHER ONES INTO COMMANDS.
+  | FetchAll
   deriving (Generic, Show)
 
 instance S.Serialize SelectQuery
@@ -174,10 +178,10 @@ instance S.Serialize Node
 
 data Request =
   Shutdown
-  | Insert                ByteString DbRecord
-  | CreateDb              ByteString DbSchema
+  | Insert                DbName DbRecord
+  | CreateDb              DbName DbSchema
   -- TODO: Add ByteString here, never encode it inside of SelectQuery itself
-  | Select                SelectQuery
+  | Select                DbName SelectQuery
   deriving(Generic, Show)
 
 instance S.Serialize Request

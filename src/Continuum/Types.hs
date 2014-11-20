@@ -17,8 +17,6 @@ import           GHC.Generics                   ( Generic )
 import qualified Data.Map                       as Map
 import qualified Data.Time.Clock.POSIX          as Clock
 
-type DbName        = ByteString
-
 type AppState a    = StateT DBContext IO (DbErrorMonad a)
 
 type RWOptions     = (ReadOptions, WriteOptions)

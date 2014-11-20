@@ -37,8 +37,8 @@ processRequest :: Socket
                   -> Request
                   -> IO ()
 -- TODO: GET RID OF THAT
-processRequest socket shared (Select query) = do
-  resp  <- runQuery shared query
+processRequest socket shared (Select dbName query) = do
+  resp  <- runQuery shared dbName query
   _     <- N.send socket (encode $ resp)
   return ()
 
@@ -64,15 +64,18 @@ processRequest _ _ Shutdown = return ()
 
 
 -- TODO: REFACTOR THAT INTO A COMMON PATTERN
-runQuery :: TVar DBContext -> SelectQuery -> IO (DbErrorMonad DbResult)
+runQuery :: TVar DBContext
+            -> DbName
+            -> SelectQuery
+            -> IO (DbErrorMonad DbResult)
 
-runQuery shared (FetchAll name) = do
+runQuery shared dbName FetchAll = do
   ctx <- atomRead shared
-  (res, newst) <- runAppState ctx (scan name EntireKeyspace Record appendFold)
+  (res, newst) <- runAppState ctx (scan dbName EntireKeyspace Record appendFold)
   atomReset newst shared
   return (DbResults <$> res)
 
-runQuery _ other = do
+runQuery _ _ other = do
   _ <- print $ other
   return (Right EmptyRes)
 

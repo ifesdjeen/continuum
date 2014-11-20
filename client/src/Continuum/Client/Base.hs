@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE DeriveGeneric    #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module Continuum.Client.Base
@@ -34,11 +34,12 @@ disconnect client = do
   return ()
 
 executeQuery :: ContinuumClient
+             -> DbName
              -> SelectQuery
              -> IO (DbErrorMonad DbResult)
-executeQuery client query = do
+executeQuery client dbName query = do
   let sock = (clientSocket client)
-  _      <-  N.send sock (encode (Select query))
+  _      <-  N.send sock (encode (Select dbName query))
   bs     <-  N.recv sock
   return $ (S.decodeDbResult bs)
 

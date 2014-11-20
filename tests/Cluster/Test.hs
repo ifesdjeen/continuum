@@ -22,7 +22,7 @@ main = hspec $ around_ withRunningServer $ do
       _       <- sendRequest client (Insert dbName (mkRec 112233 1 "one"))
       _       <- sendRequest client (Insert dbName (mkRec 223344 2 "two"))
 
-      res     <- exec client (FetchAll dbName)
+      res     <- exec client dbName FetchAll
 
       res `shouldBe` (Right (DbResults [ RecordRes $ mkRec 112233 1 "one"
                                        , RecordRes $ mkRec 223344 2 "two" ]))
@@ -78,6 +78,7 @@ testPort :: String
 testPort = "5566"
 
 exec :: ContinuumClient
+        -> DbName
         -> SelectQuery
         -> IO (DbErrorMonad DbResult)
 exec = executeQuery
