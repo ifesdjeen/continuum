@@ -9,26 +9,24 @@ import           Continuum.Types
 import           Continuum.Storage
 import           Continuum.Common.Serialization
 
-import           Control.Monad.State.Strict     ( get )
-import           Control.Monad.State.Strict     ( liftIO, evalStateT )
+import           Continuum.Folds                ( appendFold )
+import           Control.Monad.State.Strict     ( get, lift, liftIO, evalStateT )
 import           Control.Applicative            ( (<$>) )
-import           Data.ByteString                ( ByteString )
 import           Control.Foldl                  ( Fold(..) )
 
-import qualified Database.LevelDB.Base          as LDB
 import qualified Data.Map.Strict                as Map
 
 -- |Just a demonstration of how parallel scan works
-example :: ByteString -> AppState DbResult
-example dbName = do
-  chunks <- readChunks
-  st     <- get
-  let ranges           = makeRanges <$> chunks
-      scanChunk r      = scan dbName r (Field "status") (queryStep (Group Count))
-      asyncReadChunk i = execAsyncIO st (scanChunk i)
+-- example :: ByteString -> AppState DbResult
+-- example dbName = do
+--   chunks <- readChunks
+--   st     <- get
+--   let ranges           = makeRanges <$> chunks
+--       scanChunk r      = scan dbName r (Field "status") (queryStep (Group Count))
+--       asyncReadChunk i = execAsyncIO st (scanChunk i)
 
-  rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
-  return $ (finalize . mconcat) <$> rangeResults
+--   rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
+--   return $ (finalize . mconcat) <$> rangeResults
 
 parallelScan :: DbName
                 -> Decoding
@@ -59,21 +57,21 @@ execAsyncIO  st op = evalStateT op $ st
 -- |Read Chunk ids from the Chunks Database
 --
 -- TODO: REWRITE READ CHUNKS TO COMMON SCANNING
-readChunks :: AppState [Integer]
+readChunks :: AppState [DbResult]
 readChunks = do
-  db  <- getCtxChunksDb
-  ro  <- getReadOptions
-  LDB.withIter db ro iter
-  where iter i = mapM unpackWord64 <$> (LDB.iterFirst i >> LDB.iterKeys i)
+  db     <- getCtxChunksDb
+  ro     <- getReadOptions
+  chunks <- lift $ scanDb db ro EntireKeyspace decodeChunkKey appendFold
+  return chunks
 
 -- |Split chunks into ranges (pretty much partitioning with a step of 1)
 --
-makeRanges :: [Integer]
+makeRanges :: [DbResult]
               -> [KeyRange]
-makeRanges (f:s:xs) = (TsKeyRange f s) : makeRanges (s:xs)
-makeRanges [a]      = [TsOpenEnd a]
-makeRanges []       = []
-
+makeRanges ((KeyRes f):n@(KeyRes s):xs) = (TsKeyRange f s) : makeRanges (n:xs)
+makeRanges [(KeyRes a)]                 = [TsOpenEnd a]
+makeRanges []                           = []
+makeRanges _ = error "should never happen"
 -- |
 -- | QUERY STEP
 -- |

@@ -92,10 +92,6 @@ decodeRecord (Field field) schema !(k, bs) = do
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 
-decodeRecord Key schema !(k, _) = do
-  timestamp      <- decodeKey k
-  return $! KeyRes timestamp
-
 decodeRecord Record schema !(k, bs) = do
   timestamp      <- decodeKey k
   decodedValue   <- decodeValues schema bs
@@ -119,6 +115,10 @@ decodeRecord (Fields flds) schema (k, bs) = do
 decodeKey :: B.ByteString -> DbErrorMonad Integer
 decodeKey x = unpackWord64 (B.take 8 x)
 {-# INLINE decodeKey #-}
+
+decodeChunkKey :: (B.ByteString, B.ByteString) -> DbErrorMonad DbResult
+decodeChunkKey (x, _) = KeyRes <$> unpackWord64 (B.take 8 x)
+{-# INLINE decodeChunkKey #-}
 
 decodeIndexes :: DbSchema -> B.ByteString -> [Int]
 decodeIndexes schema bs =
