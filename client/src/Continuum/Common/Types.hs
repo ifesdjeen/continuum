@@ -103,15 +103,22 @@ instance S.Serialize DbResult
 -- | RANGE
 -- |
 
-data KeyRange =
-  OpenEnd                  ByteString
-  | TsOpenEnd              Integer
-  | SingleKey              ByteString
-  | TsSingleKey            Integer
-  | KeyRange               ByteString ByteString
-  | TsKeyRange             Integer Integer
+-- data TsScanRange =
+--   TsOpenEnd                Integer
+--   | TsSingleKey            Integer
+--   | TsKeyRange             Integer Integer
+--   | TsEntireKeyspace
+--   deriving(Show, Generic)
+-- instance S.Serialize TsScanRange
+
+data ScanRange =
+  OpenEnd                  Integer
+  | SingleKey              Integer
+  | KeyRange               Integer Integer
   | EntireKeyspace
-  deriving(Show)
+  deriving(Show, Generic)
+
+instance S.Serialize ScanRange
 
 -- |
 -- | AGGREGATES

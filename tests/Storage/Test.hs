@@ -36,7 +36,7 @@ main =  hspec $ do
             _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
                                                 ("b", (DbString "1"))]
 
-            scantdb (TsSingleKey 123) Record appendFold
+            scantdb (SingleKey 123) Record appendFold
 
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
@@ -61,7 +61,7 @@ main =  hspec $ do
             _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3),
                                                 ("b", DbString "3")]
 
-            scantdb (TsSingleKey 123) Record appendFold
+            scantdb (SingleKey 123) Record appendFold
 
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
@@ -96,7 +96,7 @@ main =  hspec $ do
             _ <- putRecordTdb $ makeRecord 555 [("a", (DbInt 3)),
                                                 ("b", (DbString "3"))]
 
-            scantdb (TsKeyRange 123 456) Record appendFold
+            scantdb (KeyRange 123 456) Record appendFold
 
       res `shouldReturn` Right [RecordRes $
                                 makeRecord 123 [("a", DbInt 1),
@@ -140,7 +140,7 @@ main =  hspec $ do
             _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3),
                                                 ("b", DbString "3")]
 
-            scantdb (TsKeyRange 300 456) Record appendFold
+            scantdb (KeyRange 300 456) Record appendFold
 
       res `shouldReturn` (Right [RecordRes $
                                  makeRecord 456 [("a", DbInt 1),

@@ -73,20 +73,20 @@ putSchema dbName sch = do
 -- TODO: add delete operation
 
 scan :: DbName
-        -> KeyRange
+        -> ScanRange
         -> Decoding
         -> Fold DbResult acc
         -> AppState acc
-scan dbName keyRange decoding foldOp = do
+scan dbName scanRange decoding foldOp = do
   maybeDb <- getDb dbName
   ro      <- getReadOptions
   case maybeDb of
-    (Just (schema, db)) -> lift   $ scanDb db ro keyRange (decodeRecord decoding schema) foldOp
+    (Just (schema, db)) -> lift   $ scanDb db ro scanRange (decodeRecord decoding schema) foldOp
     Nothing             -> return $ Left NoSuchDatabaseError
 
 -- |Perform a Scan operation.
 --
---   * @KeyRange@ specifies where the given scan should start, and until when
+--   * @ScanRange@ specifies where the given scan should start, and until when
 --     it should be scanning.
 --   * @Decoding@ specifies what / how to deserialize (single @Field@, many
 --     @Fields@, or an entire @DbRecord@
@@ -95,16 +95,16 @@ scan dbName keyRange decoding foldOp = do
 --
 scanDb :: LDB.DB
            -> LDB.ReadOptions
-           -> KeyRange
+           -> ScanRange
            -> Decoder
            -> Fold DbResult acc
            -> IO (DbErrorMonad acc)
 
-scanDb db ro keyRange decoder (Fold foldop acc done) = do
+scanDb db ro scanRange decoder (Fold foldop acc done) = do
   records <- LDB.withIter db ro $ \iter -> do
-    let getNext      = advanceIterator iter keyRange
+    let getNext      = advanceIterator iter scanRange
         step !a !x   = liftDbError foldop a (decoder x)
-    setStartPosition iter keyRange
+    setStartPosition iter scanRange
     scanStep getNext step (Right acc)
   return $! fmap done records
 
@@ -128,14 +128,14 @@ scanStep getNext op orig = recur orig
 
 -- | Advances iterator for _just one_ step, exits and returns nothing in
 -- case there's either nothing more to read or we've reached the end of
--- @KeyRange@.
+-- @ScanRange@.
 --
 -- Exit (interrupt) condition depends on the given @KeyRange@. For example,
 -- @OpenEnd@ doesn't exit until all the entries are read from database.
 --
 advanceIterator :: MonadIO m =>
                    LDB.Iterator
-                   -> KeyRange
+                   -> ScanRange
                    -> m (Maybe (ByteString, ByteString))
 advanceIterator iter (KeyRange _ rangeEnd) = do
   mkey <- LDB.iterKey iter
@@ -145,12 +145,9 @@ advanceIterator iter (KeyRange _ rangeEnd) = do
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
 
   where maybeInterrupt k = k >>= condition
-        condition resKey = if resKey <= rangeEnd
+        condition resKey = if (unpackWord64 resKey) <= rangeEnd
                            then Just resKey
                            else Nothing
-
-advanceIterator iter (TsKeyRange _ rangeEnd) =
-  advanceIterator iter (KeyRange BS.empty (encodeEndTimestamp rangeEnd))
 
 advanceIterator iter (SingleKey singleKey) = do
   mkey <- LDB.iterKey iter
@@ -160,23 +157,9 @@ advanceIterator iter (SingleKey singleKey) = do
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
 
   where maybeInterrupt k = k >>= condition
-        condition resKey = if resKey == singleKey
+        condition resKey = if (unpackWord64 resKey) == singleKey
                            then Just resKey
                            else Nothing
-
-advanceIterator iter (TsSingleKey intKey) = do
-  mkey <- LDB.iterKey iter
-  mval <- LDB.iterValue iter
-  _    <- LDB.iterNext iter
-
-  return $ (,) <$> (maybeInterrupt mkey) <*> mval
-
-  where maybeInterrupt k = k >>= condition
-        encodedKey       = packWord64 intKey
-        condition resKey = if (BS.take 8 resKey) == encodedKey
-                           then Just resKey
-                           else Nothing
-
 
 advanceIterator iter _ = do
   mkey <- LDB.iterKey iter
@@ -184,30 +167,21 @@ advanceIterator iter _ = do
   _    <- LDB.iterNext iter
   return $ (,) <$> mkey <*> mval
 
--- |Sets start position of @Iterator@ depending on @KeyRange@ type.
+-- |Sets start position of @Iterator@ depending on @ScanRange@ type.
 -- Every Range has some start position.
 --
 setStartPosition :: MonadIO m =>
                     LDB.Iterator
-                    -> KeyRange
+                    -> ScanRange
                     -> m ()
 
-setStartPosition iter (OpenEnd startPosition) =
-  LDB.iterSeek iter startPosition
-setStartPosition iter (TsOpenEnd startPosition)  =
-  setStartPosition iter (OpenEnd (encodeBeginTimestamp startPosition))
-
-setStartPosition iter (SingleKey startPosition)  =
-  LDB.iterSeek iter startPosition
-setStartPosition iter (TsSingleKey startPosition)  =
-  setStartPosition iter (SingleKey (encodeBeginTimestamp startPosition))
-
-setStartPosition iter (KeyRange startPosition _) =
-  LDB.iterSeek iter startPosition
-setStartPosition iter (TsKeyRange startPosition _) =
-  setStartPosition iter (KeyRange (encodeBeginTimestamp startPosition) BS.empty)
-
-setStartPosition iter EntireKeyspace = LDB.iterFirst iter
+setStartPosition iter scanRange =
+  case scanRange of
+    (OpenEnd startPosition)    -> defaultStartPosition startPosition
+    (SingleKey startPosition)  -> defaultStartPosition startPosition
+    (KeyRange startPosition _) -> defaultStartPosition startPosition
+    EntireKeyspace             ->  LDB.iterFirst iter
+  where defaultStartPosition sp = LDB.iterSeek iter (packWord64 sp)
 
 -- |
 -- | Chunking / Query Parallelisation
