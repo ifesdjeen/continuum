@@ -6,6 +6,7 @@ module Continuum.Cluster where
 
 import           Continuum.Types
 import           Continuum.Storage
+import           Continuum.ParallelStorage
 import           Continuum.Folds
 
 
@@ -64,18 +65,11 @@ runQuery :: TVar DBContext
             -> SelectQuery
             -> IO (DbErrorMonad DbResult)
 
-runQuery shared dbName FetchAll = do
+runQuery shared dbName query = do
   ctx <- atomRead shared
-  (res, newst) <- runAppState ctx (scan dbName EntireKeyspace Record appendFold)
+  (res, newst) <- runAppState ctx (parallelScan dbName EntireKeyspace Record query)
   atomReset newst shared
-  return (DbResults <$> res)
-
-runQuery _ _ other = do
-  _ <- print $ other
-  return (Right EmptyRes)
-
-
-
+  return res
 
 withTmpStorage :: String
                -> IO ()
