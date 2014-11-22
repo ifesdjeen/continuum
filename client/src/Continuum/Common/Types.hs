@@ -103,14 +103,9 @@ instance S.Serialize DbResult
 -- | RANGE
 -- |
 
--- data TsScanRange =
---   TsOpenEnd                Integer
---   | TsSingleKey            Integer
---   | TsKeyRange             Integer Integer
---   | TsEntireKeyspace
---   deriving(Show, Generic)
--- instance S.Serialize TsScanRange
-
+-- Maybe someday we'll need a ByteBuffer scan ranges. For now all keys are always
+-- integers. Maybe iterators for something like indexes should be done somehow
+-- differently not to make that stuff even more complex.
 data ScanRange =
   OpenEnd                  Integer
   | SingleKey              Integer

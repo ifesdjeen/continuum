@@ -216,17 +216,3 @@ unpackFloat _ = error "Can't unpack Float"
 unpackDouble :: DbValue -> Double
 unpackDouble (DbDouble i) = i
 unpackDouble _ = error "Can't unpack Double"
-
-
-
--- toScanRange :: TsScanRange -> ScanRange
--- toScanRange (TsOpenEnd i)    = OpenEnd   (packWord64 i)
--- toScanRange (TsSingleKey i)  = SingleKey (packWord64 i)
--- toScanRange (TsKeyRange i j) = KeyRange  (packWord64 i) (packWord64 j)
--- toScanRange TsEntireKeyspace = EntireKeyspace
-
--- toTsScanRange :: ScanRange -> TsScanRange
--- toTsScanRange (OpenEnd i)    = TsOpenEnd   (unpackWord64 i)
--- toTsScanRange (SingleKey i)  = TsSingleKey (unpackWord64 i)
--- toTsScanRange (KeyRange i j) = TsKeyRange  (unpackWord64 i) (unpackWord64 j)
--- toTsScanRange EntireKeyspace = TsEntireKeyspace
