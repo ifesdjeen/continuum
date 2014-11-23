@@ -126,10 +126,6 @@ decodeIndexes schema bs =
   map fromIntegral $ B.unpack $ B.take (length (fields schema)) bs
 {-# INLINE decodeIndexes #-}
 
-slide :: [a] -> [(a, a)]
-slide (f:s:xs) = (f,s) : slide (s:xs)
-slide _ = []
-
 decodeValues :: DbSchema -> B.ByteString -> DbErrorMonad [DbValue]
 decodeValues schema bs = mapM (\(t, s) -> fastDecodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
@@ -188,31 +184,3 @@ unpackWord64 s =
     (fromIntegral (s `B.index` 6) `shiftL`  8) .|.
     (fromIntegral (s `B.index` 7) )
 {-# INLINE unpackWord64 #-}
-
--- Group Queries
-
-byField :: B.ByteString -> DbRecord -> DbValue
-byField f (DbRecord _ m) = fromJust $ Map.lookup f m
-
-byFieldMaybe :: B.ByteString -> DbRecord -> Maybe DbValue
-byFieldMaybe f (DbRecord _ m) = Map.lookup f m
-
-byTime :: Integer -> DbRecord -> Integer
-byTime interval (DbRecord t _) = interval * (t `quot` interval)
-
-
-unpackString :: DbValue -> B.ByteString
-unpackString (DbString i) = i
-unpackString _ = error "Can't unpack Int"
-
-unpackInt :: DbValue -> Integer
-unpackInt (DbInt i) = i
-unpackInt _ = error "Can't unpack Int"
-
-unpackFloat :: DbValue -> Float
-unpackFloat (DbFloat i) = i
-unpackFloat _ = error "Can't unpack Float"
-
-unpackDouble :: DbValue -> Double
-unpackDouble (DbDouble i) = i
-unpackDouble _ = error "Can't unpack Double"

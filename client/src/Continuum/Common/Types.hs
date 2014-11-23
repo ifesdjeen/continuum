@@ -57,11 +57,11 @@ type DbErrorMonad  = Either  DbError
 data DbValue =
   EmptyValue
   | DbInt                   Integer
+  | DbString                ByteString
   | DbFloat                 Float
   | DbDouble                Double
-  | DbString                ByteString
-  | DbTimestamp             Integer
-  | DbSequenceId            Integer
+  -- | DbTimestamp             Integer
+  -- | DbSequenceId            Integer
   -- DbList [DbValue]
   -- DbMap [(DbValue, DbValue)]
   deriving (Show, Eq, Ord, Generic)
