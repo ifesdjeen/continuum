@@ -125,3 +125,4 @@ executable continuum-shell-client
                         , aeson                  >= 0.8.0.2
                         , containers             >0.5
                         , text                   >=1.2.0.0
+                        , bytestring             >= 0.10.4.0
