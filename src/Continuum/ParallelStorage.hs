@@ -59,7 +59,6 @@ execAsyncIO  st op = evalStateT op $ st
 
 -- |Read Chunk ids from the Chunks Database
 --
--- TODO: REWRITE READ CHUNKS TO COMMON SCANNING
 readChunks :: ScanRange -> AppState [DbResult]
 readChunks scanRange = do
   db     <- getCtxChunksDb
