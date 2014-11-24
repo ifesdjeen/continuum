@@ -23,24 +23,19 @@ queryStep :: SelectQuery
              -- TODO: Maybe makes sense to add error result here? O_O
              -> Fold DbResult DbResult
 
-queryStep v@(Group subquery) =
+queryStep v@(Group fieldName subquery) =
   case queryStep subquery of
     (Fold subLocalStep subInit subFinalize) ->
       let
         wrappedSubLocalStep _ Nothing  = return $! subInit
         wrappedSubLocalStep n (Just a) = return $! (subLocalStep a n)
 
-        localStep m v@(FieldRes (_, field)) =
-          Map.alter (wrappedSubLocalStep v) field m
+        localStep m v@(RecordRes record) =
+          Map.alter (wrappedSubLocalStep v) (getValue fieldName record) m
 
         finalize g = GroupRes $ Map.map subFinalize g
       in
        Fold localStep Map.empty finalize
-
-
-    -- inc Nothing = return $! CountStep 0
-    -- inc (Just (CountStep a)) = return $! CountStep (a + 1)
-    -- inc _ = error ("NOT IMPLEMENTED: " ++ show v)
 
 queryStep Count = Fold localStep (CountStep 0) id
   where
