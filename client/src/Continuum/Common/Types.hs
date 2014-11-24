@@ -60,10 +60,8 @@ data DbValue =
   | DbString                ByteString
   | DbFloat                 Float
   | DbDouble                Double
-  -- | DbTimestamp             Integer
-  -- | DbSequenceId            Integer
   -- DbList [DbValue]
-  -- DbMap [(DbValue, DbValue)]
+  -- DbMap [Map.Map DbValue DbValue]
   deriving (Show, Eq, Ord, Generic)
 
 instance S.Serialize DbValue
@@ -87,15 +85,27 @@ data DbResult =
   EmptyRes
   | ErrorRes               DbError
   | KeyRes                 Integer
+  | ValueRes               DbValue
   | RecordRes              DbRecord
   | FieldRes               (Integer, DbValue)
   | FieldsRes              (Integer, [DbValue])
+  -- Split Step and Res
+
   | CountStep              Integer
-  | CountRes               Integer
   | GroupRes               (Map.Map DbValue DbResult)
+
   | DbResults              [DbResult]
   | DbSchemaResult         (DbName, DbSchema)
   deriving(Generic, Show, Eq)
+
+-- data StepResult =
+--   CountStep                Integer
+--   | GroupRes               (Map.Map DbValue DbResult)
+--   deriving(Generic, Show, Eq)
+
+-- toDbResult :: StepResult -> DbResult
+-- toDbResult (CountStep i) = CountRes i
+-- toDbResult _ = ErrorRes $ OtherError
 
 instance S.Serialize DbResult
 

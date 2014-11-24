@@ -137,6 +137,7 @@ advanceIterator :: MonadIO m =>
                    LDB.Iterator
                    -> ScanRange
                    -> m (Maybe (ByteString, ByteString))
+
 advanceIterator iter (KeyRange _ rangeEnd) = do
   mkey <- LDB.iterKey iter
   mval <- LDB.iterValue iter
@@ -237,6 +238,7 @@ createDatabase dbName sch = do
   if (not exists)
     then createDb
     else return $ Right EmptyRes
+
   where createDb = do
           path <- getCtxPath
           ldb  <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts

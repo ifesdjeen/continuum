@@ -162,8 +162,8 @@ main =  hspec $ do
             forM_ [1..1000000]
               (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
                                                   ("b", DbString "1")])
-            scantdb EntireKeyspace (Field "a") countFold
-      res `shouldReturn` (Right 1000000)
+            scantdb EntireKeyspace (Field "a") (queryStep Count)
+      res `shouldReturn` (Right (CountStep 1000000))
 
 
 

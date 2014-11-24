@@ -1,63 +1,85 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE BangPatterns #-}
 
-module Continuum.Folds (countFold
-                       , appendFold
-                       , groupFold
-                       , countStepFold
-                       , countMergeFold)
-       where
+module Continuum.Folds where
 
 import           Continuum.Types
--- import           Debug.Trace
 import qualified Data.Map.Strict as Map
-import qualified Control.Foldl as L
+import           Control.Foldl      ( Fold(..) )
+import           Data.Monoid
 
--- forall .acc br Fold (acc -> i -> acc) i (acc -> done)
--- Fold i done
--- | Count Fold
-countFold :: L.Fold a Int
-countFold = L.Fold step 0 id
-  where step acc _ = acc + 1
-
-countStepFold :: L.Fold a Int
-countStepFold = L.Fold step 0 id
-  where step acc _ = acc + 1
-
-countMergeFold :: L.Fold a Int
-countMergeFold = L.Fold step 0 id
-  where step acc _ = acc + 1
-
-
--- | Append Fold
-appendFold :: L.Fold a [a]
-appendFold = L.Fold step [] id
+appendFold :: Fold a [a]
+appendFold = Fold step [] id
   where step acc val = acc ++ [val]
 
-groupFold :: (Ord k) =>
-              (DbResult -> (k, v))
-              -> L.Fold v res
-              -> L.Fold DbResult (Map.Map k res)
+-- |
+-- | QUERY STEP
+-- |
 
-groupFold conv (L.Fold stepIntern accIntern doneIntern) = L.Fold step Map.empty rewrap
+-- |Query Step is given as a Fold to every @Chunk@ processor that's
+-- being asynchronously executed. Results of @queryStep@ are then
+-- merged with @DbResult@ Monoid and finalized with a @Finalizer@
+queryStep :: SelectQuery
+             -- TODO: Maybe makes sense to add error result here? O_O
+             -> Fold DbResult DbResult
+
+queryStep v@(Group subquery) =
+  case queryStep subquery of
+    (Fold subLocalStep subInit subFinalize) ->
+      let
+        wrappedSubLocalStep _ Nothing  = return $! subInit
+        wrappedSubLocalStep n (Just a) = return $! (subLocalStep a n)
+
+        localStep m v@(FieldRes (_, field)) =
+          Map.alter (wrappedSubLocalStep v) field m
+
+        finalize g = GroupRes $ Map.map subFinalize g
+      in
+       Fold localStep Map.empty finalize
+
+
+    -- inc Nothing = return $! CountStep 0
+    -- inc (Just (CountStep a)) = return $! CountStep (a + 1)
+    -- inc _ = error ("NOT IMPLEMENTED: " ++ show v)
+
+queryStep Count = Fold localStep (CountStep 0) id
   where
-    {-# INLINE step #-}
-    step !acc !val =
-      let (k,v) = conv val in
-      Map.alter (updateFn v) k acc
+    -- TODO: consider turning DbResult into Functor
+    localStep (CountStep a) _ = CountStep $ a + 1
 
-    rewrap x = Map.map doneIntern x
+queryStep FetchAll = Fold step (DbResults []) id
+  where step (DbResults acc) val = DbResults $ acc ++ [val]
+          -- if ((length acc) > 100)
+          -- then DbResults $ acc
+          -- else
 
-    {-# INLINE updateFn #-}
-    updateFn v i = case i of
-      (Just x)  -> Just $! stepIntern x v
-      (Nothing) -> Just accIntern
+  -- where step (DbResults acc) val = DbResults $ acc ++ [val]
 
+queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 
--- Median -> Group
--- Count -> Group
+-- |
+-- | MONOIDS
+-- |
 
--- Filtering???
+-- |@DbResult@ monoid is used to merge instances of @Chunks@ obtained
+-- by performing Scan operations in parallel. Results should be piped
+-- into @Finalizer@ afterwards.
+--
+instance Monoid DbResult where
+  mempty  = EmptyRes
+  mappend (CountStep a) (CountStep b) =
+    CountStep $! a + b
 
--- Query typeclass?
--- Identify required fields
+  mappend (GroupRes a)  (GroupRes b) =
+    GroupRes $! Map.unionWith mappend a b
+
+  mappend a EmptyRes = a
+  mappend EmptyRes b = b
+  mappend _ _ = ErrorRes NoAggregatorAvailable
+
+-- |
+-- | FINALIZERS
+-- |
+
+finalize :: DbResult -> DbResult
+finalize a = a

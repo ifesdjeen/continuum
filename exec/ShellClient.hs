@@ -27,7 +27,8 @@ instance ToJSON DbResult where
 main :: IO ()
 main = do
   client <- connect "127.0.0.1" "5566"
-  res    <- sendRequest client (Select "memory" FetchAll)
+  -- res    <- sendRequest client (Select "memory" FetchAll)
+  res    <- sendRequest client (Select "memory" Count)
 
   case res of
     (Right r)  -> print $ encode $ toJSON r
