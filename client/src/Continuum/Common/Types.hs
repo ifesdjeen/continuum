@@ -62,7 +62,14 @@ data DbValue =
   | DbDouble                Double
   -- DbList [DbValue]
   -- DbMap [Map.Map DbValue DbValue]
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic)
+
+instance Show DbValue where
+  show EmptyValue   = ""
+  show (DbInt v)    = show v
+  show (DbString v) = sq $ show v
+  show (DbFloat v)  = show v
+  show (DbDouble v) = show v
 
 instance S.Serialize DbValue
 
@@ -206,3 +213,11 @@ data Request =
   deriving(Generic, Show)
 
 instance S.Serialize Request
+
+sq :: String -> String
+sq s@[c]                     = s
+sq ('"':s)  | last s == '"'  = init s
+	    | otherwise	     = s
+sq ('\'':s) | last s == '\'' = init s
+	    | otherwise	     = s
+sq s                         = s
