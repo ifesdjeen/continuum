@@ -84,25 +84,25 @@ decodeRecord :: Decoding
              -> Decoder
 
 decodeRecord (Field field) schema !(k, bs) = do
-  decodedK      <- decodeKey k
+  timestamp     <- decodeKey k
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
                    else throwError FieldNotFoundError
-  return $! FieldRes (decodedK, decodedVal)
+  return $! RecordRes $ DbRecord timestamp (Map.fromList $ [(field, decodedVal)])
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 
 decodeRecord Record schema !(k, bs) = do
   timestamp      <- decodeKey k
-  decodedValue   <- decodeValues schema bs
-  return $! RecordRes $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedValue)
+  decodedVal     <- decodeValues schema bs
+  return $! RecordRes $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
 
 decodeRecord (Fields flds) schema (k, bs) = do
-  decodedK      <- decodeKey k
-  decodedVal    <- if isJust idxs
+  timestamp     <- decodeKey k
+  decodedVals   <- if isJust idxs
                    then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
                    else throwError FieldNotFoundError
-  return $! FieldsRes (decodedK, decodedVal)
+  return $! RecordRes $ DbRecord timestamp (Map.fromList $ zip flds decodedVals)
   where
     {-# INLINE idxs #-}
     idxs         = mapM (`elemIndex` (fields schema)) flds

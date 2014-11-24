@@ -87,10 +87,14 @@ data DbResult =
   | KeyRes                 Integer
   | ValueRes               DbValue
   | RecordRes              DbRecord
-  | FieldRes               (Integer, DbValue)
-  | FieldsRes              (Integer, [DbValue])
-  -- Split Step and Res
+  -- TODO: Ok, these two make no sense
+  -- | FieldRes               (Integer, DbValue)
+  -- | FieldsRes              (Integer, [DbValue])
+  -- It looks like in the end, we can only get an empty result, error result,
+  -- "raw" result (that covers things like key res and all other special cases),
+  -- and record result (which overs both single and multi-field scenarios).
 
+  -- TODO: Split Step and Res ??
   | CountStep              Integer
   | GroupRes               (Map.Map DbValue DbResult)
 
