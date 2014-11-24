@@ -59,7 +59,6 @@ processRequest _ _ Shutdown = return ()
 -- |
 
 
--- TODO: REFACTOR THAT INTO A COMMON PATTERN
 runQuery :: TVar DBContext
             -> DbName
             -> SelectQuery
