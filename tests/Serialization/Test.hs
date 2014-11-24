@@ -31,8 +31,8 @@ main =  hspec $ do
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
 
 
-    it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
-      decodeFn "a" `shouldBe` (Right $ FieldRes (123, DbInt    123))
-      decodeFn "b" `shouldBe` (Right $ FieldRes (123, DbString "STRINGIE"))
-      decodeFn "c" `shouldBe` (Right $ FieldRes (123, DbString "STRINGO"))
+    -- it "reads out indexes from serialized items" $ do
+    --   let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
+    --   decodeFn "a" `shouldBe` (Right $ FieldRes (123, DbInt    123))
+    --   decodeFn "b" `shouldBe` (Right $ FieldRes (123, DbString "STRINGIE"))
+    --   decodeFn "c" `shouldBe` (Right $ FieldRes (123, DbString "STRINGO"))
