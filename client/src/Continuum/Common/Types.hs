@@ -4,6 +4,8 @@ module Continuum.Common.Types where
 
 import           Data.ByteString                ( ByteString )
 import           GHC.Generics                   ( Generic )
+import           Data.Maybe                     ( fromMaybe )
+
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
@@ -12,6 +14,7 @@ import qualified Data.Map                       as Map
 -- |
 
 type DbName        = ByteString
+type FieldName     = ByteString
 
 type Decoder       = (ByteString, ByteString) -> DbErrorMonad DbResult
 
@@ -78,6 +81,11 @@ data DbRecord =
   deriving(Generic, Show, Eq)
 
 instance S.Serialize DbRecord
+
+getValue :: FieldName -> DbRecord -> DbValue
+getValue fieldName (DbRecord _ fields) =
+  fromMaybe EmptyValue (Map.lookup fieldName fields)
+
 
 -- | Creates a DbRecord from Timestamp and Key/Value pairs
 --
@@ -187,7 +195,7 @@ data SelectQuery =
   -- | Distinct
   -- | Min
   -- | Max
-  | Group                 SelectQuery
+  | Group                  FieldName SelectQuery
   | FetchAll
   deriving (Generic, Show)
 
