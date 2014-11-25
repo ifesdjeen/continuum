@@ -18,6 +18,7 @@ library
   exposed-modules:      Continuum.Client.Base
                         , Continuum.Common.Types
                         , Continuum.Common.Serialization
+                        , Continuum.Common.Primitive
   hs-source-dirs:       src
   build-depends:          base                   >= 4 && < 5
                         , containers             >0.5
