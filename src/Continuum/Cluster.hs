@@ -9,7 +9,6 @@ import           Continuum.Storage
 import           Continuum.ParallelStorage
 import           Continuum.Folds
 
-
 import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
 

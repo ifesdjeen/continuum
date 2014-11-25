@@ -163,7 +163,7 @@ fastDecodeValue DbtString bs = return $ DbString bs
 packWord64 :: Integer -> B.ByteString
 packWord64 i =
   let w = (fromIntegral i :: Word64)
-  in B.pack [ (fromIntegral (w `shiftR` 56) :: Word8)
+  in B.pack [  (fromIntegral (w `shiftR` 56) :: Word8)
              , (fromIntegral (w `shiftR` 48) :: Word8)
              , (fromIntegral (w `shiftR` 40) :: Word8)
              , (fromIntegral (w `shiftR` 32) :: Word8)
