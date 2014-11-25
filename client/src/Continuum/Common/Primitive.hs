@@ -81,14 +81,7 @@ safeTake i bs =
   if (B.length bs) <= i
   then return $ Unsafe.unsafeTake i bs
   else throwError $ NotEnoughInput
-
--- writeNBytes :: Int -> (Int -> Word8) -> ByteString
--- writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p (total - 1) (8 * (total - 1)))
---   where writeOne p i shift = do
---           _ <- poke (p `plusPtr` i) (op shift)
---           if shift == 0
---             then return ()
---             else writeOne p (i - 1) (shift - 8)
+{-# INLINE safeTake #-}
 
 -- |Allocate and Write @n@ bytes in Native host order
 writeNBytes :: Int -> (Int -> Word8) -> ByteString
