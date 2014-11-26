@@ -113,11 +113,11 @@ decodeRecord (Fields flds) schema (k, bs) = do
 -- |
 
 decodeKey :: B.ByteString -> DbErrorMonad Integer
-decodeKey x = return $ unpackWord64 (B.take 8 x)
+decodeKey x = unpackWord64 (B.take 8 x)
 {-# INLINE decodeKey #-}
 
 decodeChunkKey :: (B.ByteString, B.ByteString) -> DbErrorMonad DbResult
-decodeChunkKey (x, _) = return $ KeyRes (unpackWord64 (B.take 8 x))
+decodeChunkKey (x, _) = KeyRes <$> (unpackWord64 (B.take 8 x))
 
 {-# INLINE decodeChunkKey #-}
 
@@ -157,8 +157,8 @@ fastEncodeValue (DbInt    value) = packWord64 value
 fastEncodeValue (DbString value) = value
 
 fastDecodeValue :: DbType -> B.ByteString -> DbErrorMonad DbValue
-fastDecodeValue DbtInt bs    = return $ DbInt (unpackWord64 bs)
-fastDecodeValue DbtString bs = return $ DbString bs
+fastDecodeValue DbtInt     bs  = DbInt <$> (unpackWord64 bs)
+fastDecodeValue DbtString  bs  = return $ DbString bs
 
 packWord64 :: Integer -> B.ByteString
 packWord64 i =
@@ -173,8 +173,8 @@ packWord64 i =
              , (fromIntegral (w)             :: Word8)]
 {-# INLINE packWord64 #-}
 
-unpackWord64 :: B.ByteString -> Integer
-unpackWord64 s =
+unpackWord64 :: B.ByteString -> DbErrorMonad Integer
+unpackWord64 s = return $
     (fromIntegral (s `B.index` 0) `shiftL` 56) .|.
     (fromIntegral (s `B.index` 1) `shiftL` 48) .|.
     (fromIntegral (s `B.index` 2) `shiftL` 40) .|.

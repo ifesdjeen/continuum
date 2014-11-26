@@ -146,9 +146,10 @@ advanceIterator iter (KeyRange _ rangeEnd) = do
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
 
   where maybeInterrupt k = k >>= condition
-        condition resKey = if (unpackWord64 resKey) <= rangeEnd
-                           then Just resKey
-                           else Nothing
+        condition resKey =
+          case unpackWord64 resKey of
+            (Right k) | k <= rangeEnd -> Just resKey
+            otherwise                 -> Nothing
 
 advanceIterator iter (SingleKey singleKey) = do
   mkey <- LDB.iterKey iter
@@ -158,9 +159,10 @@ advanceIterator iter (SingleKey singleKey) = do
   return $ (,) <$> (maybeInterrupt mkey) <*> mval
 
   where maybeInterrupt k = k >>= condition
-        condition resKey = if (unpackWord64 resKey) == singleKey
-                           then Just resKey
-                           else Nothing
+        condition resKey =
+          case unpackWord64 resKey of
+            (Right k) | k == singleKey -> Just resKey
+            otherwise                  -> Nothing
 
 advanceIterator iter _ = do
   mkey <- LDB.iterKey iter
