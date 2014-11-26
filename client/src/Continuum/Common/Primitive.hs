@@ -6,6 +6,7 @@ import qualified Data.ByteString           as B
 import qualified Data.ByteString.Internal  as S
 import qualified Data.ByteString.Unsafe    as Unsafe
 
+import           Continuum.Common.Types ( DbErrorMonad(..), DbError(..) )
 import           Data.Word              ( Word8, Word16, Word32, Word64 )
 import           Data.ByteString        ( ByteString )
 import           Control.Applicative    ( (<$>) )
@@ -14,10 +15,6 @@ import           Foreign                ( Storable, Ptr, sizeOf, poke, peek, cas
 import           Foreign.C.Types        ( CSize(..) )
 import           Foreign.ForeignPtr     ( withForeignPtr )
 import           Foreign.Ptr            ( castPtr )
-
-data SerializationError =
-  OtherError | NotEnoughInput
-  deriving (Show)
 
 -- |
 -- | SIZES
@@ -32,51 +29,54 @@ word64Size = sizeOf (undefined :: Word64)
 -- | PACKING
 -- |
 
-packWord8      :: Word8 -> ByteString
-packWord8 w    = B.pack [w]
+packWord8      :: (Integral a) => a -> ByteString
+packWord8 w    = B.pack [(fromIntegral w)]
 
-packWord16     :: Word16 -> ByteString
-packWord16 w16 = writeNBytes word16Size (\i -> fromIntegral $ w16 `shiftR` i)
+packWord16     :: (Integral a) => a -> ByteString
+packWord16 w16 = let conv = (fromIntegral w16) :: Word16
+                 in  writeNBytes word16Size (\i -> fromIntegral $ conv `shiftR` i)
 
-packWord32     :: Word32 -> ByteString
-packWord32 w32 = writeNBytes word32Size (\i -> fromIntegral $ w32 `shiftR` i)
+packWord32     :: (Integral a) => a -> ByteString
+packWord32 w32 = let conv = (fromIntegral w32) :: Word32
+                 in  writeNBytes word32Size (\i -> fromIntegral $ conv `shiftR` i)
 
-packWord64     :: Word64  -> ByteString
-packWord64 w64 = writeNBytes word64Size (\i -> fromIntegral $ w64 `shiftR` i)
+packWord64     :: (Integral a) => a -> ByteString
+packWord64 w64 = let conv = (fromIntegral w64) :: Word64
+                 in  writeNBytes word64Size (\i -> fromIntegral $ conv `shiftR` i)
 
 packFloat      :: Float   -> ByteString
-packFloat      = packWord32 . fromFloat
+packFloat      = (packWord32 :: Word32 -> ByteString) . fromFloat
 
 packDouble     :: Double   -> ByteString
-packDouble     = packWord64 . fromFloat
+packDouble     = (packWord64 :: Word64 -> ByteString) . fromFloat
 
 -- |
 -- | UNPACKING
 -- |
 
-unpackWord8  :: ByteString -> Either SerializationError Word8
-unpackWord8 w = Unsafe.unsafeHead <$> safeTake word8Size w
+unpackWord8  :: (Num a) => ByteString -> DbErrorMonad a
+unpackWord8 w = fromIntegral <$> Unsafe.unsafeHead <$> safeTake word8Size w
 
-unpackWord16 :: ByteString -> Either SerializationError Word16
-unpackWord16 = readNBytes word16Size
+unpackWord16 :: (Num a) => ByteString -> DbErrorMonad a
+unpackWord16 w = fromIntegral <$> (readNBytes word16Size w :: DbErrorMonad Word16)
 
-unpackWord32 :: ByteString -> Either SerializationError Word32
-unpackWord32 = readNBytes word32Size
+unpackWord32 :: (Num a) => ByteString -> DbErrorMonad a
+unpackWord32 w = fromIntegral <$> (readNBytes word32Size w :: DbErrorMonad Word32)
 
-unpackWord64 :: ByteString -> Either SerializationError Word64
-unpackWord64 = readNBytes word64Size
+unpackWord64 :: (Num a) => ByteString -> DbErrorMonad a
+unpackWord64 w = fromIntegral <$> (readNBytes word64Size w :: DbErrorMonad Word64)
 
-unpackFloat :: ByteString -> Either SerializationError Float
+unpackFloat :: ByteString -> DbErrorMonad Float
 unpackFloat  = readNBytes word32Size
 
-unpackDouble :: ByteString -> Either SerializationError Double
+unpackDouble :: ByteString -> DbErrorMonad Double
 unpackDouble  = readNBytes word64Size
 
 -- |
 -- | Helper Functions
 -- |
 
-safeTake :: Int -> ByteString -> Either SerializationError ByteString
+safeTake :: Int -> ByteString -> DbErrorMonad ByteString
 safeTake i bs =
   if (B.length bs) <= i
   then return $ Unsafe.unsafeTake i bs
@@ -94,7 +94,7 @@ writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p 0 0)
 {-# INLINE writeNBytes #-}
 
 -- |Read N Bytes in Native host order
-readNBytes :: Storable a => Int -> ByteString -> Either SerializationError a
+readNBytes :: Storable a => Int -> ByteString -> DbErrorMonad a
 readNBytes n bs = do
     (fp,o,_) <- S.toForeignPtr `fmap` (safeTake n bs)
     let k p = peek (castPtr (p `plusPtr` o))
