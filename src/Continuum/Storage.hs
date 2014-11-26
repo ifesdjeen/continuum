@@ -9,8 +9,10 @@ module Continuum.Storage
        where
 
 import           Continuum.Types
+import           Continuum.Common.Primitive
 import           Continuum.Options
 import           Continuum.Common.Serialization
+
 import           Control.Monad.Except
 
 

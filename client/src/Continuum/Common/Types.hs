@@ -46,6 +46,8 @@ data DbError =
   | NoAggregatorAvailable
   | SchemaDecodingError     String
   | OtherError
+
+  | NotEnoughInput
   deriving (Show, Eq, Ord, Generic)
 
 instance S.Serialize DbError

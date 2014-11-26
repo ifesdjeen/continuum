@@ -9,6 +9,7 @@ module Continuum.Common.Serialization where
 
 import           Foreign
 import           Continuum.Common.Types
+import           Continuum.Common.Primitive
 
 import           Data.Serialize       as S
 import qualified Data.ByteString      as B
@@ -113,7 +114,7 @@ decodeRecord (Fields flds) schema (k, bs) = do
 -- |
 
 decodeKey :: B.ByteString -> DbErrorMonad Integer
-decodeKey x = unpackWord64 (B.take 8 x)
+decodeKey = unpackWord64
 {-# INLINE decodeKey #-}
 
 decodeChunkKey :: (B.ByteString, B.ByteString) -> DbErrorMonad DbResult
@@ -159,28 +160,3 @@ fastEncodeValue (DbString value) = value
 fastDecodeValue :: DbType -> B.ByteString -> DbErrorMonad DbValue
 fastDecodeValue DbtInt     bs  = DbInt <$> (unpackWord64 bs)
 fastDecodeValue DbtString  bs  = return $ DbString bs
-
-packWord64 :: Integer -> B.ByteString
-packWord64 i =
-  let w = (fromIntegral i :: Word64)
-  in B.pack [  (fromIntegral (w `shiftR` 56) :: Word8)
-             , (fromIntegral (w `shiftR` 48) :: Word8)
-             , (fromIntegral (w `shiftR` 40) :: Word8)
-             , (fromIntegral (w `shiftR` 32) :: Word8)
-             , (fromIntegral (w `shiftR` 24) :: Word8)
-             , (fromIntegral (w `shiftR` 16) :: Word8)
-             , (fromIntegral (w `shiftR`  8) :: Word8)
-             , (fromIntegral (w)             :: Word8)]
-{-# INLINE packWord64 #-}
-
-unpackWord64 :: B.ByteString -> DbErrorMonad Integer
-unpackWord64 s = return $
-    (fromIntegral (s `B.index` 0) `shiftL` 56) .|.
-    (fromIntegral (s `B.index` 1) `shiftL` 48) .|.
-    (fromIntegral (s `B.index` 2) `shiftL` 40) .|.
-    (fromIntegral (s `B.index` 3) `shiftL` 32) .|.
-    (fromIntegral (s `B.index` 4) `shiftL` 24) .|.
-    (fromIntegral (s `B.index` 5) `shiftL` 16) .|.
-    (fromIntegral (s `B.index` 6) `shiftL`  8) .|.
-    (fromIntegral (s `B.index` 7) )
-{-# INLINE unpackWord64 #-}
