@@ -23,7 +23,11 @@ type Decoder       = (ByteString, ByteString) -> DbErrorMonad DbResult
 -- |
 
 data DbType =
-  DbtInt
+  DbtLong
+  | DbtInt
+  | DbtByte
+  | DbtShort
+  | DbtFloat
   | DbtDouble
   | DbtString
   deriving(Show, Generic, Eq)
@@ -61,8 +65,11 @@ type DbErrorMonad  = Either  DbError
 
 data DbValue =
   EmptyValue
-  | DbInt                   Integer
   | DbString                ByteString
+  | DbLong                  Integer
+  | DbInt                   Integer
+  | DbShort                 Integer
+  | DbByte                  Integer
   | DbFloat                 Float
   | DbDouble                Double
   -- DbList [DbValue]

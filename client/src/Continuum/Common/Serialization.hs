@@ -154,9 +154,19 @@ decodeFieldByIndex schema indices idx bs = fastDecodeValue ((schemaTypes schema)
 -- |
 
 fastEncodeValue :: DbValue -> B.ByteString
-fastEncodeValue (DbInt    value) = packWord64 value
+fastEncodeValue (DbLong   value) = packWord64 value
+fastEncodeValue (DbInt    value) = packWord32 value
+fastEncodeValue (DbShort  value) = packWord16 value
+fastEncodeValue (DbByte   value) = packWord8  value
+fastEncodeValue (DbFloat  value) = packFloat value
+fastEncodeValue (DbDouble value) = packDouble value
 fastEncodeValue (DbString value) = value
 
 fastDecodeValue :: DbType -> B.ByteString -> DbErrorMonad DbValue
-fastDecodeValue DbtInt     bs  = DbInt <$> (unpackWord64 bs)
+fastDecodeValue DbtLong    bs  = DbLong   <$> (unpackWord64 bs)
+fastDecodeValue DbtInt     bs  = DbInt    <$> (unpackWord32 bs)
+fastDecodeValue DbtShort   bs  = DbShort  <$> (unpackWord16 bs)
+fastDecodeValue DbtByte    bs  = DbByte   <$> (unpackWord8 bs)
+fastDecodeValue DbtFloat   bs  = DbFloat  <$> (unpackFloat bs)
+fastDecodeValue DbtDouble  bs  = DbDouble <$> (unpackDouble bs)
 fastDecodeValue DbtString  bs  = return $ DbString bs
