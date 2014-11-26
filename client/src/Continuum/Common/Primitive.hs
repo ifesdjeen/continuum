@@ -2,12 +2,12 @@
 
 module Continuum.Common.Primitive where
 
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Internal  as S
+import qualified Data.ByteString.Unsafe    as Unsafe
+
 import           Data.Word              ( Word8, Word16, Word32, Word64 )
 import           Data.ByteString        ( ByteString )
-import qualified Data.ByteString        as B
-import qualified Data.ByteString.Internal as S
-import qualified Data.ByteString.Unsafe as Unsafe
-
 import           Control.Applicative    ( (<$>) )
 import           Control.Monad.Except   ( forM_, throwError )
 import           Foreign                ( Storable, Ptr, sizeOf, poke, peek, castPtr, plusPtr, shiftR, shiftL, alloca )
@@ -23,7 +23,7 @@ data SerializationError =
 -- | SIZES
 -- |
 
-word8Size = sizeOf (undefined :: Word8)
+word8Size  = sizeOf (undefined :: Word8)
 word16Size = sizeOf (undefined :: Word16)
 word32Size = sizeOf (undefined :: Word32)
 word64Size = sizeOf (undefined :: Word64)
@@ -100,12 +100,6 @@ readNBytes n bs = do
     let k p = peek (castPtr (p `plusPtr` o))
     return $ S.inlinePerformIO (withForeignPtr fp k)
 {-# INLINE readNBytes #-}
-
-toFloat :: (Storable w, Storable f) => w -> f
-toFloat word = S.inlinePerformIO $ alloca $ \buf -> do
-  poke (castPtr buf) word
-  peek buf
-{-# INLINE toFloat #-}
 
 fromFloat :: (Storable f, Storable w) => f -> w
 fromFloat float = S.inlinePerformIO $ alloca $ \buf -> do
