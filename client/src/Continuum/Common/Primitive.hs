@@ -78,7 +78,7 @@ unpackDouble  = readNBytes word64Size
 
 safeTake :: Int -> ByteString -> DbErrorMonad ByteString
 safeTake i bs =
-  if (B.length bs) <= i
+  if (B.length bs) >= i
   then return $ Unsafe.unsafeTake i bs
   else throwError $ NotEnoughInput
 {-# INLINE safeTake #-}
