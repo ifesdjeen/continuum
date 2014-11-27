@@ -70,8 +70,8 @@ test-suite tests
   main-is:                Main.hs
   hs-source-dirs:         tests
 
-  other-modules:          Serialization.Test
-                        , Storage.Test
+  other-modules:          Storage.Test
+                          , Cluster.Test
 
   build-depends:          base                   >= 3 && < 5
                         , continuum              >= 0.1.0.8
