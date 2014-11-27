@@ -19,18 +19,6 @@ import           Control.Foldl                  ( Fold(..) )
 
 import qualified Data.Map.Strict                as Map
 
--- |Just a demonstration of how parallel scan works
--- example :: ByteString -> AppState DbResult
--- example dbName = do
---   chunks <- readChunks
---   st     <- get
---   let ranges           = makeRanges <$> chunks
---       scanChunk r      = scan dbName r (Field "status") (queryStep (Group Count))
---       asyncReadChunk i = execAsyncIO st (scanChunk i)
-
---   rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
---   return $ (finalize . mconcat) <$> rangeResults
-
 parallelScan :: DbName
                 -> ScanRange
                 -> Decoding
