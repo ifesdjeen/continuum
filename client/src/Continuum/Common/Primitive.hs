@@ -85,18 +85,18 @@ safeTake i bs =
 
 -- |Allocate and Write @n@ bytes in Native host order
 writeNBytes :: Int -> (Int -> Word8) -> ByteString
-writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p 0 0)
+writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p 0 ((total - 1) * 8))
   where writeOne p i shift = do
           _ <- poke (p `plusPtr` i) (op shift)
           if i == total
             then return ()
-            else writeOne p (i + 1) (shift + 8)
+            else writeOne p (i + 1) (shift - 8)
 {-# INLINE writeNBytes #-}
 
 -- |Read N Bytes in Native host order
 readNBytes :: Storable a => Int -> ByteString -> DbErrorMonad a
 readNBytes n bs = do
-    (fp,o,_) <- S.toForeignPtr `fmap` (safeTake n bs)
+    (fp,o,_) <- S.toForeignPtr `fmap` B.reverse `fmap` (safeTake n bs)
     let k p = peek (castPtr (p `plusPtr` o))
     return $ S.inlinePerformIO (withForeignPtr fp k)
 {-# INLINE readNBytes #-}
