@@ -33,6 +33,9 @@ main =  hspec $ do
       let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
+            _ <- putRecordTdb $ makeRecord 100 [("a", (DbInt 1)),
+                                                ("b", (DbString "1"))]
+
             _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
                                                 ("b", (DbString "1"))]
 
