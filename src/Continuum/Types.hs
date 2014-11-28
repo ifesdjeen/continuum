@@ -8,12 +8,15 @@ module Continuum.Types
        )
        where
 
+
 import           Continuum.Common.Types
 import           Control.Monad.State.Strict     ( StateT(..), MonadState(..), gets, modify, liftM )
 import           Data.ByteString                ( ByteString )
 import           Database.LevelDB.Base          ( DB, WriteOptions, ReadOptions )
 import           GHC.Generics                   ( Generic )
+import           Data.Default.Class             ( Default(..) )
 
+import qualified Continuum.Options              as Opts
 import qualified Data.Map                       as Map
 import qualified Data.Time.Clock.POSIX          as Clock
 
@@ -35,7 +38,21 @@ data DbContext = DbContext
     , sequenceNumber :: Integer
     , lastSnapshot   :: Integer
     , ctxRwOptions   :: RWOptions
+    , snapshotAfter  :: Integer
     }
+
+defaultDbContext :: DbContext
+defaultDbContext = DbContext
+    {sequenceNumber = 1
+    , lastSnapshot  = 1
+    , ctxRwOptions  = (Opts.readOpts,
+                       Opts.writeOpts)
+    , snapshotAfter = 100000
+    }
+
+instance Default DbContext where
+  def = defaultDbContext
+
 
 -- |Creates Getter, Mapper and Modifier accessors for the record
 -- fields.

@@ -192,9 +192,6 @@ setStartPosition iter scanRange =
 -- | Chunking / Query Parallelisation
 -- |
 
-snapshotAfter :: Integer
-snapshotAfter = 250000
-
 maybeWriteChunk :: Integer
                    -> DbRecord
                    -> AppState DbResult
