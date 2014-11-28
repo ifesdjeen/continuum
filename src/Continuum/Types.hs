@@ -17,7 +17,7 @@ import           GHC.Generics                   ( Generic )
 import qualified Data.Map                       as Map
 import qualified Data.Time.Clock.POSIX          as Clock
 
-type AppState a    = StateT DBContext IO (DbErrorMonad a)
+type AppState a    = StateT DbContext IO (DbErrorMonad a)
 
 type RWOptions     = (ReadOptions, WriteOptions)
 
@@ -27,27 +27,27 @@ type ContextDbsMap = Map.Map ByteString (DbSchema, DB)
 -- | DB CONTEXT
 -- |
 
-data DBContext = DBContext
-    { ctxSystemDb       :: DB
-    , ctxDbs            :: ContextDbsMap
-    , ctxChunksDb       :: DB
-    , ctxPath           :: String
-    , sequenceNumber    :: Integer
-    , lastSnapshot      :: Integer
-    , ctxRwOptions      :: RWOptions
+data DbContext = DbContext
+    { ctxSystemDb    :: DB
+    , ctxDbs         :: ContextDbsMap
+    , ctxChunksDb    :: DB
+    , ctxPath        :: String
+    , sequenceNumber :: Integer
+    , lastSnapshot   :: Integer
+    , ctxRwOptions   :: RWOptions
     }
 
 -- |Creates Getter, Mapper and Modifier accessors for the record
 -- fields.
 --
 #define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
-GETTER :: MonadState DBContext m => m FTYPE                     ; \
+GETTER :: MonadState DbContext m => m FTYPE                     ; \
 GETTER = gets FIELD                                             ; \
                                                                 ; \
-MAPPER :: (FTYPE -> FTYPE) -> DBContext  -> DBContext           ; \
+MAPPER :: (FTYPE -> FTYPE) -> DbContext  -> DbContext           ; \
 MAPPER f a = a {FIELD = f (FIELD a) }                           ; \
                                                                 ; \
-MODIFIER :: MonadState DBContext m => (FTYPE -> FTYPE) ->  m () ; \
+MODIFIER :: MonadState DbContext m => (FTYPE -> FTYPE) ->  m () ; \
 MODIFIER f = do                                                 ; \
   modify (MAPPER f)                                             ; \
   return ()
@@ -66,7 +66,7 @@ ACCESSORS(getSequenceNumber, fmapSequenceNumber, modifySequenceNumber, sequenceN
 
 -- |Check whether Database with the given name exist or no
 --
-dbExists :: MonadState DBContext m =>
+dbExists :: MonadState DbContext m =>
             DbName
             -> m Bool
 dbExists k = do
@@ -77,7 +77,7 @@ dbExists k = do
 
 -- |Retrieve database with the given name from Context.
 --
-getDb :: MonadState DBContext m =>
+getDb :: MonadState DbContext m =>
          DbName
          -> m (Maybe (DbSchema, DB))
 getDb k = do
@@ -85,22 +85,22 @@ getDb k = do
   return $ Map.lookup k dbs
 
 -- |Returns a database-unique monotonically incrementing sequence number.
-getAndincrementSequence :: MonadState DBContext m
+getAndincrementSequence :: MonadState DbContext m
                            => m Integer
 getAndincrementSequence = do
   old <- get
   _   <- modifySequenceNumber (+ 1)
   return $ sequenceNumber old
 
-rwOptions :: MonadState DBContext m
+rwOptions :: MonadState DbContext m
              => m RWOptions
 rwOptions = gets ctxRwOptions
 
-getReadOptions :: MonadState DBContext m
+getReadOptions :: MonadState DbContext m
                   => m ReadOptions
 getReadOptions = liftM fst rwOptions
 
-getWriteOptions :: MonadState DBContext m
+getWriteOptions :: MonadState DbContext m
                    => m WriteOptions
 getWriteOptions = liftM snd rwOptions
 

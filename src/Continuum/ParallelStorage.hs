@@ -42,7 +42,7 @@ parallelRangeScan (Right ranges) op = do
   res <- parallel $ map op ranges
   return $ sequence res
 
-execAsyncIO :: DBContext -> AppState a -> IO (Either DbError a)
+execAsyncIO :: DbContext -> AppState a -> IO (Either DbError a)
 execAsyncIO  st op = evalStateT op $ st
 
 -- |Read Chunk ids from the Chunks Database

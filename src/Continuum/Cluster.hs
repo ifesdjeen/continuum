@@ -28,7 +28,7 @@ type Socket = N.Socket N.Rep
 -- |
 
 processRequest :: Socket
-                  -> TVar DBContext
+                  -> TVar DbContext
                   -> Request
                   -> IO ()
 -- TODO: GET RID OF THAT
@@ -58,7 +58,7 @@ processRequest _ _ Shutdown = return ()
 -- |
 
 
-runQuery :: TVar DBContext
+runQuery :: TVar DbContext
             -> DbName
             -> SelectQuery
             -> IO (DbErrorMonad DbResult)
@@ -71,7 +71,7 @@ runQuery shared dbName query = do
 
 withTmpStorage :: String
                -> IO ()
-               -> (TVar DBContext -> IO a)
+               -> (TVar DbContext -> IO a)
                -> IO a
 withTmpStorage path cleanup subsystem =
   bracket (startStorage path)
@@ -81,7 +81,7 @@ withTmpStorage path cleanup subsystem =
 
 startClientAcceptor :: MVar ()
                        -> String
-                       -> TVar DBContext
+                       -> TVar DbContext
                        -> IO (N.Socket N.Rep, N.Endpoint)
 startClientAcceptor startedMVar port _ = do
   serverSocket <- N.socket N.Rep
@@ -103,7 +103,7 @@ stopClientAcceptor doneMVar (serverSocket, endpoint) = do
 withClientAcceptor :: MVar ()
                       -> MVar ()
                       -> String
-                      -> TVar DBContext
+                      -> TVar DbContext
                       -> IO ()
 
 withClientAcceptor startedMVar doneMVar port shared =
@@ -123,7 +123,7 @@ startNode startedMVar doneMVar path port = do
 emptyResult :: DbErrorMonad DbResult
 emptyResult = Right EmptyRes
 
-receiveLoop :: N.Socket N.Rep -> TVar DBContext -> IO ()
+receiveLoop :: N.Socket N.Rep -> TVar DbContext -> IO ()
 receiveLoop serverSocket shared = do
   received <- N.recv serverSocket
 

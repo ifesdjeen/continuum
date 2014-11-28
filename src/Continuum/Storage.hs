@@ -199,7 +199,7 @@ maybeWriteChunk :: Integer
                    -> DbRecord
                    -> AppState DbResult
 maybeWriteChunk sid (DbRecord time _) = do
-  DBContext{..} <- get
+  DbContext{..} <- get
   when (sid >= lastSnapshot + snapshotAfter || sid == 1) $ do
     modifyLastSnapshot $ const sid
     LDB.put ctxChunksDb (snd ctxRwOptions) (packWord64 time) BS.empty
@@ -269,7 +269,7 @@ liftDbError _ _         (Left b)  = Left b
 -- |
 
 
-startStorage :: String -> IO (TVar DBContext)
+startStorage :: String -> IO (TVar DbContext)
 startStorage path = do
   _           <- system ("mkdir " ++ path)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
@@ -278,7 +278,7 @@ startStorage path = do
   -- TODO: add Error Handling!
   (Right dbs) <- initializeDbs path systemDb
 
-  let context = DBContext {ctxPath           = path,
+  let context = DbContext {ctxPath           = path,
                            ctxSystemDb       = systemDb,
                            ctxDbs            = dbs,
                            ctxChunksDb       = chunksDb,
@@ -291,9 +291,9 @@ startStorage path = do
 
   return shared
 
-stopStorage :: TVar DBContext -> IO ()
+stopStorage :: TVar DbContext -> IO ()
 stopStorage shared = do
-  DBContext{..} <- atomRead shared
+  DbContext{..} <- atomRead shared
   _             <- LDB.close ctxSystemDb
   _             <- LDB.close ctxChunksDb
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
@@ -301,15 +301,15 @@ stopStorage shared = do
   where atomRead = atomically . readTVar
 
 withStorage :: String
-               -> (TVar DBContext -> IO a)
+               -> (TVar DbContext -> IO a)
                -> IO a
 withStorage path subsystem = do
   bracket (startStorage path)
           stopStorage
           subsystem
 
-runAppState :: DBContext
+runAppState :: DbContext
                -> AppState a
                -> IO (DbErrorMonad a,
-                      DBContext)
+                      DbContext)
 runAppState = flip runStateT
