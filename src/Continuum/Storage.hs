@@ -185,7 +185,7 @@ setStartPosition iter scanRange =
     (OpenEnd startPosition)    -> defaultStartPosition startPosition
     (SingleKey startPosition)  -> defaultStartPosition startPosition
     (KeyRange startPosition _) -> defaultStartPosition startPosition
-    EntireKeyspace             ->  LDB.iterFirst iter
+    EntireKeyspace             -> LDB.iterFirst iter
   where defaultStartPosition sp = LDB.iterSeek iter (packWord64 sp)
 
 -- |
