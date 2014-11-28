@@ -74,7 +74,7 @@ withTmpStorage :: String
                -> (TVar DbContext -> IO a)
                -> IO a
 withTmpStorage path cleanup subsystem =
-  bracket (startStorage path)
+  bracket (startStorage path defaultDbContext)
           (\i -> stopStorage i >> cleanup)
           subsystem
 

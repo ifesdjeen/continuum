@@ -266,8 +266,8 @@ liftDbError _ _         (Left b)  = Left b
 -- |
 
 
-startStorage :: String -> IO (TVar DbContext)
-startStorage path = do
+startStorage :: String -> DbContext -> IO (TVar DbContext)
+startStorage path ctx = do
   _           <- system ("mkdir " ++ path)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
   chunksDb    <- LDB.open (path ++ "/chunksDb") Opts.opts
@@ -275,14 +275,10 @@ startStorage path = do
   -- TODO: add Error Handling!
   (Right dbs) <- initializeDbs path systemDb
 
-  let context = DbContext {ctxPath           = path,
-                           ctxSystemDb       = systemDb,
-                           ctxDbs            = dbs,
-                           ctxChunksDb       = chunksDb,
-                           sequenceNumber    = 1,
-                           lastSnapshot      = 1,
-                           ctxRwOptions      = (Opts.readOpts,
-                                                Opts.writeOpts)}
+  let context = ctx  {ctxPath           = path,
+                      ctxSystemDb       = systemDb,
+                      ctxDbs            = dbs,
+                      ctxChunksDb       = chunksDb }
 
   shared <- atomically $ newTVar context
 
@@ -301,7 +297,7 @@ withStorage :: String
                -> (TVar DbContext -> IO a)
                -> IO a
 withStorage path subsystem = do
-  bracket (startStorage path)
+  bracket (startStorage path defaultDbContext)
           stopStorage
           subsystem
 
