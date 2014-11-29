@@ -18,8 +18,11 @@ testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)]
 
+testDbContext :: DbContext
+testDbContext = defaultDbContext { snapshotAfter = 10 }
+
 runner :: String -> AppState a -> IO (DbErrorMonad a)
-runner str op = Server.withTmpStorage str cleanup $ \shared -> do
+runner str op = Server.withTmpStorage str testDbContext cleanup $ \shared -> do
   ctx <- Server.atomRead shared
   (res, newst) <- runAppState ctx op
   Server.atomReset newst shared
@@ -30,6 +33,7 @@ main =  hspec $ do
   let scantdb = scan testDBName
   describe "Basic DB Functionality" $ do
     it "should put items into the database and retrieve them" $  do
+
       let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
@@ -157,6 +161,14 @@ main =  hspec $ do
                                 ])
 
 
+    it "should create snapshots after each 10 records" $  do
+      let res = runner testDBPath $ do
+            _ <- createDatabase testDBName testSchema
+            forM_ [1..100]
+              (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
+                                                  ("b", DbString "1")])
+            readChunks EntireKeyspace
+      res `shouldReturn` (Right (take 10 $ [(KeyRes $ 10 * x + 1) | x <- [0..]]))
 
     it "should iterate over a large amount of records" $  do
       let res = runner testDBPath $ do
