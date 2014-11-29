@@ -8,6 +8,8 @@
 module Continuum.Storage
        where
 
+import           Debug.Trace                    ( trace )
+
 import           Continuum.Types
 import           Continuum.Common.Primitive
 import           Continuum.Options
@@ -28,7 +30,7 @@ import           Control.Concurrent.STM         ( TVar, newTVar, atomically, rea
 import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
 import           Control.Monad.State.Strict     ( get )
-import           Data.Traversable               ( traverse, sequenceA )
+import           Data.Traversable               ( traverse )
 import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
@@ -151,7 +153,7 @@ advanceIterator iter (KeyRange _ rangeEnd) = do
         condition resKey =
           case unpackWord64 resKey of
             (Right k) | k <= rangeEnd -> Just resKey
-            otherwise                 -> Nothing
+            _                         -> Nothing
 
 advanceIterator iter (SingleKey singleKey) = do
   mkey <- LDB.iterKey iter
@@ -164,7 +166,7 @@ advanceIterator iter (SingleKey singleKey) = do
         condition resKey =
           case unpackWord64 resKey of
             (Right k) | k == singleKey -> Just resKey
-            otherwise                  -> Nothing
+            _                          -> Nothing
 
 advanceIterator iter _ = do
   mkey <- LDB.iterKey iter
@@ -201,6 +203,15 @@ maybeWriteChunk sid (DbRecord time _) = do
     modifyLastSnapshot $ const sid
     LDB.put ctxChunksDb (snd ctxRwOptions) (packWord64 time) BS.empty
   return $ return $ EmptyRes
+
+-- |Read Chunk ids from the Chunks Database
+--
+readChunks :: ScanRange -> AppState [DbResult]
+readChunks scanRange = do
+  db     <- getCtxChunksDb
+  ro     <- getReadOptions
+  chunks <- lift $ scanDb db ro scanRange decodeChunkKey appendFold
+  return chunks
 
 -- |
 -- | DATABASE INITIALIZATION
@@ -294,10 +305,11 @@ stopStorage shared = do
   where atomRead = atomically . readTVar
 
 withStorage :: String
-               -> (TVar DbContext -> IO a)
-               -> IO a
-withStorage path subsystem = do
-  bracket (startStorage path defaultDbContext)
+            -> DbContext
+            -> (TVar DbContext -> IO a)
+            -> IO a
+withStorage path context subsystem = do
+  bracket (startStorage path context)
           stopStorage
           subsystem
 

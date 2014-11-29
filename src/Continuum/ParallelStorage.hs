@@ -45,15 +45,6 @@ parallelRangeScan (Right ranges) op = do
 execAsyncIO :: DbContext -> AppState a -> IO (Either DbError a)
 execAsyncIO  st op = evalStateT op $ st
 
--- |Read Chunk ids from the Chunks Database
---
-readChunks :: ScanRange -> AppState [DbResult]
-readChunks scanRange = do
-  db     <- getCtxChunksDb
-  ro     <- getReadOptions
-  chunks <- lift $ scanDb db ro scanRange decodeChunkKey appendFold
-  return chunks
-
 -- |Split chunks into ranges (pretty much partitioning with a step of 1)
 --
 makeRanges :: [DbResult]

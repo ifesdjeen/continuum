@@ -70,11 +70,12 @@ runQuery shared dbName query = do
   return res
 
 withTmpStorage :: String
+               -> DbContext
                -> IO ()
                -> (TVar DbContext -> IO a)
                -> IO a
-withTmpStorage path cleanup subsystem =
-  bracket (startStorage path defaultDbContext)
+withTmpStorage path context cleanup subsystem =
+  bracket (startStorage path context)
           (\i -> stopStorage i >> cleanup)
           subsystem
 
@@ -116,7 +117,7 @@ startNode :: MVar ()
              -> String -> String
              -> IO ()
 startNode startedMVar doneMVar path port = do
-  withStorage path $
+  withStorage path defaultDbContext $
     withClientAcceptor startedMVar doneMVar port
 
 
