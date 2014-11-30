@@ -15,8 +15,7 @@ import           Continuum.Types
 import           Test.Hspec
 
 testSchema :: DbSchema
-testSchema = makeSchema [ ("a", DbtInt)
-                        , ("b", DbtString)]
+testSchema = makeSchema [ ("a", DbtInt) ]
 
 testDbContext :: DbContext
 testDbContext = defaultDbContext { snapshotAfter = 10 }
@@ -34,132 +33,86 @@ main =  hspec $ do
   describe "Basic DB Functionality" $ do
     it "should put items into the database and retrieve them" $  do
 
+      res <- runner testDBPath $ do
+        _ <- createDatabase testDBName testSchema
+        _ <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
+        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+
+        scantdb (SingleKey 123) Record appendFold
+
+      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)]]
+
+
+  describe "Scans" $ do
+
+    it "Single Key Scan " $  do
+      res <- runner testDBPath $ do
+        _ <- createDatabase testDBName testSchema
+
+        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 2)]
+        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 3)]
+
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
+
+        scantdb (SingleKey 123) Record appendFold
+
+      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
+                            RecordRes $ makeRecord 123 [("a", DbInt 2)],
+                            RecordRes $ makeRecord 123 [("a", DbInt 3)]]
+
+
+
+    it "Key Range (inclusive Range)" $  do
+      res <- runner testDBPath $ do
+        _ <- createDatabase testDBName testSchema
+
+        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+        _ <- putRecordTdb $ makeRecord 124 [("a", DbInt 2)]
+        _ <- putRecordTdb $ makeRecord 125 [("a", DbInt 3)]
+
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
+        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
+
+        _ <- putRecordTdb $ makeRecord 555 [("a", DbInt 3)]
+
+        scantdb (KeyRange 123 456) Record appendFold
+
+      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
+                            RecordRes $ makeRecord 124 [("a", DbInt 2)],
+                            RecordRes $ makeRecord 125 [("a", DbInt 3)],
+
+                            RecordRes $ makeRecord 456 [("a", DbInt 1)],
+                            RecordRes $ makeRecord 456 [("a", DbInt 2)],
+                            RecordRes $ makeRecord 456 [("a", DbInt 3)]]
+
+    it "Key Range (inclusive range), when there're records both before and after" $  do
       let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
 
-            _ <- putRecordTdb $ makeRecord 100 [("a", (DbInt 1)),
-                                                ("b", (DbString "1"))]
+            _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+            _ <- putRecordTdb $ makeRecord 124 [("a", DbInt 2)]
+            _ <- putRecordTdb $ makeRecord 125 [("a", DbInt 3)]
 
-            _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
-                                                ("b", (DbString "1"))]
+            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
+            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
+            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
 
-            scantdb (SingleKey 123) Record appendFold
-
-      res `shouldReturn` Right [RecordRes $
-                                makeRecord 123 [("a", DbInt 1),
-                                                ("b", DbString "1")]]
-
-
-    it "should retrieve items by given timestamp" $  do
-      let res = runner testDBPath $ do
-            _ <- createDatabase testDBName testSchema
-
-            _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1),
-                                                ("b", DbString "1")]
-            _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 2),
-                                                ("b", DbString "2")]
-            _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 3),
-                                                ("b", DbString "3")]
-
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1),
-                                                ("b", DbString "1")]
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2),
-                                                ("b", DbString "2")]
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3),
-                                                ("b", DbString "3")]
-
-            scantdb (SingleKey 123) Record appendFold
-
-      res `shouldReturn` Right [RecordRes $
-                                makeRecord 123 [("a", DbInt 1),
-                                                ("b", DbString "1")],
-                                RecordRes $
-                                makeRecord 123 [("a", DbInt 2),
-                                                ("b", DbString "2")],
-                                RecordRes $
-                                makeRecord 123 [("a", DbInt 3),
-                                                ("b", DbString "3")]]
-
-
-
-    it "should return inclusive range of timestamps" $  do
-      let res = runner testDBPath $ do
-            _ <- createDatabase testDBName testSchema
-
-            _ <- putRecordTdb $ makeRecord 123 [("a", (DbInt 1)),
-                                                ("b", (DbString "1"))]
-            _ <- putRecordTdb $ makeRecord 124 [("a", (DbInt 2)),
-                                                ("b", (DbString "2"))]
-            _ <- putRecordTdb $ makeRecord 125 [("a", (DbInt 3)),
-                                                ("b", (DbString "3"))]
-
-            _ <- putRecordTdb $ makeRecord 456 [("a", (DbInt 1)),
-                                                ("b", (DbString "1"))]
-            _ <- putRecordTdb $ makeRecord 456 [("a", (DbInt 2)),
-                                                ("b", (DbString "2"))]
-            _ <- putRecordTdb $ makeRecord 456 [("a", (DbInt 3)),
-                                                ("b", (DbString "3"))]
-
-            _ <- putRecordTdb $ makeRecord 555 [("a", (DbInt 3)),
-                                                ("b", (DbString "3"))]
-
-            scantdb (KeyRange 123 456) Record appendFold
-
-      res `shouldReturn` Right [RecordRes $
-                                makeRecord 123 [("a", DbInt 1),
-                                                ("b", DbString "1")],
-                                RecordRes $
-                                makeRecord 124 [("a", DbInt 2),
-                                                ("b", DbString "2")],
-                                RecordRes $
-                                makeRecord 125 [("a", DbInt 3),
-                                                ("b", DbString "3")],
-                                RecordRes $
-                                makeRecord 456 [("a", DbInt 1),
-                                                ("b", DbString "1")],
-                                RecordRes $
-                                makeRecord 456 [("a", DbInt 2),
-                                                ("b", DbString "2")],
-                                RecordRes $
-                                makeRecord 456 [("a", DbInt 3),
-                                                ("b", DbString "3")]]
-
-
-
-    it "should scantdb a range of times that do not directly include the record at hand inclusive range of timestamps" $  do
-      let res = runner testDBPath $ do
-            _ <- createDatabase testDBName testSchema
-
-            _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1),
-                                                ("b", DbString "1")]
-            _ <- putRecordTdb $ makeRecord 124 [("a", DbInt 2),
-                                                ("b", DbString "2")]
-            _ <- putRecordTdb $ makeRecord 125 [("a", DbInt 3),
-                                                ("b", DbString "3")]
-
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1),
-                                                ("b", DbString "1")]
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2),
-                                                ("b", DbString "2")]
-            _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3),
-                                                ("b", DbString "3")]
-
-            _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3),
-                                                ("b", DbString "3")]
+            _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3)]
 
             scantdb (KeyRange 300 456) Record appendFold
 
-      res `shouldReturn` (Right [RecordRes $
-                                 makeRecord 456 [("a", DbInt 1),
-                                                 ("b", DbString "1")],
-                                 RecordRes $
-                                 makeRecord 456 [("a", DbInt 2),
-                                                 ("b", DbString "2")],
-                                 RecordRes $
-                                 makeRecord 456 [("a", DbInt 3),
-                                                 ("b", DbString "3")]
-                                ])
+      res `shouldReturn` Right [RecordRes $ makeRecord 456 [("a", DbInt 1)],
+                                RecordRes $ makeRecord 456 [("a", DbInt 2)],
+                                RecordRes $ makeRecord 456 [("a", DbInt 3)]]
 
+
+    -- it "Open End" $ do -- TODO
+
+  describe "Snapshotting" $ do
 
     it "should create snapshots after each 10 records" $  do
       let res = runner testDBPath $ do
@@ -170,6 +123,16 @@ main =  hspec $ do
             readChunks EntireKeyspace
       res `shouldReturn` (Right (take 10 $ [(KeyRes $ 10 * x + 1) | x <- [0..]]))
 
+
+  -- describe "Queries" $ do
+    -- FetchAll
+    -- FetchAll with limits
+    -- Group
+    -- Min
+    -- Max
+    -- Combinations
+
+  describe "Stack Allocations / Thunk Leaks" $ do
     it "should iterate over a large amount of records" $  do
       let res = runner testDBPath $ do
             _ <- createDatabase testDBName testSchema
@@ -179,7 +142,6 @@ main =  hspec $ do
                                                   ("b", DbString "1")])
             scantdb EntireKeyspace (Field "a") (queryStep Count)
       res `shouldReturn` (Right (CountStep 1000000))
-
 
 
     -- it "should iterate " $  do
