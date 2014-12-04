@@ -12,6 +12,8 @@ import           Continuum.Folds
 import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
 
+import           Control.Monad.IO.Class         ( liftIO )
+import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
 import           Control.Exception.Base         ( bracket )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
@@ -28,69 +30,59 @@ type Socket = N.Socket N.Rep
 -- |
 
 processRequest :: Socket
-                  -> TVar DbContext
                   -> Request
-                  -> IO ()
+                  -> StateT DbContext IO ()
 -- TODO: GET RID OF THAT
-processRequest socket shared (Select dbName query) = do
-  resp  <- runQuery shared dbName query
-  _     <- N.send socket (encode $ resp)
+processRequest socket (Select dbName query) = do
+  resp  <- runQuery dbName query
+  _     <- liftIO $ N.send socket (encode $ resp)
   return ()
 
-processRequest socket shared (CreateDb name schema) = do
-  ctx          <- atomRead shared
-  (res, newst) <- runAppState ctx (createDatabase name schema)
-  _            <- atomReset newst shared
-  _            <- N.send socket (encode $ res)
+processRequest socket (CreateDb name schema) = do
+  res          <- createDatabase name schema
+  _            <- liftIO $ N.send socket (encode $ res)
   return ()
 
 
-processRequest socket shared (Insert name record) = do
-  ctx          <- atomRead shared
-  (res, newst) <- runAppState ctx (putRecord name record)
-  _            <- atomReset newst shared
-  _            <- N.send socket (encode $ res)
+processRequest socket (Insert name record) = do
+  res          <- putRecord name record
+  _            <- liftIO $ N.send socket (encode $ res)
   return ()
 
-processRequest _ _ Shutdown = return ()
+processRequest _ Shutdown = return ()
 -- |
 -- | Query
 -- |
 
 
-runQuery :: TVar DbContext
-            -> DbName
+runQuery :: DbName
             -> SelectQuery
-            -> IO (DbErrorMonad DbResult)
+            -> AppState DbResult
 
-runQuery shared dbName query = do
-  ctx <- atomRead shared
-  (res, newst) <- runAppState ctx (parallelScan dbName EntireKeyspace Record query)
-  atomReset newst shared
-  return res
+runQuery dbName query = parallelScan dbName EntireKeyspace Record query
 
 withTmpStorage :: String
                -> DbContext
                -> IO ()
-               -> (TVar DbContext -> IO a)
-               -> IO a
+               -> AppState a
+               -> IO (DbErrorMonad a)
 withTmpStorage path context cleanup subsystem =
   bracket (startStorage path context)
-          (\i -> stopStorage i >> cleanup)
-          subsystem
+          (\_ -> return ())
+  (runStateT subsystem) >>= (\(res,state) -> (stopStorage state) >> cleanup >> return res)
 
 
 startClientAcceptor :: MVar ()
                        -> String
-                       -> TVar DbContext
-                       -> IO (N.Socket N.Rep, N.Endpoint)
-startClientAcceptor startedMVar port _ = do
+                       -> DbContext
+                       -> IO (DbContext, (N.Socket N.Rep, N.Endpoint)) -- Probably that all should be dbcontext??
+startClientAcceptor startedMVar port context = do
   serverSocket <- N.socket N.Rep
   endpoint     <- N.bind serverSocket ("tcp://*:" ++ port)
 
   _            <- putMVar startedMVar ()
 
-  return (serverSocket, endpoint)
+  return (context, (serverSocket, endpoint))
 
 stopClientAcceptor :: MVar () -> (N.Socket N.Rep, N.Endpoint) -> IO ()
 stopClientAcceptor doneMVar (serverSocket, endpoint) = do
@@ -101,52 +93,58 @@ stopClientAcceptor doneMVar (serverSocket, endpoint) = do
 
   return ()
 
-withClientAcceptor :: MVar ()
-                      -> MVar ()
-                      -> String
-                      -> TVar DbContext
-                      -> IO ()
+-- withClientAcceptor :: MVar ()
+--                       -> MVar ()
+--                       -> String
+--                       -> TVar DbContext
+--                       -> IO ()
 
-withClientAcceptor startedMVar doneMVar port shared =
-  bracket (startClientAcceptor startedMVar port shared)
-          (stopClientAcceptor doneMVar)
-          (\(serverSocket, _) -> receiveLoop serverSocket shared)
+-- withClientAcceptor startedMVar doneMVar port shared =
+--   bracket (startClientAcceptor startedMVar port shared)
+--           (stopClientAcceptor doneMVar)
+--           (\(serverSocket, _) -> receiveLoop serverSocket shared)
 
 startNode :: MVar ()
              -> MVar ()
              -> String -> String
              -> IO ()
 startNode startedMVar doneMVar path port = do
-  withStorage path defaultDbContext $
-    withClientAcceptor startedMVar doneMVar port
+  bracket ( (startStorage path defaultDbContext) >>= (startClientAcceptor startedMVar port) )
+          ( \(x,y) -> do
+               _ <- stopStorage x
+               _ <- stopClientAcceptor doneMVar y
+               return ())
+          (\(context, (serverSocket, _)) -> (evalStateT (receiveLoop serverSocket) context ) >> return ())
+  -- withStorage path defaultDbContext $
+  --   withClientAcceptor startedMVar doneMVar port
 
 
 emptyResult :: DbErrorMonad DbResult
 emptyResult = Right EmptyRes
 
-receiveLoop :: N.Socket N.Rep -> TVar DbContext -> IO ()
-receiveLoop serverSocket shared = do
-  received <- N.recv serverSocket
+receiveLoop :: N.Socket N.Rep -> StateT DbContext IO ()
+receiveLoop serverSocket = do
+  received <- liftIO $ N.recv serverSocket
 
   case (decode received :: Either String Request) of
     (Right Shutdown) -> do
-      N.send serverSocket (encode emptyResult)
+      _ <- liftIO $ N.send serverSocket (encode emptyResult)
       return ()
 
     (Left err)       -> do
-      print ("Can't decode message: " ++ (show err))
-      receiveLoop serverSocket shared
+      _ <- liftIO $ print ("Can't decode message: " ++ (show err))
+      receiveLoop serverSocket
 
     (Right request)  -> do
-      print ("Request received: " ++ (show request))
-      processRequest serverSocket shared request
-      receiveLoop serverSocket shared
+      _ <- liftIO $ print ("Request received: " ++ (show request))
+      processRequest serverSocket request
+      receiveLoop serverSocket
 
-atomRead :: TVar a -> IO a
-atomRead = atomically . readTVar
+-- atomRead :: TVar a -> IO a
+-- atomRead = atomically . readTVar
 
-swap :: (b -> b) -> TVar b -> IO ()
-swap fn x = atomically $ readTVar x >>= writeTVar x . fn
+-- swap :: (b -> b) -> TVar b -> IO ()
+-- swap fn x = atomically $ readTVar x >>= writeTVar x . fn
 
-atomReset :: b -> TVar b -> IO ()
-atomReset newv x = atomically $ writeTVar x newv
+-- atomReset :: b -> TVar b -> IO ()
+-- atomReset newv x = atomically $ writeTVar x newv
