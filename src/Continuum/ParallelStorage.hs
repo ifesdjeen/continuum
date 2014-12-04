@@ -35,8 +35,8 @@ parallelScan dbName scanRange decoding query = do
   return $ (finalize . mconcat) <$> rangeResults
 
 parallelRangeScan :: DbErrorMonad [ScanRange]
-                  -> (ScanRange -> IO (DbErrorMonad DbResult))
-                  -> IO (DbErrorMonad [DbResult])
+                  -> (ScanRange -> IO (DbErrorMonad a))
+                  -> IO (DbErrorMonad [a])
 parallelRangeScan (Left  err)    _  = return $ Left err
 parallelRangeScan (Right ranges) op = do
   res <- parallel $ map op ranges
