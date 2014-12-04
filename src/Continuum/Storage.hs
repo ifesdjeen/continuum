@@ -16,7 +16,7 @@ import           Continuum.Options
 import           Continuum.Common.Serialization
 
 import           Control.Monad.Except
-
+import           Control.Monad                  ( (=<<) )
 
 import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
@@ -24,7 +24,7 @@ import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
 
-import           Control.Monad.State.Strict     ( runStateT )
+import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
 import           Continuum.Folds                ( appendFold )
 import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
 import           Control.Exception.Base         ( bracket )
@@ -277,7 +277,7 @@ liftDbError _ _         (Left b)  = Left b
 -- |
 
 
-startStorage :: String -> DbContext -> IO (TVar DbContext)
+startStorage :: String -> DbContext -> IO DbContext
 startStorage path ctx = do
   _           <- system ("mkdir " ++ path)
   systemDb    <- LDB.open (path ++ "/system") Opts.opts
@@ -286,18 +286,13 @@ startStorage path ctx = do
   -- TODO: add Error Handling!
   (Right dbs) <- initializeDbs path systemDb
 
-  let context = ctx  {ctxPath           = path,
-                      ctxSystemDb       = systemDb,
-                      ctxDbs            = dbs,
-                      ctxChunksDb       = chunksDb }
+  return $ ctx  {ctxPath           = path,
+                 ctxSystemDb       = systemDb,
+                 ctxDbs            = dbs,
+                 ctxChunksDb       = chunksDb }
 
-  shared <- atomically $ newTVar context
-
-  return shared
-
-stopStorage :: TVar DbContext -> IO ()
-stopStorage shared = do
-  DbContext{..} <- atomRead shared
+stopStorage :: DbContext -> IO ()
+stopStorage DbContext{..} = do
   _             <- LDB.close ctxSystemDb
   _             <- LDB.close ctxChunksDb
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
@@ -306,12 +301,12 @@ stopStorage shared = do
 
 withStorage :: String
             -> DbContext
-            -> (TVar DbContext -> IO a)
-            -> IO a
+            -> AppState a
+            -> IO ()
 withStorage path context subsystem = do
   bracket (startStorage path context)
-          stopStorage
-          subsystem
+          (\_ -> return ())
+          (execStateT subsystem) >>= stopStorage
 
 runAppState :: DbContext
                -> AppState a
