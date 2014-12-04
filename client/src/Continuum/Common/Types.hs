@@ -79,6 +79,8 @@ data DbValue =
 instance Show DbValue where
   show EmptyValue   = ""
   show (DbInt v)    = show v
+  show (DbLong v)   = show v
+  show (DbShort v)  = show v
   show (DbString v) = sq $ show v
   show (DbFloat v)  = show v
   show (DbDouble v) = show v
