@@ -18,12 +18,12 @@ instance ToJSON DbValue where
   toJSON (DbString i) = toJSON (decodeUtf8 i)
 
 instance ToJSON DbResult where
-  toJSON EmptyRes = toJSON ("" :: String)
-  toJSON (CountStep r) = toJSON r
-  toJSON (DbResults r) = toJSON r
-  toJSON (GroupRes vals) = object $
-                        concat $
-                        map (\(k, v) -> [(pack (show k)) .= v]) (Map.toList vals)
+  toJSON EmptyRes         = toJSON ("" :: String)
+  toJSON (ValueRes  r)    = toJSON r
+  toJSON (ListResult r)   = toJSON r
+  toJSON (MapResult vals) = object $
+                            concat $
+                            map (\(k, v) -> [(pack (show k)) .= v]) (Map.toList vals)
   toJSON (RecordRes
           (DbRecord ts vals)) = object $
                                 concat $
