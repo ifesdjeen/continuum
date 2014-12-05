@@ -49,6 +49,7 @@ data DbError =
   | NoSuchDatabaseError
   | NoAggregatorAvailable
   | SchemaDecodingError     String
+  | NoStepToResultConvertor
   | OtherError
 
   | NotEnoughInput
@@ -113,29 +114,35 @@ data DbResult =
   | KeyRes                 Integer
   | ValueRes               DbValue
   | RecordRes              DbRecord
-  -- TODO: Ok, these two make no sense
-  -- | FieldRes               (Integer, DbValue)
-  -- | FieldsRes              (Integer, [DbValue])
+  | ListResult             [DbResult]
+  | MapResult              (Map.Map DbValue DbResult)
+  -- TODO: RAW RESULT
+
   -- It looks like in the end, we can only get an empty result, error result,
   -- "raw" result (that covers things like key res and all other special cases),
   -- and record result (which overs both single and multi-field scenarios).
 
   -- TODO: Split Step and Res ??
-  | CountStep              Integer
-  | GroupRes               (Map.Map DbValue DbResult)
-
-  | DbResults              [DbResult]
   | DbSchemaResult         (DbName, DbSchema)
   deriving(Generic, Show, Eq)
 
--- data StepResult =
---   CountStep                Integer
---   | GroupRes               (Map.Map DbValue DbResult)
---   deriving(Generic, Show, Eq)
+-- It (only) seems to me that this split makes sense. For example, when
+-- we have things like Limit or Skip steps that should keep some internal
+-- state and then discard it after the step is finished. I'm not entirely
+-- sure if we can avoid using the intermediate structure... Maybe we can tho.
+data StepResult =
+  EmptyStepRes
+  | ErrorStepRes           DbError
+  | CountStep              Integer
+  | ListStep               [DbResult]
+  | GroupStep              (Map.Map DbValue StepResult)
+  deriving(Generic, Show, Eq)
 
--- toDbResult :: StepResult -> DbResult
--- toDbResult (CountStep i) = CountRes i
--- toDbResult _ = ErrorRes $ OtherError
+toDbResult :: StepResult -> DbResult
+toDbResult (CountStep i) = ValueRes   $ DbInt i
+toDbResult (ListStep i)  = ListResult $ i
+toDbResult (GroupStep i) = MapResult  $ Map.map toDbResult i
+toDbResult _ = ErrorRes $ NoStepToResultConvertor
 
 instance S.Serialize DbResult
 
@@ -208,6 +215,8 @@ data SelectQuery =
   -- | Max
   | Group                  FieldName SelectQuery
   | FetchAll
+  | Skip                   Integer
+  | Limit                  Integer
   deriving (Generic, Show)
 
 instance S.Serialize SelectQuery
