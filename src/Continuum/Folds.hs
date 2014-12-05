@@ -5,7 +5,7 @@ module Continuum.Folds where
 
 import           Continuum.Types
 import qualified Data.Map.Strict as Map
-import           Control.Foldl      ( Fold(..) )
+import           Control.Foldl      ( Fold(..), fold )
 import           Data.Monoid
 
 appendFold :: Fold a [a]
@@ -21,7 +21,7 @@ appendFold = Fold step [] id
 -- merged with @DbResult@ Monoid and finalized with a @Finalizer@
 queryStep :: SelectQuery
              -- TODO: Maybe makes sense to add error result here? O_O
-             -> Fold DbResult DbResult
+             -> Fold DbResult StepResult
 
 queryStep v@(Group fieldName subquery) =
   case queryStep subquery of
@@ -33,7 +33,7 @@ queryStep v@(Group fieldName subquery) =
         localStep m v@(RecordRes record) =
           Map.alter (wrappedSubLocalStep v) (getValue fieldName record) m
 
-        finalize g = GroupRes $ Map.map subFinalize g
+        finalize g = GroupStep $ Map.map subFinalize g
       in
        Fold localStep Map.empty finalize
 
@@ -42,13 +42,14 @@ queryStep Count = Fold localStep (CountStep 0) id
     -- TODO: consider turning DbResult into Functor
     localStep (CountStep a) _ = CountStep $ a + 1
 
-queryStep FetchAll = Fold step (DbResults []) id
-  where step (DbResults acc) val = DbResults $ acc ++ [val]
+-- queryStep (Skip howMany) = Fold
+queryStep FetchAll = Fold step (ListStep []) id
+  where step (ListStep acc) val = ListStep $ acc ++ [val]
           -- if ((length acc) > 100)
-          -- then DbResults $ acc
+          -- then ListResult $ acc
           -- else
 
-  -- where step (DbResults acc) val = DbResults $ acc ++ [val]
+  -- where step (ListResult acc) val = ListResult $ acc ++ [val]
 
 queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 
@@ -60,21 +61,22 @@ queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 -- by performing Scan operations in parallel. Results should be piped
 -- into @Finalizer@ afterwards.
 --
-instance Monoid DbResult where
-  mempty  = EmptyRes
+instance Monoid StepResult where
+  mempty  = EmptyStepRes
+
   mappend (CountStep a) (CountStep b) =
     CountStep $! a + b
 
-  mappend (GroupRes a)  (GroupRes b) =
-    GroupRes $! Map.unionWith mappend a b
+  mappend (GroupStep a)  (GroupStep b) =
+    GroupStep $! Map.unionWith mappend a b
 
-  mappend a EmptyRes = a
-  mappend EmptyRes b = b
-  mappend _ _ = ErrorRes NoAggregatorAvailable
+  mappend a EmptyStepRes = a
+  mappend EmptyStepRes b = b
+  mappend _ _ = ErrorStepRes NoAggregatorAvailable
 
 -- |
 -- | FINALIZERS
 -- |
 
-finalize :: DbResult -> DbResult
-finalize a = a
+finalize :: StepResult -> DbResult
+finalize = toDbResult
