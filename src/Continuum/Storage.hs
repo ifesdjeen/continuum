@@ -24,7 +24,7 @@ import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
 
-import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
+-- import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
 import           Continuum.Folds                ( appendFold )
 import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
 import           Control.Exception.Base         ( bracket )
@@ -44,8 +44,10 @@ import           Data.ByteString                ( ByteString )
 --
 putRecord :: DbName
              -> DbRecord
-             -> AppState DbResult
-putRecord dbName record = do
+             -> ContextState
+             -> DbErrorMonad DbResult
+
+putRecord dbName record contextState= do
   sid          <- getAndincrementSequence
   _            <- maybeWriteChunk sid record
   maybeDbDescr <- getDb dbName
@@ -298,15 +300,6 @@ stopStorage DbContext{..} = do
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
   return ()
   where atomRead = atomically . readTVar
-
-withStorage :: String
-            -> DbContext
-            -> AppState a
-            -> IO ()
-withStorage path context subsystem = do
-  bracket (startStorage path context)
-          (\_ -> return ())
-          (execStateT subsystem) >>= stopStorage
 
 runAppState :: DbContext
                -> AppState a
