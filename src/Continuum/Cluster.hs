@@ -11,17 +11,15 @@ import           Continuum.Folds
 
 import           Control.Concurrent             ( putMVar, MVar )
 import           Control.Concurrent.STM
-
+import           Control.Monad.Trans.Class      ( lift )
 import           Control.Monad.IO.Class         ( liftIO )
-import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
+import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..), get )
 import           Control.Exception.Base         ( bracket )
 import           Data.Serialize                 ( encode, decode )
 -- import           Continuum.Internal.Directory   ( mkdir )
 import           Control.Applicative            ( (<$>) )
 
 import qualified Nanomsg as N
-
--- import           Debug.Trace                    ( trace )
 
 type Socket = N.Socket N.Rep
 
@@ -93,17 +91,6 @@ stopClientAcceptor doneMVar (serverSocket, endpoint) = do
 
   return ()
 
--- withClientAcceptor :: MVar ()
---                       -> MVar ()
---                       -> String
---                       -> TVar DbContext
---                       -> IO ()
-
--- withClientAcceptor startedMVar doneMVar port shared =
---   bracket (startClientAcceptor startedMVar port shared)
---           (stopClientAcceptor doneMVar)
---           (\(serverSocket, _) -> receiveLoop serverSocket shared)
-
 startNode :: MVar ()
              -> MVar ()
              -> String -> String
@@ -115,9 +102,6 @@ startNode startedMVar doneMVar path port = do
                _ <- stopClientAcceptor doneMVar y
                return ())
           (\(context, (serverSocket, _)) -> (evalStateT (receiveLoop serverSocket) context ) >> return ())
-  -- withStorage path defaultDbContext $
-  --   withClientAcceptor startedMVar doneMVar port
-
 
 emptyResult :: DbErrorMonad DbResult
 emptyResult = Right EmptyRes
@@ -139,12 +123,3 @@ receiveLoop serverSocket = do
       _ <- liftIO $ print ("Request received: " ++ (show request))
       processRequest serverSocket request
       receiveLoop serverSocket
-
--- atomRead :: TVar a -> IO a
--- atomRead = atomically . readTVar
-
--- swap :: (b -> b) -> TVar b -> IO ()
--- swap fn x = atomically $ readTVar x >>= writeTVar x . fn
-
--- atomReset :: b -> TVar b -> IO ()
--- atomReset newv x = atomically $ writeTVar x newv
