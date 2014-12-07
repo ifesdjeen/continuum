@@ -21,7 +21,27 @@ import qualified Continuum.Options              as Opts
 import qualified Data.Map                       as Map
 import qualified Data.Time.Clock.POSIX          as Clock
 
+import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..), get, gets )
+import           Control.Monad.State.Class      ( MonadState )
+import           Control.Monad.IO.Class         ( MonadIO(..), liftIO )
+
 -- type AppState a    = StateT DbContext IO (DbErrorMonad a)
+
+type DbState s r = StateT (TVar s) IO (DbErrorMonad r)
+
+modifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
+           (DbContext -> DbContext)
+           -> m ()
+modifyT f = do
+  tvar <- get
+  _    <- liftIO $ atomSwap f tvar
+  return ()
+
+readT :: (MonadIO m, (MonadState (TVar DbContext) m)) => m DbContext
+readT = do
+  tvar <- get
+  res  <- liftIO $ atomRead tvar
+  return res
 
 type RWOptions     = (ReadOptions, WriteOptions)
 
