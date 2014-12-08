@@ -27,7 +27,16 @@ import           Control.Monad.IO.Class         ( MonadIO(..), liftIO )
 
 -- type AppState a    = StateT DbContext IO (DbErrorMonad a)
 
-type DbState s r = StateT (TVar s) IO (DbErrorMonad r)
+type DbDryRun = StateT (TVar DbContext) IO ()
+type DbState a = StateT (TVar DbContext) IO (DbErrorMonad a)
+
+readAndModifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
+                  (DbContext -> DbContext)
+                  -> m DbContext
+readAndModifyT f = do
+  tvar <- get
+  res    <- liftIO $ atomReadSwap f tvar
+  return $ res
 
 modifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
            (DbContext -> DbContext)
@@ -35,7 +44,7 @@ modifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
 modifyT f = do
   tvar <- get
   _    <- liftIO $ atomSwap f tvar
-  return ()
+  return $ ()
 
 readT :: (MonadIO m, (MonadState (TVar DbContext) m)) => m DbContext
 readT = do
@@ -90,14 +99,14 @@ type ContextState = TVar DbContext
 -- fields.
 --
 #define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
-GETTER :: ContextState -> IO FTYPE                     ; \
-GETTER s = FIELD <$> atomRead s                                              ; \
-                                                                ; \
-MAPPER :: (FTYPE -> FTYPE) -> DbContext  -> DbContext           ; \
-MAPPER f a = a {FIELD = f (FIELD a) }                           ; \
-                                                                ; \
-MODIFIER :: (FTYPE -> FTYPE) -> ContextState ->  IO () ; \
-MODIFIER f s = atomSwap (MAPPER f) s
+GETTER :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) => m FTYPE                    ; \
+GETTER = FIELD <$> readT                                                             ; \
+                                                                                     ; \
+MAPPER :: (FTYPE -> FTYPE) -> DbContext  -> DbContext                                ; \
+MAPPER f a = a {FIELD = f (FIELD a) }                                                ; \
+                                                                                     ; \
+MODIFIER :: (MonadIO m, (MonadState (TVar DbContext) m)) => (FTYPE -> FTYPE) -> m () ; \
+MODIFIER f = modifyT (MAPPER f)
 
 ACCESSORS(getCtxDbs,         fmapCtxDbs,         modifyCtxDbs,         ctxDbs,            ContextDbsMap)
 ACCESSORS(getCtxChunksDb,    fmapCtxChunksDb,    modifyCtxChunksDb,    ctxChunksDb,       DB)
@@ -110,35 +119,37 @@ ACCESSORS(getCtxRwOptions,   fmapCtxRwOptions,   modifyCtxRwOptions,   ctxRwOpti
 
 -- |Check whether Database with the given name exist or no
 --
-dbExists :: ContextState
-            -> DbName
-            -> IO Bool
-dbExists ctx k = do
-  db <- getDb ctx k
+dbExists :: (Functor m, MonadIO m, MonadState (TVar DbContext) m) =>
+            DbName
+            -> m Bool
+dbExists ctx = do
+  db <- getDb ctx
   return $ case db of
     (Just _) ->  True
     (Nothing) -> False
 
 -- |Retrieve database with the given name from Context.
 --
-getDb :: ContextState
-         -> DbName
-         -> IO (Maybe (DbSchema, DB))
-getDb ctx k = do
-  dbs <- getCtxDbs ctx
+getDb :: (Functor m, MonadIO m, MonadState (TVar DbContext) m) =>
+         DbName
+         -> m (Maybe (DbSchema, DB))
+getDb k = do
+  dbs <- getCtxDbs
   return $ Map.lookup k dbs
 
 -- |Returns a database-unique monotonically incrementing sequence number.
-getAndincrementSequence :: ContextState -> IO Integer
-getAndincrementSequence s = sequenceNumber <$> (atomReadSwap increment s)
+getAndincrementSequence :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) =>
+                           m Integer
+getAndincrementSequence = sequenceNumber <$> (readAndModifyT increment)
   where increment old = old {sequenceNumber = ((sequenceNumber old) + 1) }
 
-getReadOptions :: ContextState -> IO ReadOptions
-getReadOptions st = fst <$> getCtxRwOptions st
+getReadOptions :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) =>
+                  m ReadOptions
+getReadOptions = fst <$> getCtxRwOptions
 
-getWriteOptions :: ContextState -> IO WriteOptions
-getWriteOptions st = snd <$> getCtxRwOptions st
-
+getWriteOptions :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) =>
+                   m WriteOptions
+getWriteOptions = snd <$> getCtxRwOptions
 
 atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
@@ -154,3 +165,6 @@ atomReadSwap f x = atomically $ do
 
 atomReset :: b -> TVar b -> IO ()
 atomReset newv x = atomically $ writeTVar x newv
+
+atomInit :: b -> IO (TVar b)
+atomInit v = atomically $ newTVar v
