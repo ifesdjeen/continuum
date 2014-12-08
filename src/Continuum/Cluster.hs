@@ -29,7 +29,7 @@ type Socket = N.Socket N.Rep
 
 processRequest :: Socket
                   -> Request
-                  -> StateT DbContext IO ()
+                  -> DbDryRun
 -- TODO: GET RID OF THAT
 processRequest socket (Select dbName query) = do
   resp  <- runQuery dbName query
@@ -55,20 +55,26 @@ processRequest _ Shutdown = return ()
 
 runQuery :: DbName
             -> SelectQuery
-            -> AppState DbResult
-
+            -> DbState DbResult
 runQuery dbName query = parallelScan dbName EntireKeyspace Record query
 
 withTmpStorage :: String
                -> DbContext
                -> IO ()
-               -> AppState a
+               -> DbState a
                -> IO (DbErrorMonad a)
 withTmpStorage path context cleanup subsystem =
   bracket (startStorage path context)
-          (\_ -> return ())
-  (runStateT subsystem) >>= (\(res,state) -> (stopStorage state) >> cleanup >> return res)
-
+          stop
+          runner
+  where stop _ = return ()
+        runner ctx = do
+          ctxTVar <- atomInit ctx
+          (res,_) <- runStateT subsystem ctxTVar
+          ctx     <- atomRead ctxTVar -- shadowing
+          _       <- stopStorage ctx
+          _       <- cleanup
+          return res
 
 startClientAcceptor :: MVar ()
                        -> String
@@ -101,12 +107,16 @@ startNode startedMVar doneMVar path port = do
                _ <- stopStorage x
                _ <- stopClientAcceptor doneMVar y
                return ())
-          (\(context, (serverSocket, _)) -> (evalStateT (receiveLoop serverSocket) context ) >> return ())
+          runner
+  where runner (context, (serverSocket, _)) = do
+          ctxTVar <- atomInit context
+          _       <- evalStateT (receiveLoop serverSocket) ctxTVar
+          return ()
 
 emptyResult :: DbErrorMonad DbResult
 emptyResult = Right EmptyRes
 
-receiveLoop :: N.Socket N.Rep -> StateT DbContext IO ()
+receiveLoop :: N.Socket N.Rep -> DbDryRun
 receiveLoop serverSocket = do
   received <- liftIO $ N.recv serverSocket
 

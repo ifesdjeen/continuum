@@ -4,7 +4,7 @@
 module Storage.Test where
 
 import qualified Continuum.Cluster as Server
-import           Continuum.Storage    ( runAppState )
+import           Control.Monad.IO.Class ( liftIO )
 import           Data.ByteString      ( ByteString )
 import           Control.Monad        ( forM_ )
 import           System.Process       ( system )
@@ -20,21 +20,22 @@ testSchema = makeSchema [ ("a", DbtInt) ]
 testDbContext :: DbContext
 testDbContext = defaultDbContext { snapshotAfter = 10 }
 
-runner :: AppState a -> IO (DbErrorMonad a)
+runner :: DbState a -> IO (DbErrorMonad a)
 runner = Server.withTmpStorage testDbPath testDbContext cleanup
 
 main :: IO ()
 main =  hspec $ do
-  let scantdb = scan testDbName
+  -- let scantdb = scan testDbName
+
   describe "Basic DB Functionality" $ do
     it "should put items into the database and retrieve them" $  do
 
       res <- runner $ do
-        _ <- createDatabase testDbName testSchema
-        _ <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
-        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
-
-        scantdb (SingleKey 123) Record appendFold
+        _   <- createDatabase testDbName testSchema
+        _   <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
+        _   <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+        ctx <- readT
+        liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
 
       res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)]]
 
@@ -53,12 +54,12 @@ main =  hspec $ do
         _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
         _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
 
-        scantdb (SingleKey 123) Record appendFold
+        ctx <- readT
+        liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
 
       res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
                             RecordRes $ makeRecord 123 [("a", DbInt 2)],
                             RecordRes $ makeRecord 123 [("a", DbInt 3)]]
-
 
 
     it "Key Range (inclusive Range)" $  do
@@ -75,7 +76,8 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 555 [("a", DbInt 3)]
 
-        scantdb (KeyRange 123 456) Record appendFold
+        ctx <- readT
+        liftIO $ scan ctx testDbName (KeyRange 123 456) Record appendFold
 
       res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
                             RecordRes $ makeRecord 124 [("a", DbInt 2)],
@@ -99,14 +101,15 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3)]
 
-        scantdb (KeyRange 300 456) Record appendFold
+        ctx <- readT
+        liftIO $ scan ctx testDbName (KeyRange 300 456) Record appendFold
 
       res `shouldBe` Right [RecordRes $ makeRecord 456 [("a", DbInt 1)],
                             RecordRes $ makeRecord 456 [("a", DbInt 2)],
                             RecordRes $ makeRecord 456 [("a", DbInt 3)]]
 
 
-    -- it "Open End" $ do -- TODO
+  --   -- it "Open End" $ do -- TODO
 
   describe "Snapshotting" $ do
 
@@ -127,10 +130,12 @@ main =  hspec $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        scantdb EntireKeyspace Record (queryStep FetchAll)
+        ctx <- readT
+        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep FetchAll)
+
       res `shouldBe` (Right (ListStep $ (map RecordRes records)))
 
-      -- it "should run FetchAll
+    -- it "should run FetchAll
     -- FetchAll with limits
     -- Group
     -- Min
@@ -145,7 +150,10 @@ main =  hspec $ do
             forM_ [1..1000000]
               (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
                                                   ("b", DbString "1")])
-            scantdb EntireKeyspace (Field "a") (queryStep Count)
+
+            ctx <- readT
+            liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
+
       res `shouldReturn` (Right (CountStep 1000000))
 
 
@@ -161,5 +169,5 @@ testDbName = "testdb"
 cleanup :: IO ()
 cleanup = system ("rm -fr " ++ testDbPath) >> system ("mkdir " ++ testDbPath) >> return ()
 
-putRecordTdb :: DbRecord -> AppState DbResult
+putRecordTdb :: DbRecord -> DbState DbResult
 putRecordTdb = putRecord testDbName

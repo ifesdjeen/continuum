@@ -24,12 +24,10 @@ import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
 
--- import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..) )
 import           Continuum.Folds                ( appendFold )
 import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
 import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
-import           Control.Monad.State.Strict     ( get )
 import           Data.Traversable               ( traverse )
 import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
@@ -44,10 +42,8 @@ import           Data.ByteString                ( ByteString )
 --
 putRecord :: DbName
              -> DbRecord
-             -> ContextState
-             -> DbErrorMonad DbResult
-
-putRecord dbName record contextState= do
+             -> DbState DbResult
+putRecord dbName record = do
   sid          <- getAndincrementSequence
   _            <- maybeWriteChunk sid record
   maybeDbDescr <- getDb dbName
@@ -68,7 +64,7 @@ putRecord dbName record contextState= do
 --
 putSchema :: DbName
              -> DbSchema
-             -> AppState DbResult
+             -> DbState DbResult
 putSchema dbName sch = do
   sysDb   <- getCtxSystemDb
   wo      <- getWriteOptions
@@ -78,16 +74,19 @@ putSchema dbName sch = do
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
 
-scan :: DbName
+scan :: DbContext
+        -> DbName
         -> ScanRange
         -> Decoding
         -> Fold DbResult acc
-        -> AppState acc
-scan dbName scanRange decoding foldOp = do
-  maybeDb <- getDb dbName
-  ro      <- getReadOptions
+        -> IO (DbErrorMonad acc)
+scan context dbName scanRange decoding foldOp = do
+  let maybeDb = Map.lookup dbName (ctxDbs context)
+      ro      = fst $ ctxRwOptions context
+  -- maybeDb <- getDb dbName
+  -- ro      <- getReadOptions
   case maybeDb of
-    (Just (schema, db)) -> lift   $ scanDb db ro scanRange (decodeRecord decoding schema) foldOp
+    (Just (schema, db)) -> scanDb db ro scanRange (decodeRecord decoding schema) foldOp
     Nothing             -> return $ Left NoSuchDatabaseError
 
 -- |Perform a Scan operation.
@@ -198,9 +197,9 @@ setStartPosition iter scanRange =
 
 maybeWriteChunk :: Integer
                    -> DbRecord
-                   -> AppState DbResult
+                   -> DbState DbResult
 maybeWriteChunk sid (DbRecord time _) = do
-  DbContext{..} <- get
+  DbContext{..} <- readT
   when (sid >= lastSnapshot + snapshotAfter || sid == 1) $ do
     modifyLastSnapshot $ const sid
     LDB.put ctxChunksDb (snd ctxRwOptions) (packWord64 time) BS.empty
@@ -208,7 +207,7 @@ maybeWriteChunk sid (DbRecord time _) = do
 
 -- |Read Chunk ids from the Chunks Database
 --
-readChunks :: ScanRange -> AppState [DbResult]
+readChunks :: ScanRange -> DbState [DbResult]
 readChunks scanRange = do
   db     <- getCtxChunksDb
   ro     <- getReadOptions
@@ -246,7 +245,7 @@ initializeDb _ _ = error "can't initialize the database"
 --
 createDatabase :: DbName
                   -> DbSchema
-                  -> AppState DbResult
+                  -> DbState DbResult
 createDatabase dbName sch = do
   exists <- dbExists dbName
   if (not exists)
@@ -301,8 +300,8 @@ stopStorage DbContext{..} = do
   return ()
   where atomRead = atomically . readTVar
 
-runAppState :: DbContext
-               -> AppState a
-               -> IO (DbErrorMonad a,
-                      DbContext)
-runAppState = flip runStateT
+-- runAppState :: DbContext
+--                -> DbState a
+--                -> IO (DbErrorMonad a,
+--                       DbContext)
+-- runAppState = flip runStateT

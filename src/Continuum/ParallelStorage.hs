@@ -23,15 +23,14 @@ parallelScan :: DbName
                 -> ScanRange
                 -> Decoding
                 -> SelectQuery
-                -> AppState DbResult
+                -> DbState DbResult
 parallelScan dbName scanRange decoding query = do
-  chunks <- readChunks scanRange
-  st     <- get
+  chunks  <- readChunks scanRange
+  context <- readT
   let ranges           = (adjustRanges scanRange) <$> makeRanges <$> chunks
-      scanChunk chunk  = scan dbName chunk decoding (queryStep query)
-      asyncReadChunk i = execAsyncIO st (scanChunk i)
+      scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
 
-  rangeResults <- liftIO $ parallelRangeScan ranges asyncReadChunk
+  rangeResults <- liftIO $ parallelRangeScan ranges scanChunk
   return $ (finalize . mconcat) <$> rangeResults
 
 parallelRangeScan :: DbErrorMonad [ScanRange]
@@ -42,8 +41,8 @@ parallelRangeScan (Right ranges) op = do
   res <- parallel $ map op ranges
   return $ sequence res
 
-execAsyncIO :: DbContext -> AppState a -> IO (Either DbError a)
-execAsyncIO  st op = evalStateT op $ st
+-- execAsyncIO :: DbContext -> IO (DbErrorMonad acc) -> IO (DbErrorMonad a)
+-- execAsyncIO  st op = evalStateT op $ st
 
 -- |Split chunks into ranges (pretty much partitioning with a step of 1)
 --
