@@ -242,11 +242,3 @@ data Request =
   deriving(Generic, Show)
 
 instance S.Serialize Request
-
-sq :: String -> String
-sq s@[c]                     = s
-sq ('"':s)  | last s == '"'  = init s
-	    | otherwise	     = s
-sq ('\'':s) | last s == '\'' = init s
-	    | otherwise	     = s
-sq s                         = s
