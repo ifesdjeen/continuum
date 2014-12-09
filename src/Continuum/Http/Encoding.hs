@@ -13,6 +13,9 @@ import           Data.Text                   ( pack )
 import           Data.Text.Encoding          ( decodeUtf8 )
 import           Continuum.Types
 
+instance ToJSON DbError where
+  toJSON _ = "Error Occured"
+
 instance ToJSON (Map.Map ByteString (DbSchema, a)) where
   toJSON dbsMap = object $
                   concat $
@@ -25,8 +28,12 @@ instance ToJSON DbSchema where
 
 
 instance ToJSON DbValue where
-  toJSON (DbInt i) = toJSON i
-  toJSON (DbString i) = toJSON (decodeUtf8 i)
+  toJSON (DbInt v)    = toJSON v
+  toJSON (DbLong v)   = toJSON v
+  toJSON (DbShort v)  = toJSON v
+  toJSON (DbString v) = toJSON $ decodeUtf8 v
+  toJSON (DbFloat v)  = toJSON v
+  toJSON (DbDouble v) = toJSON v
 
 instance ToJSON DbResult where
   toJSON EmptyRes         = toJSON ("" :: String)
