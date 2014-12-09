@@ -40,6 +40,8 @@ library
                         , Continuum.Options
                         , Continuum.Types
                         , Continuum.Folds
+                        , Continuum.Http.Server
+                        , Continuum.Http.Encoding
 
   build-depends:          base                   >= 4 && < 5
                         , continuum-client       >= 0.1.0.0
@@ -60,10 +62,12 @@ library
                         , transformers           >= 0.4.1.0
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
-                        , network                >= 2.2.1.7
+--                        , network                >= 2.2.1.7
 
+                        -- Web
                         , scotty                 >= 0.9.0
-
+                        , text                   >=1.2.0.0
+                        , aeson                  >= 0.8.0.2
 test-suite tests
   default-language:       Haskell2010
   type:                   exitcode-stdio-1.0
@@ -123,7 +127,7 @@ executable continuum-shell-client
 
   build-depends:          base                   >= 4 && < 5
                         , continuum-client       >= 0.1.0.0
+                        , text                   >=1.2.0.0
                         , aeson                  >= 0.8.0.2
                         , containers             >0.5
-                        , text                   >=1.2.0.0
                         , bytestring             >= 0.10.4.0
