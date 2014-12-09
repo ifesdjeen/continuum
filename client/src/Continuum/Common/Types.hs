@@ -3,6 +3,7 @@
 module Continuum.Common.Types where
 
 import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Char8          ( unpack )
 import           GHC.Generics                   ( Generic )
 import           Data.Maybe                     ( fromMaybe )
 
@@ -82,7 +83,7 @@ instance Show DbValue where
   show (DbInt v)    = show v
   show (DbLong v)   = show v
   show (DbShort v)  = show v
-  show (DbString v) = sq $ show v
+  show (DbString v) = unpack v
   show (DbFloat v)  = show v
   show (DbDouble v) = show v
 
