@@ -7,17 +7,13 @@ module Continuum.Cluster where
 import           Continuum.Types
 import           Continuum.Storage
 import           Continuum.ParallelStorage
-import           Continuum.Folds
 
 import           Control.Concurrent             ( putMVar, MVar )
-import           Control.Concurrent.STM
-import           Control.Monad.Trans.Class      ( lift )
 import           Control.Monad.IO.Class         ( liftIO )
-import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..), get )
+import           Control.Monad.State.Strict     ( runStateT, evalStateT )
 import           Control.Exception.Base         ( bracket )
 import           Data.Serialize                 ( encode, decode )
--- import           Continuum.Internal.Directory   ( mkdir )
-import           Control.Applicative            ( (<$>) )
+import           Continuum.Http.Server          ( runWebServer )
 
 import qualified Nanomsg as N
 
@@ -71,8 +67,8 @@ withTmpStorage path context cleanup subsystem =
         runner ctx = do
           ctxTVar <- atomInit ctx
           (res,_) <- runStateT subsystem ctxTVar
-          ctx     <- atomRead ctxTVar -- shadowing
-          _       <- stopStorage ctx
+          ctx'    <- atomRead ctxTVar -- shadowing
+          _       <- stopStorage ctx'
           _       <- cleanup
           return res
 
@@ -110,6 +106,7 @@ startNode startedMVar doneMVar path port = do
           runner
   where runner (context, (serverSocket, _)) = do
           ctxTVar <- atomInit context
+          _       <- runWebServer ctxTVar
           _       <- evalStateT (receiveLoop serverSocket) ctxTVar
           return ()
 
