@@ -65,7 +65,7 @@ data DbContext = DbContext
     , ctxDbs         :: ContextDbsMap
     , ctxChunksDb    :: DB
     , ctxPath        :: String
-    , sequenceNumber :: Integer
+    , sequenceNumber :: Integer -- TODO: Make it per-database ...
     , lastSnapshot   :: Integer
     , ctxRwOptions   :: RWOptions
     , snapshotAfter  :: Integer
