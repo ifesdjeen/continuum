@@ -38,7 +38,7 @@ library
                         , Continuum.ParallelStorage
                         , Continuum.Cluster
                         , Continuum.Options
-                        , Continuum.Types
+                        , Continuum.Context
                         , Continuum.Folds
                         , Continuum.Http.Server
                         , Continuum.Http.Encoding

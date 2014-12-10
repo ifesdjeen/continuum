@@ -2,6 +2,7 @@
 
 module Continuum.Http.Server where
 
+import qualified Data.Map                       as Map
 import           Data.Text.Lazy                 ( Text )
 import           Control.Concurrent.STM
 import           Control.Concurrent             ( forkIO )
@@ -9,7 +10,8 @@ import           Control.Monad.State.Strict     ( evalStateT )
 import qualified Web.Scotty as Scotty
 import           Control.Monad.IO.Class         ( liftIO )
 import           Control.Applicative            ( (<$>) )
-import           Continuum.Types
+import           Continuum.Context
+import           Continuum.Common.Types
 import           Continuum.Http.Encoding
 import           Continuum.ParallelStorage      ( parallelScan )
 
@@ -23,7 +25,7 @@ runWebServer ctxTVar = do
 
     Scotty.get "/dbs" $ do
       res <- processRequest getCtxDbs
-      Scotty.json res
+      Scotty.json (Map.map fst res)
 
     Scotty.get "/dbs/:db/range" $ do
       db   <- Scotty.param "db"

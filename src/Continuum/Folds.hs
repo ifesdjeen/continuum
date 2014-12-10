@@ -3,7 +3,7 @@
 
 module Continuum.Folds where
 
-import           Continuum.Types
+import           Continuum.Common.Types
 import qualified Data.Map.Strict as Map
 import           Control.Foldl      ( Fold(..), fold )
 import           Data.Monoid

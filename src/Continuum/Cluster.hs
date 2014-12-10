@@ -4,7 +4,8 @@
 
 module Continuum.Cluster where
 
-import           Continuum.Types
+import           Continuum.Context
+import           Continuum.Common.Types
 import           Continuum.Storage
 import           Continuum.ParallelStorage
 

@@ -10,7 +10,8 @@ module Continuum.Storage
 
 import           Debug.Trace                    ( trace )
 
-import           Continuum.Types
+import           Continuum.Context
+import           Continuum.Common.Types
 import           Continuum.Common.Primitive
 import           Continuum.Options
 import           Continuum.Common.Serialization

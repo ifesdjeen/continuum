@@ -10,7 +10,8 @@ import           Control.Monad        ( forM_ )
 import           System.Process       ( system )
 import           Continuum.Folds
 import           Continuum.Storage
-import           Continuum.Types
+import           Continuum.Common.Types
+import           Continuum.Context
 
 import           Test.Hspec
 

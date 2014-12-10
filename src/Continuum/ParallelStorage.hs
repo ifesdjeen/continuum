@@ -5,9 +5,9 @@
 module Continuum.ParallelStorage
        where
 
-
 import           Control.Concurrent.ParallelIO.Global
-import           Continuum.Types
+import           Continuum.Context
+import           Continuum.Common.Types
 import           Continuum.Storage
 import           Continuum.Common.Serialization
 
