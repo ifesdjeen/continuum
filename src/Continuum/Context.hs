@@ -2,55 +2,29 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Continuum.Types
-       (module Continuum.Types
-       , module Continuum.Common.Types
-       )
-       where
-
-import           Control.Applicative    ( (<$>) )
-import           Control.Concurrent.STM
+module Continuum.Context where
 
 import           Continuum.Common.Types
-import           Data.ByteString                ( ByteString )
-import           Database.LevelDB.Base          ( DB, WriteOptions, ReadOptions )
-import           GHC.Generics                   ( Generic )
-import           Data.Default.Class             ( Default(..) )
 
 import qualified Continuum.Options              as Opts
 import qualified Data.Map                       as Map
-import qualified Data.Time.Clock.POSIX          as Clock
 
-import           Control.Monad.State.Strict     ( runStateT, evalStateT, execStateT, StateT(..), get, gets )
+import           Control.Monad.State.Strict     ( StateT(..), get )
 import           Control.Monad.State.Class      ( MonadState )
 import           Control.Monad.IO.Class         ( MonadIO(..), liftIO )
+import           Control.Concurrent.STM         ( TVar, atomically, readTVar, writeTVar, newTVar, modifyTVar)
+import           Control.Applicative            ( (<$>) )
+import           Data.ByteString                ( ByteString )
+import           Database.LevelDB.Base          ( DB, WriteOptions, ReadOptions )
+import           Data.Default.Class             ( Default(..) )
 
--- type AppState a    = StateT DbContext IO (DbErrorMonad a)
+-- |
+-- | Aliases
+-- |
 
-type DbDryRun = StateT (TVar DbContext) IO ()
+type DbDryRun  = StateT (TVar DbContext) IO ()
+
 type DbState a = StateT (TVar DbContext) IO (DbErrorMonad a)
-
-readAndModifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
-                  (DbContext -> DbContext)
-                  -> m DbContext
-readAndModifyT f = do
-  tvar <- get
-  res    <- liftIO $ atomReadSwap f tvar
-  return $ res
-
-modifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
-           (DbContext -> DbContext)
-           -> m ()
-modifyT f = do
-  tvar <- get
-  _    <- liftIO $ atomSwap f tvar
-  return $ ()
-
-readT :: (MonadIO m, (MonadState (TVar DbContext) m)) => m DbContext
-readT = do
-  tvar <- get
-  res  <- liftIO $ atomRead tvar
-  return res
 
 type RWOptions     = (ReadOptions, WriteOptions)
 
@@ -87,17 +61,12 @@ instance Default DbContext where
 -- | Cluster Related Data Types
 -- |
 
-data NodeStatus = NodeStatus {lastHeartbeat :: Clock.POSIXTime}
-                deriving(Generic, Eq, Ord, Show)
-
-type ClusterNodes = Map.Map Node NodeStatus
-
-
 type ContextState = TVar DbContext
 
--- |Creates Getter, Mapper and Modifier accessors for the record
--- fields.
---
+-- |
+-- | Getters / Mappers / Modifiers
+-- |
+
 #define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
 GETTER :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) => m FTYPE                    ; \
 GETTER = FIELD <$> readT                                                             ; \
@@ -151,6 +120,10 @@ getWriteOptions :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) =>
                    m WriteOptions
 getWriteOptions = snd <$> getCtxRwOptions
 
+-- |
+-- | Atom-related
+-- |
+
 atomRead :: TVar a -> IO a
 atomRead = atomically . readTVar
 
@@ -168,3 +141,29 @@ atomReset newv x = atomically $ writeTVar x newv
 
 atomInit :: b -> IO (TVar b)
 atomInit v = atomically $ newTVar v
+
+-- |
+-- | StateT + Atom
+-- |
+
+readAndModifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
+                  (DbContext -> DbContext)
+                  -> m DbContext
+readAndModifyT f = do
+  tvar <- get
+  res    <- liftIO $ atomReadSwap f tvar
+  return $ res
+
+modifyT :: (MonadIO m, (MonadState (TVar DbContext) m)) =>
+           (DbContext -> DbContext)
+           -> m ()
+modifyT f = do
+  tvar <- get
+  _    <- liftIO $ atomSwap f tvar
+  return $ ()
+
+readT :: (MonadIO m, (MonadState (TVar DbContext) m)) => m DbContext
+readT = do
+  tvar <- get
+  res  <- liftIO $ atomRead tvar
+  return res
