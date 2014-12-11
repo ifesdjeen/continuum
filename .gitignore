@@ -12,3 +12,6 @@ cabal.sandbox.config
 *.json
 *_flymake.hs
 .*
+docsets
+*.js
+last_bench_results
