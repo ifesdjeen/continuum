@@ -52,8 +52,7 @@ data DbError =
   | SchemaDecodingError     String
   | NoStepToResultConvertor
   | OtherError
-
-  | NotEnoughInput
+  | NotEnoughInput Int Int
   deriving (Show, Eq, Ord, Generic)
 
 instance S.Serialize DbError
