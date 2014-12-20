@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts  #-}
@@ -34,6 +36,8 @@ import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
 import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
 import           Data.ByteString                ( ByteString )
+
+import Debug.Trace
 
 -- |
 -- | OPERATIONS
@@ -86,6 +90,7 @@ scan context dbName scanRange decoding foldOp = do
       ro      = fst $ ctxRwOptions context
   -- maybeDb <- getDb dbName
   -- ro      <- getReadOptions
+
   case maybeDb of
     (Just (schema, db)) -> scanDb db ro scanRange (decodeRecord decoding schema) foldOp
     Nothing             -> return $ Left NoSuchDatabaseError

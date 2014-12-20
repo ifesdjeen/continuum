@@ -19,6 +19,8 @@ import           Control.Foldl                  ( Fold(..) )
 
 import qualified Data.Map.Strict                as Map
 
+import Debug.Trace
+
 parallelScan :: DbName
                 -> ScanRange
                 -> Decoding
@@ -27,6 +29,7 @@ parallelScan :: DbName
 parallelScan dbName scanRange decoding query = do
   chunks  <- readChunks scanRange
   context <- readT
+
   let ranges           = (adjustRanges scanRange) <$> makeRanges <$> chunks
       scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
 

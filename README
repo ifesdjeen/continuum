@@ -10,6 +10,10 @@ make install
 ldconfig
 ```
 
+```
+cabal install --allow-newer
+```
+
 ## License
 
 Copyright (c) Alex Petrov

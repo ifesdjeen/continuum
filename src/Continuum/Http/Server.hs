@@ -15,10 +15,15 @@ import           Continuum.Common.Types
 import           Continuum.Http.Encoding
 import           Continuum.ParallelStorage      ( parallelScan )
 
+import           Network.Wai.Middleware.Static  ( static, staticPolicy, addBase )
+
 runWebServer :: (TVar DbContext) -> IO ()
 runWebServer ctxTVar = do
   let processRequest op = evalStateT op ctxTVar
   _ <- forkIO $ Scotty.scotty 3000 $ do
+
+    Scotty.middleware (staticPolicy (addBase "/Users/ifesdjeen/hackage/continuum/public"))
+
     Scotty.get "/" $ do
       res <- processRequest getSequenceNumber
       Scotty.json res
@@ -29,8 +34,8 @@ runWebServer ctxTVar = do
 
     Scotty.get "/dbs/:db/range" $ do
       db   <- Scotty.param "db"
-      from <- maybeParam "from"
-      to   <- maybeParam "to"
+      from <- maybeParam   "from"
+      to   <- maybeParam   "to"
       res  <- liftIO $ processRequest (parallelScan db (toRange from to) Record FetchAll)
       Scotty.json res
 
