@@ -14,7 +14,8 @@ import           Data.Text.Encoding          ( decodeUtf8 )
 import           Continuum.Common.Types
 
 instance ToJSON DbError where
-  toJSON _ = "Error Occured"
+  toJSON (NotEnoughInput should was) = toJSON $ "Not Enough Input: " ++ (show should) ++ ", but was: " ++ (show was)
+  toJSON err = toJSON $ show err
 
 instance ToJSON ByteString where
   toJSON = toJSON . decodeUtf8
@@ -49,3 +50,4 @@ instance ToJSON DbResult where
                                 concat $
                                 ["timestamp" .= ts] :
                                 map (\(k, v) -> [(decodeUtf8 k) .= v]) (Map.toList vals)
+  toJSON a = toJSON $ show a
