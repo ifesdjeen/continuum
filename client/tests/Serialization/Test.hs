@@ -7,6 +7,8 @@ import Continuum.Common.Serialization
 import Continuum.Common.Types
 import Test.Hspec
 
+import Debug.Trace
+
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)
@@ -16,11 +18,12 @@ main =  hspec $ do
 
   describe "Serialization" $ do
 
-    let encoded = encodeRecord testSchema record 1
-        record  = makeRecord 123 [ ("a", (DbInt 123))
+    let record  = makeRecord 123 [ ("a", (DbInt 123))
                                  , ("b", (DbString "STRINGIE"))
                                  , ("c", (DbString "STRINGO"))]
+        encoded = encodeRecord testSchema record 1
         indices = decodeIndexes testSchema (snd encoded)
+
     it "reads out indexes from serialized items" $
       indices `shouldBe` [4,8,7]
 
@@ -30,9 +33,21 @@ main =  hspec $ do
       decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
 
+    it "decodes certain serialized values" $ do
+      let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
+      decodeFn "a" `shouldBe` (Right $ RecordRes $ makeRecord 123 [ ("a", (DbInt 123))])
 
-    -- it "reads out indexes from serialized items" $ do
-    --   let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
-    --   decodeFn "a" `shouldBe` (Right $ FieldRes (123, DbInt    123))
-    --   decodeFn "b" `shouldBe` (Right $ FieldRes (123, DbString "STRINGIE"))
-    --   decodeFn "c" `shouldBe` (Right $ FieldRes (123, DbString "STRINGO"))
+    it "decodes a complete serialized value" $ do
+      let decodeFn = \x -> decodeRecord Record testSchema encoded
+      decodeFn "a" `shouldBe` (Right $ RecordRes record)
+
+  describe "Partial Serialization" $ do
+    -- OKAY HERES THE BUG
+    it "decodes the record that was only partially encoded" $ do
+      let schema = makeSchema [ ("a", DbtString)
+                              , ("b", DbtLong)
+                              , ("c", DbtLong) ]
+          record  = makeRecord 123 [("a", (DbString "STRINGIE"))]
+          encoded = encodeRecord schema record 1
+          decodeFn = \x -> decodeRecord Record schema encoded
+      decodeFn "a" `shouldBe` (Right $ RecordRes record)
