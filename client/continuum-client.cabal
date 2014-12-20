@@ -1,7 +1,7 @@
 name:                continuum-client
 stability:           experimental
 description:         Continuum Database Client
-version:             0.1.0.0
+version:             0.1.0.1
 license:             MIT
 license-file:        LICENSE
 author:              Alex Petrov
@@ -39,7 +39,7 @@ test-suite tests
                         , Primitive.Test
 
   build-depends:          base                   >= 3 && < 5
-                        , continuum-client       >= 0.1.0.0
+                        , continuum-client       >= 0.1.0.1
                         , hspec                  >= 2.0.1
                         , hspec-expectations     >= 0.6.0.1
                         , bytestring             >= 0.10.4.0
