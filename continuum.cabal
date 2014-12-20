@@ -38,8 +38,9 @@ library
                         , MagicHash
 
   Include-dirs:           cbits
-
+  c-sources:              cbits/continuum.c
   exposed-modules:        Continuum.Storage
+                        , Continuum.NewStorage
                         , Continuum.ParallelStorage
                         , Continuum.Cluster
                         , Continuum.Options
@@ -67,9 +68,6 @@ library
                         , transformers           >= 0.4.1.0
                         , transformers-base      >= 0.4.1 && < 0.5
                         , nanomsg-haskell        >= 0.2.2
---                        , network                >= 2.2.1.7
-
-                        -- Web
                         , scotty                 >= 0.9.0
                         , text                   >=1.2.0.0
                         , aeson                  >= 0.8.0.2
