@@ -80,7 +80,7 @@ safeTake :: Int -> ByteString -> DbErrorMonad ByteString
 safeTake i bs =
   if (B.length bs) >= i
   then return $ Unsafe.unsafeTake i bs
-  else throwError $ NotEnoughInput
+  else throwError $ NotEnoughInput (B.length bs) i
 {-# INLINE safeTake #-}
 
 -- |Allocate and Write @n@ bytes in Native host order
@@ -96,9 +96,9 @@ writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p 0 ((total - 1) *
 -- |Read N Bytes in Native host order
 readNBytes :: Storable a => Int -> ByteString -> DbErrorMonad a
 readNBytes n bs = do
-    (fp,o,_) <- S.toForeignPtr `fmap` B.reverse `fmap` (safeTake n bs)
-    let k p = peek (castPtr (p `plusPtr` o))
-    return $ S.inlinePerformIO (withForeignPtr fp k)
+  (fp,o,_) <- S.toForeignPtr `fmap` B.reverse `fmap` (safeTake n bs)
+  let k p = peek (castPtr (p `plusPtr` o))
+  return $ S.inlinePerformIO (withForeignPtr fp k)
 {-# INLINE readNBytes #-}
 
 fromFloat :: (Storable f, Storable w) => f -> w

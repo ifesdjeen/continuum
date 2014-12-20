@@ -21,7 +21,7 @@ import           Data.Maybe           ( isJust, fromJust, catMaybes )
 import           Control.Monad.Except ( forM_, throwError )
 import           Control.Monad        ( join )
 
--- import Debug.Trace
+import Debug.Trace
 
 data Success = Success
 
@@ -115,6 +115,7 @@ decodeRecord (Fields flds) schema (k, bs) = do
 
 decodeKey :: B.ByteString -> DbErrorMonad Integer
 decodeKey = unpackWord64
+
 {-# INLINE decodeKey #-}
 
 decodeChunkKey :: (B.ByteString, B.ByteString) -> DbErrorMonad DbResult
