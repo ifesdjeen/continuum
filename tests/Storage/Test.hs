@@ -4,6 +4,7 @@
 module Storage.Test where
 
 import qualified Continuum.Cluster as Server
+import qualified Continuum.NewStorage as NS
 import           Control.Monad.IO.Class ( liftIO )
 import           Data.ByteString      ( ByteString )
 import           Control.Monad        ( forM_ )
@@ -143,19 +144,48 @@ main =  hspec $ do
     -- Max
     -- Combinations
 
-  describe "Stack Allocations / Thunk Leaks" $ do
-    it "should iterate over a large amount of records" $  do
-      let res = runner $ do
-            _ <- createDatabase testDbName testSchema
+  describe "New Storage" $ do
+    it "should work" $ do
+      let records = take 10 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
+      res <- runner $ do
+        _ <- createDatabase testDbName testSchema
+        _ <- forM_ records putRecordTdb
 
-            forM_ [1..1000000]
-              (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
-                                                  ("b", DbString "1")])
+        ctx <- readT
 
-            ctx <- readT
-            liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
+        res <- liftIO $ NS.scanKeyspace ctx testDbName
 
-      res `shouldReturn` (Right (CountStep 1000000))
+        return $ Right EmptyRes
+      return ()
+
+
+  -- describe "New Storage" $ do
+  --   it "should iterate over a large amount of records" $  do
+  --     res <- runner $ do
+  --       _ <- createDatabase testDbName testSchema
+
+  --       forM_ [1..5]
+  --         (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
+  --                                             ("b", DbString "1")])
+
+  --       ctx <- readT
+  --       liftIO $ NS.scanKeyspace ctx testDbName
+
+  --     res `shouldBe` (Right [])
+
+  -- describe "Stack Allocations / Thunk Leaks" $ do
+  --   it "should iterate over a large amount of records" $  do
+  --     let res = runner $ do
+  --           _ <- createDatabase testDbName testSchema
+
+  --           forM_ [1..1000000]
+  --             (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
+  --                                                 ("b", DbString "1")])
+
+  --           ctx <- readT
+  --           liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
+
+  --     res `shouldReturn` (Right (CountStep 1000000))
 
 
     -- it "should iterate " $  do
@@ -168,7 +198,9 @@ testDbName :: ByteString
 testDbName = "testdb"
 
 cleanup :: IO ()
-cleanup = system ("rm -fr " ++ testDbPath) >> system ("mkdir " ++ testDbPath) >> return ()
+cleanup = do
+  print "ASDASDASD"
+  system ("rm -fr " ++ testDbPath) >> system ("mkdir " ++ testDbPath) >> return ()
 
 putRecordTdb :: DbRecord -> DbState DbResult
 putRecordTdb = putRecord testDbName
