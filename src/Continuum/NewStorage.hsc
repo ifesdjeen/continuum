@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Continuum.NewStorage where
 
@@ -83,10 +84,11 @@ scanKeyspace context dbName = do
     (Just (schema, CLDBI.DB dbPtr _)) -> do
       let decoder = decodeRecord Record schema
 
-      results <- scan_entire_keyspace dbPtr cReadOpts
-      results <- peek results
-      return $ sequence $ fmap decoder (toByteStringTuple results)
+      resultsPtr <- scan_entire_keyspace dbPtr cReadOpts
+      results    <- (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr
+      _          <- free resultsPtr
 
+      return results
     Nothing             -> return $ Left NoSuchDatabaseError
 
 
