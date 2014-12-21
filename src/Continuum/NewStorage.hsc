@@ -43,7 +43,7 @@ instance Storable CKeyValuePair where
     valLen <- #{peek key_value_pair_t, val_len}  p
     valPtr <- #{peek key_value_pair_t, val}  p
 
-    CKeyValuePair <$> (iterString keyLen keyPtr) <*> (iterString valLen valPtr)
+    CKeyValuePair <$> (decodeString keyLen keyPtr) <*> (decodeString valLen valPtr)
 
   poke = undefined -- we never need or use that
 
@@ -61,9 +61,9 @@ instance Storable CDbResults where
   poke = undefined -- we never need or use that
 
 
-iterString :: CSize -> CString -> IO ByteString
-iterString len res = packCStringLen (res, fromIntegral len)
-{-# INLINE iterString #-}
+decodeString :: CSize -> CString -> IO ByteString
+decodeString len res = packCStringLen (res, fromIntegral len)
+{-# INLINE decodeString #-}
 
 
 foreign import ccall safe "continuum.h scan_entire_keyspace"
