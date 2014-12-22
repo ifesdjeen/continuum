@@ -59,7 +59,7 @@ library
                         , timers                 >=0.2.0.0
                         , stm                    >=2.4.3
                         , suspend                >=0.1.0.1
-                        , leveldb-haskell-fork   >= 0.3.4.3
+                        , leveldb-haskell-fork   >= 0.3.4.4
                         , resourcet              >= 1.1.2.2
                         , bytestring             >= 0.10.4.0
                         , parallel-io            >= 0.3.3
