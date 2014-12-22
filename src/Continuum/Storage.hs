@@ -22,6 +22,7 @@ import           Control.Monad.Except
 import           Control.Monad                  ( (=<<) )
 
 import qualified Database.LevelDB.Base          as LDB
+import qualified Database.LevelDB.C             as CLDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
@@ -303,6 +304,7 @@ stopStorage DbContext{..} = do
   _             <- LDB.close ctxSystemDb
   _             <- LDB.close ctxChunksDb
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
+  _             <- CLDB.leveldb_env_shutdown
   return ()
   where atomRead = atomically . readTVar
 
