@@ -30,4 +30,6 @@ db_results_t*
 scan_entire_keyspace(leveldb_t* db,
                      leveldb_readoptions_t* roptions);
 
+void
+free_db_results(db_results_t* ptr);
 #endif /* CONTINUUM_H */

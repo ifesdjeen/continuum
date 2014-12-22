@@ -31,8 +31,19 @@ scan_entire_keyspace(leveldb_t* db,
     leveldb_iter_destroy(iter);
   }
 
-  db_results_t *db_result = calloc(1, sizeof(db_results_t));
+  db_results_t* db_result = calloc(1, sizeof(db_results_t));
   db_result->results = kvps;
   db_result->count = count;
+
   return db_result;
+  /* in fact, freeing just db_result is not enough. we should also free all the key_value_pairs */
+}
+
+void
+free_db_results(db_results_t* dbr) {
+  if (dbr == NULL)
+    return;
+
+  free(dbr->results);
+  free(dbr);
 }
