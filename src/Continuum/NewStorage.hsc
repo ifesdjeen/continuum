@@ -4,6 +4,8 @@
 
 module Continuum.NewStorage where
 
+import Control.Exception ( bracket )
+
 import qualified Database.LevelDB.Base          as LDB
 import qualified Database.LevelDB.C             as CLDB
 import qualified Database.LevelDB.Internal      as CLDBI
@@ -67,9 +69,6 @@ decodeString len res = packCStringLen (res, fromIntegral len)
 {-# INLINE decodeString #-}
 
 
-foreign import ccall safe "continuum.h scan_entire_keyspace"
-  scan_entire_keyspace :: CLDB.LevelDBPtr -> CLDB.ReadOptionsPtr -> IO CDbResultsPtr
-
 scanKeyspace :: DbContext
                 -> DbName
                 -> IO (DbErrorMonad [DbResult])
@@ -84,13 +83,19 @@ scanKeyspace context dbName = do
     (Just (schema, CLDBI.DB dbPtr _)) -> do
       let decoder = decodeRecord Record schema
 
-      resultsPtr <- scan_entire_keyspace dbPtr cReadOpts
-      results    <- (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr
-      _          <- free resultsPtr
+      bracket (scan_entire_keyspace dbPtr cReadOpts)
+              free_db_results
+              (\resultsPtr -> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
 
-      return results
     Nothing             -> return $ Left NoSuchDatabaseError
 
 
 toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
 toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
+
+
+foreign import ccall safe "continuum.h scan_entire_keyspace"
+  scan_entire_keyspace :: CLDB.LevelDBPtr -> CLDB.ReadOptionsPtr -> IO CDbResultsPtr
+
+foreign import ccall safe "continuum.h free_db_results"
+  free_db_results :: CDbResultsPtr -> IO ()
