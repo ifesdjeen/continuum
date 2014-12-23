@@ -37,7 +37,9 @@ library
                         , ForeignFunctionInterface
                         , MagicHash
 
+  extra-lib-dirs:              /Users/ifesdjeen/hackage/continuum/leveldb
   Include-dirs:           cbits
+                        , /Users/ifesdjeen/hackage/continuum/leveldb/include
   c-sources:              cbits/continuum.c
   exposed-modules:        Continuum.Storage
                         , Continuum.NewStorage
