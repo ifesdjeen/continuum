@@ -24,8 +24,8 @@ main = hspec $ around_ withRunningServer $ do
 
       res     <- exec client dbName FetchAll
 
-      res `shouldBe` (Right (ListResult [ RecordRes $ mkRec 112233 1 "one"
-                                        , RecordRes $ mkRec 223344 2 "two" ]))
+      res `shouldBe` (Right (ListResult [ mkRec 112233 1 "one"
+                                        , mkRec 223344 2 "two" ]))
 
       _       <- disconnect client
       return ()

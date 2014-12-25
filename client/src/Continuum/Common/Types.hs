@@ -17,7 +17,7 @@ import qualified Data.Map                       as Map
 type DbName        = ByteString
 type FieldName     = ByteString
 
-type Decoder       = (ByteString, ByteString) -> DbErrorMonad DbResult
+type Decoder a     = (ByteString, ByteString) -> DbErrorMonad a
 
 -- |
 -- | INTERNAL DB TYPES
@@ -114,7 +114,7 @@ data DbResult =
   | KeyRes                 Integer
   | ValueRes               DbValue
   | RecordRes              DbRecord
-  | ListResult             [DbResult]
+  | ListResult             [DbRecord]
   | MapResult              (Map.Map DbValue DbResult)
   -- TODO: RAW RESULT
 
@@ -134,7 +134,7 @@ data StepResult =
   EmptyStepRes
   | ErrorStepRes           DbError
   | CountStep              Integer
-  | ListStep               [DbResult]
+  | ListStep               [DbRecord]
   | GroupStep              (Map.Map DbValue StepResult)
   deriving(Generic, Show, Eq)
 
