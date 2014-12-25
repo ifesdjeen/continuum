@@ -20,6 +20,7 @@ import           Continuum.Common.Serialization
 
 import           Control.Monad.Except
 import           Control.Monad                  ( (=<<) )
+import qualified Continuum.NewStorage           as NewStorage
 
 import qualified Database.LevelDB.Base          as LDB
 import qualified Database.LevelDB.C             as CLDB
@@ -32,6 +33,7 @@ import           Continuum.Folds                ( appendFold )
 import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
 import           Control.Exception.Base         ( bracket )
 import           Control.Foldl                  ( Fold(..) )
+import qualified Control.Foldl as L
 import           Data.Traversable               ( traverse )
 import           System.Process                 ( system )
 import           Data.Maybe                     ( isJust, fromJust )
@@ -80,124 +82,6 @@ putSchema dbName sch = do
 -- TODO: add batch put operstiaon
 -- TODO: add delete operation
 
-scan :: DbContext
-        -> DbName
-        -> ScanRange
-        -> Decoding
-        -> Fold DbResult acc
-        -> IO (DbErrorMonad acc)
-scan context dbName scanRange decoding foldOp = do
-  let maybeDb = Map.lookup dbName (ctxDbs context)
-      ro      = fst $ ctxRwOptions context
-  -- maybeDb <- getDb dbName
-  -- ro      <- getReadOptions
-
-  case maybeDb of
-    (Just (schema, db)) -> scanDb db ro scanRange (decodeRecord decoding schema) foldOp
-    Nothing             -> return $ Left NoSuchDatabaseError
-
--- |Perform a Scan operation.
---
---   * @ScanRange@ specifies where the given scan should start, and until when
---     it should be scanning.
---   * @Decoding@ specifies what / how to deserialize (single @Field@, many
---     @Fields@, or an entire @DbRecord@
---   * @Fold@     specifies which Fold to use (Group, Append and so on, for
---     complex querying)
---
-scanDb :: LDB.DB
-           -> LDB.ReadOptions
-           -> ScanRange
-           -> Decoder
-           -> Fold DbResult acc
-           -> IO (DbErrorMonad acc)
-
-scanDb db ro scanRange decoder (Fold foldop acc done) = do
-  records <- LDB.withIter db ro $ \iter -> do
-    let getNext      = advanceIterator iter scanRange
-        step !a !x   = liftDbError foldop a (decoder x)
-    setStartPosition iter scanRange
-    scanStep getNext step (Right acc)
-  return $! fmap done records
-
--- |Perform a single step of the Scan Operation. Combines
--- @decodeRecord@ and @advanceIterator@, prepared in @scan@,
--- recurses into itself until @advanceIterator@ returns @Just@
--- something.
---
-scanStep :: (MonadIO m) =>
-            m (Maybe (ByteString, ByteString))
-            -> (acc -> (ByteString, ByteString) -> acc)
-            -> acc
-            -> m acc
-
-scanStep getNext op orig = recur orig
-  where recur !acc = do
-          next <- getNext
-          if isJust next
-            then recur (op acc (fromJust next))
-            else return acc
-
--- | Advances iterator for _just one_ step, exits and returns nothing in
--- case there's either nothing more to read or we've reached the end of
--- @ScanRange@.
---
--- Exit (interrupt) condition depends on the given @KeyRange@. For example,
--- @OpenEnd@ doesn't exit until all the entries are read from database.
---
-advanceIterator :: MonadIO m =>
-                   LDB.Iterator
-                   -> ScanRange
-                   -> m (Maybe (ByteString, ByteString))
-
-advanceIterator iter (KeyRange _ rangeEnd) = do
-  mkey <- LDB.iterKey iter
-  mval <- LDB.iterValue iter
-  _    <- LDB.iterNext iter
-
-  return $ (,) <$> (maybeInterrupt mkey) <*> mval
-
-  where maybeInterrupt k = k >>= condition
-        condition resKey =
-          case unpackWord64 resKey of
-            (Right k) | k <= rangeEnd -> Just resKey
-            _                         -> Nothing
-
-advanceIterator iter (SingleKey singleKey) = do
-  mkey <- LDB.iterKey iter
-  mval <- LDB.iterValue iter
-  _    <- LDB.iterNext iter
-
-  return $ (,) <$> (maybeInterrupt mkey) <*> mval
-
-  where maybeInterrupt k = k >>= condition
-        condition resKey =
-          case unpackWord64 resKey of
-            (Right k) | k == singleKey -> Just resKey
-            _                          -> Nothing
-
-advanceIterator iter _ = do
-  mkey <- LDB.iterKey iter
-  mval <- LDB.iterValue iter
-  _    <- LDB.iterNext iter
-  return $ (,) <$> mkey <*> mval
-
--- |Sets start position of @Iterator@ depending on @ScanRange@ type.
--- Every Range has some start position.
---
-setStartPosition :: MonadIO m =>
-                    LDB.Iterator
-                    -> ScanRange
-                    -> m ()
-
-setStartPosition iter scanRange =
-  case scanRange of
-    (OpenEnd startPosition)    -> defaultStartPosition startPosition
-    (SingleKey startPosition)  -> defaultStartPosition startPosition
-    (KeyRange startPosition _) -> defaultStartPosition startPosition
-    EntireKeyspace             -> LDB.iterFirst iter
-  where defaultStartPosition sp = LDB.iterSeek iter (packWord64 sp)
-
 -- |
 -- | Chunking / Query Parallelisation
 -- |
@@ -212,15 +96,6 @@ maybeWriteChunk sid (DbRecord time _) = do
     LDB.put ctxChunksDb (snd ctxRwOptions) (packWord64 time) BS.empty
   return $ return $ EmptyRes
 
--- |Read Chunk ids from the Chunks Database
---
-readChunks :: ScanRange -> DbState [DbResult]
-readChunks scanRange = do
-  db     <- getCtxChunksDb
-  ro     <- getReadOptions
-  chunks <- lift $ scanDb db ro scanRange decodeChunkKey appendFold
-  return chunks
-
 -- |
 -- | DATABASE INITIALIZATION
 -- |
@@ -231,16 +106,16 @@ initializeDbs :: String
                  -> LDB.DB
                  -> IO (DbErrorMonad ContextDbsMap)
 initializeDbs path systemDb = do
-  dbs <- scanDb systemDb readOpts EntireKeyspace decodeSchema appendFold
+  dbs <- NewStorage.scan systemDb readOpts EntireKeyspace decodeSchema
   res <- traverse (mapM (initializeDb path)) dbs
   return $ Map.fromList <$> res
 
 -- |Initialize (open) an instance of an _existing_ database.
 --
 initializeDb :: String
-                -> DbResult
+                -> (DbName, DbSchema)
                 -> IO (DbName, (DbSchema, LDB.DB))
-initializeDb path (DbSchemaResult (dbName, sch)) = do
+initializeDb path (dbName, sch) = do
   -- TODO: abstract path finding
   ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
   return (dbName, (sch, ldb))
@@ -313,3 +188,28 @@ stopStorage DbContext{..} = do
 --                -> IO (DbErrorMonad a,
 --                       DbContext)
 -- runAppState = flip runStateT
+
+readChunks :: ScanRange -> DbState [Integer]
+readChunks scanRange = do
+  db     <- getCtxChunksDb
+  ro     <- getReadOptions
+  chunks <- lift $ NewStorage.scan db ro scanRange decodeChunkKey
+  return chunks
+
+
+scan :: DbContext
+        -> DbName
+        -> ScanRange
+        -> Decoding
+        -> Fold DbRecord acc
+        -> IO (DbErrorMonad acc)
+
+scan context dbName scanRange decoding foldOp = do
+  let maybeDb = Map.lookup dbName (ctxDbs context)
+      ro      = fst $ ctxRwOptions context
+
+  case maybeDb of
+    (Just (schema, db)) -> do
+      scanRes <- NewStorage.scan db ro scanRange (decodeRecord decoding schema)
+      return $ L.fold foldOp <$> scanRes
+    Nothing             -> return $ Left NoSuchDatabaseError

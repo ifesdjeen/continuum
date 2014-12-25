@@ -49,11 +49,11 @@ parallelRangeScan (Right ranges) op = do
 
 -- |Split chunks into ranges (pretty much partitioning with a step of 1)
 --
-makeRanges :: [DbResult]
+makeRanges :: [Integer]
               -> [ScanRange]
-makeRanges ((KeyRes f):n@(KeyRes s):xs) = (KeyRange f s) : makeRanges (n:xs)
-makeRanges [(KeyRes a)]                 = [OpenEnd a]
-makeRanges []                           = []
+makeRanges (f:s:xs) = (KeyRange f s) : makeRanges (s:xs)
+makeRanges [a]      = [OpenEnd a]
+makeRanges []       = []
 makeRanges _ = error "should never happen"
 
 adjustRanges :: ScanRange -> [ScanRange] -> [ScanRange]
