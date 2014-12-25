@@ -54,12 +54,11 @@ encodeEndTimestamp timestamp =
 encodeSchema :: DbSchema -> B.ByteString
 encodeSchema = encode
 
-decodeSchema :: (DbName, B.ByteString)
-                -> DbErrorMonad DbResult
+decodeSchema :: Decoder (DbName, DbSchema)
 decodeSchema (dbName, encodedSchema) =
   case (decode encodedSchema) of
     (Left err)     -> throwError $ SchemaDecodingError err
-    (Right schema) -> return $ DbSchemaResult (dbName, schema)
+    (Right schema) -> return $ (dbName, schema)
 
 decodeQuery :: B.ByteString
                -> DbErrorMonad SelectQuery
@@ -82,28 +81,28 @@ decodeDbResult encodedDbResult =
 
 decodeRecord :: Decoding
              -> DbSchema
-             -> Decoder
+             -> Decoder DbRecord
 
 decodeRecord (Field field) schema !(k, bs) = do
   timestamp     <- decodeKey k
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
                    else throwError FieldNotFoundError
-  return $! RecordRes $ DbRecord timestamp (Map.fromList $ [(field, decodedVal)])
+  return $! DbRecord timestamp (Map.fromList $ [(field, decodedVal)])
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 
 decodeRecord Record schema !(k, bs) = do
   timestamp      <- decodeKey k
   decodedVal     <- decodeValues schema bs
-  return $! RecordRes $ DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
+  return $! DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
 
 decodeRecord (Fields flds) schema (k, bs) = do
   timestamp     <- decodeKey k
   decodedVals   <- if isJust idxs
                    then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
                    else throwError FieldNotFoundError
-  return $! RecordRes $ DbRecord timestamp (Map.fromList $ zip flds decodedVals)
+  return $! DbRecord timestamp (Map.fromList $ zip flds decodedVals)
   where
     {-# INLINE idxs #-}
     idxs         = mapM (`elemIndex` (fields schema)) flds
@@ -115,11 +114,10 @@ decodeRecord (Fields flds) schema (k, bs) = do
 
 decodeKey :: B.ByteString -> DbErrorMonad Integer
 decodeKey = unpackWord64
-
 {-# INLINE decodeKey #-}
 
-decodeChunkKey :: (B.ByteString, B.ByteString) -> DbErrorMonad DbResult
-decodeChunkKey (x, _) = KeyRes <$> (unpackWord64 (B.take 8 x))
+decodeChunkKey :: Decoder Integer
+decodeChunkKey (x, _) = unpackWord64 (B.take 8 x)
 
 {-# INLINE decodeChunkKey #-}
 
