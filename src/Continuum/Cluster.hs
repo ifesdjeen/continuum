@@ -68,7 +68,7 @@ withTmpStorage path context cleanup subsystem =
         runner ctx = do
           ctxTVar <- atomInit ctx
           (res,_) <- runStateT subsystem ctxTVar
-          ctx'    <- atomRead ctxTVar -- shadowing
+          ctx'    <- atomRead ctxTVar
           _       <- stopStorage ctx'
           _       <- cleanup
           return res
