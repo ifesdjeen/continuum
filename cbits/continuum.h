@@ -30,6 +30,17 @@ db_results_t*
 scan_entire_keyspace(leveldb_t* db,
                      leveldb_readoptions_t* roptions);
 
+db_results_t*
+scan_range(leveldb_t*             db,
+           leveldb_readoptions_t* roptions,
+           const char*            start_at,
+           size_t                 start_at_len,
+           const char*            end_at,
+           size_t                 end_at_len,
+           int (*compare)(void*,
+                          const char* a, size_t alen,
+                          const char* b, size_t blen));
+
 void
 free_db_results(db_results_t* ptr);
 #endif /* CONTINUUM_H */
