@@ -13,31 +13,5 @@ import           Continuum.Client.Base       ( DbRecord(..), DbResult(..), Selec
 
 -- instance Continuum.DbValue ToJSON where
 
-instance ToJSON DbValue where
-  toJSON (DbInt i) = toJSON i
-  toJSON (DbString i) = toJSON (decodeUtf8 i)
-
-instance ToJSON DbResult where
-  toJSON EmptyRes         = toJSON ("" :: String)
-  toJSON (ValueRes  r)    = toJSON r
-  toJSON (ListResult r)   = toJSON r
-  toJSON (MapResult vals) = object $
-                            concat $
-                            map (\(k, v) -> [(pack (show k)) .= v]) (Map.toList vals)
-  toJSON (RecordRes
-          (DbRecord ts vals)) = object $
-                                concat $
-                                ["timestamp" .= ts] :
-                                map (\(k, v) -> [(decodeUtf8 k) .= v]) (Map.toList vals)
-
 main :: IO ()
-main = do
-  client <- connect "127.0.0.1" "5566"
-  -- res    <- sendRequest client (Select "memory" FetchAll)
-  res    <- sendRequest client (Select "memory" (Group "subtype" Count))
-
-  case res of
-    (Right r)  -> putStrLn $ unpack $ encode $ toJSON r
-    (Left err) -> print $ "error:" ++ (show err)
-
-  return ()
+main = return ()

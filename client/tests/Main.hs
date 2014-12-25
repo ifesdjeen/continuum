@@ -9,4 +9,4 @@ import qualified Primitive.Test     as Primitive
 main :: IO ()
 main = do
   Primitive.main
-  -- Serialization.main
+  Serialization.main

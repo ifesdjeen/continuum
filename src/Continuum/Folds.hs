@@ -21,17 +21,17 @@ appendFold = Fold step [] id
 -- merged with @DbResult@ Monoid and finalized with a @Finalizer@
 queryStep :: SelectQuery
              -- TODO: Maybe makes sense to add error result here? O_O
-             -> Fold DbResult StepResult
+             -> Fold DbRecord StepResult
 
-queryStep v@(Group fieldName subquery) =
+queryStep (Group fieldName subquery) =
   case queryStep subquery of
     (Fold subLocalStep subInit subFinalize) ->
       let
         wrappedSubLocalStep _ Nothing  = return $! subInit
         wrappedSubLocalStep n (Just a) = return $! (subLocalStep a n)
 
-        localStep m v@(RecordRes record) =
-          Map.alter (wrappedSubLocalStep v) (getValue fieldName record) m
+        localStep m record =
+          Map.alter (wrappedSubLocalStep record) (getValue fieldName record) m
 
         finalize g = GroupStep $ Map.map subFinalize g
       in

@@ -35,11 +35,11 @@ main =  hspec $ do
 
     it "decodes certain serialized values" $ do
       let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
-      decodeFn "a" `shouldBe` (Right $ RecordRes $ makeRecord 123 [ ("a", (DbInt 123))])
+      decodeFn "a" `shouldBe` (Right $ makeRecord 123 [ ("a", (DbInt 123))])
 
     it "decodes a complete serialized value" $ do
       let decodeFn = \x -> decodeRecord Record testSchema encoded
-      decodeFn "a" `shouldBe` (Right $ RecordRes record)
+      decodeFn "a" `shouldBe` (Right record)
 
   describe "Partial Serialization" $ do
     -- OKAY HERES THE BUG
@@ -50,4 +50,4 @@ main =  hspec $ do
           record  = makeRecord 123 [("a", (DbString "STRINGIE"))]
           encoded = encodeRecord schema record 1
           decodeFn = \x -> decodeRecord Record schema encoded
-      decodeFn "a" `shouldBe` (Right $ RecordRes record)
+      decodeFn "a" `shouldBe` (Right record)

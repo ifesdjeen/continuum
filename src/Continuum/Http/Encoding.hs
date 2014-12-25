@@ -45,9 +45,11 @@ instance ToJSON DbResult where
   toJSON (MapResult vals) = object $
                             concat $
                             map (\(k, v) -> [(pack (show k)) .= v]) (Map.toList vals)
-  toJSON (RecordRes
-          (DbRecord ts vals)) = object $
-                                concat $
-                                ["timestamp" .= ts] :
-                                map (\(k, v) -> [(decodeUtf8 k) .= v]) (Map.toList vals)
+  toJSON (RecordRes a)    = toJSON a
   toJSON a = toJSON $ show a
+
+instance ToJSON DbRecord where
+  toJSON (DbRecord ts vals) = object $
+                              concat $
+                              ["timestamp" .= ts] :
+                              map (\(k, v) -> [(decodeUtf8 k) .= v]) (Map.toList vals)
