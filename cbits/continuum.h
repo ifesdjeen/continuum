@@ -43,4 +43,10 @@ scan_range(leveldb_t*             db,
 
 void
 free_db_results(db_results_t* ptr);
+
+int
+bitwise_compare(void* shared,
+                const char* a, size_t alen,
+                const char* b, size_t blen);
+
 #endif /* CONTINUUM_H */

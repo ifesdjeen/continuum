@@ -7,15 +7,13 @@ module Continuum.NewStorage where
 import Control.Exception ( bracket )
 
 import qualified Data.ByteString.Unsafe         as BU
-import qualified Database.LevelDB.Base          as LDB
-import qualified Database.LevelDB.C             as CLDB
-import qualified Database.LevelDB.Internal      as CLDBI
-import qualified Data.Map.Strict                as Map
+import           Database.LevelDB.Base          ( ReadOptions(..) )
+import           Database.LevelDB.C             ( CompareFun, LevelDBPtr, ReadOptionsPtr,
+                                                  LevelDBPtr, mkCmp )
+import           Database.LevelDB.Internal      ( DB(..), mkCompareFun, mkCReadOpts )
 
 import           Continuum.Common.Primitive
-import           Continuum.Common.Serialization
 import           Continuum.Common.Types
-import           Continuum.Context
 
 import           Control.Applicative ( (<*>), (<$>) )
 import           Foreign
@@ -71,14 +69,14 @@ decodeString :: CSize -> CString -> IO ByteString
 decodeString len res = packCStringLen (res, fromIntegral len)
 {-# INLINE decodeString #-}
 
-scan :: LDB.DB
-        -> LDB.ReadOptions
+scan :: DB
+        -> ReadOptions
         -> ScanRange
         -> Decoder a
         -> IO (DbErrorMonad [a])
 
-scan (CLDBI.DB dbPtr _) ro scanRange decoder = do
-  cReadOpts <- CLDBI.mkCReadOpts ro
+scan (DB dbPtr _) ro scanRange decoder = do
+  cReadOpts <- mkCReadOpts ro
 
   bracket (makeScanFn dbPtr cReadOpts scanRange)
           free_db_results
@@ -88,23 +86,34 @@ toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
 toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
 
 foreign import ccall safe "continuum.h scan_entire_keyspace"
-  scan_entire_keyspace :: CLDB.LevelDBPtr -> CLDB.ReadOptionsPtr -> IO CDbResultsPtr
+  scan_entire_keyspace :: LevelDBPtr -> ReadOptionsPtr -> IO CDbResultsPtr
 
 foreign import ccall safe "continuum.h scan_range"
-  scan_range :: CLDB.LevelDBPtr
-                -> CLDB.ReadOptionsPtr
+  scan_range :: LevelDBPtr
+                -> ReadOptionsPtr
                 -> CString
                 -> CSize
                 -> CString
                 -> CSize
-                -> FunPtr CLDB.CompareFun
+                -> FunPtr CompareFun
                 -> IO CDbResultsPtr
 
-foreign import ccall safe "continuum.h free_db_results"
+foreign import ccall safe "continuum.h"
   free_db_results :: CDbResultsPtr -> IO ()
 
-makeScanFn :: CLDB.LevelDBPtr
-             -> CLDB.ReadOptionsPtr
+foreign import ccall safe "static continuum.h"
+  bitwise_compare :: CompareFun
+
+bitwise_compare_hs :: CompareFun
+bitwise_compare_hs =
+  mkCompareFun $ (\a b ->
+                   let a' = BU.unsafeTake 8 a
+                       b' = BU.unsafeTake 8 b
+                   in
+                    compare a' b')
+
+makeScanFn :: LevelDBPtr
+             -> ReadOptionsPtr
              -> ScanRange
              -> IO CDbResultsPtr
 makeScanFn db ro EntireKeyspace = scan_entire_keyspace db ro
@@ -114,9 +123,5 @@ makeScanFn db ro (KeyRange rangeStart rangeEnd) =
   in
    BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
    BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
-     comparator <- CLDB.mkCmp . CLDBI.mkCompareFun $ (\a b ->
-                                                       let a' = BU.unsafeTake 8 a
-                                                           b' = BU.unsafeTake 8 b
-                                                       in
-                                                        compare (trace (show $ unpackWord64 a') a') (trace (show $ unpackWord64 b') b'))
+     comparator <- mkCmp $ bitwise_compare
      scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator

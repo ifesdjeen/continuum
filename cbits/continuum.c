@@ -8,14 +8,12 @@
 
 #define RESULTSET_BASE 100
 
-static int compare_fn(const char* a, size_t alen,
-                   const char* b, size_t blen) {
+int
+bitwise_compare(void* shared,
+                const char* a, size_t alen,
+                const char* b, size_t blen) {
   int n = (alen < blen) ? alen : blen;
   int r = memcmp(a, b, n);
-  if (r == 0) {
-    if (alen < blen) r = -1;
-    else if (alen > blen) r = +1;
-  }
   return r;
 }
 
@@ -44,8 +42,8 @@ scan_entire_keyspace(leveldb_t* db,
   }
 
   db_results_t* db_result = calloc(1, sizeof(db_results_t));
-  db_result->results = kvps;
-  db_result->count = count;
+  db_result->results      = kvps;
+  db_result->count        = count;
 
   return db_result;
 }
@@ -71,14 +69,13 @@ scan_range(leveldb_t*             db,
       size_t current_key_len;
       const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-      /* printf("%i", compare(NULL, current_key, current_key_len, end_at, end_at_len)); */
-      /* printf("%i\n", compare_fn(current_key, current_key_len, end_at, end_at_len)); */
-      if(compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
+      if(bitwise_compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
         break;
       }
 
-      kvps[count].key = leveldb_iter_key(iter, &kvps[count].key_len);
-      kvps[count].val = leveldb_iter_value(iter, &kvps[count].val_len);
+      kvps[count].key     = current_key;
+      kvps[count].key_len = current_key_len;
+      kvps[count].val     = leveldb_iter_value(iter, &kvps[count].val_len);
       count += 1;
 
       if(count == RESULTSET_BASE) {
