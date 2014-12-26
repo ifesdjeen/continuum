@@ -94,6 +94,40 @@ scan_range(leveldb_t*             db,
   return db_result;
 }
 
+db_results_t*
+scan_open_end(leveldb_t*             db,
+              leveldb_readoptions_t* roptions,
+              const char*            start_at,
+              size_t                 start_at_len) {
+  key_value_pair_t *kvps = (key_value_pair_t *)malloc(RESULTSET_BASE * sizeof(key_value_pair_t));
+
+  int count = 0;
+  {
+    leveldb_iterator_t* iter = leveldb_create_iterator(db, roptions);
+    leveldb_iter_seek(iter, start_at, start_at_len);
+
+    while(leveldb_iter_valid(iter)) {
+      kvps[count].key = leveldb_iter_key(iter, &kvps[count].key_len);
+      kvps[count].val = leveldb_iter_value(iter, &kvps[count].val_len);
+
+      count += 1;
+      if(count == RESULTSET_BASE) {
+        kvps = (key_value_pair_t *)realloc(kvps, (count + RESULTSET_BASE) * sizeof(key_value_pair_t));
+      }
+      leveldb_iter_next(iter);
+    }
+
+    leveldb_iter_destroy(iter);
+  }
+
+  db_results_t* db_result = calloc(1, sizeof(db_results_t));
+  db_result->results      = kvps;
+  db_result->count        = count;
+
+  return db_result;
+}
+
+
 void
 free_db_results(db_results_t* dbr) {
   if (dbr == NULL)

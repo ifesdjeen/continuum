@@ -20,8 +20,7 @@ typedef struct key_value_pair_s key_value_pair_t;
 struct db_results_s
 {
   key_value_pair_t* results;
-  // TODO: Maybe unsigned?
-  int count;
+  int               count;   /* TODO: Maybe unsigned? */
 };
 
 typedef struct db_results_s db_results_t;
@@ -40,6 +39,12 @@ scan_range(leveldb_t*             db,
            int (*compare)(void*,
                           const char* a, size_t alen,
                           const char* b, size_t blen));
+
+db_results_t*
+scan_open_end(leveldb_t*             db,
+              leveldb_readoptions_t* roptions,
+              const char*            start_at,
+              size_t                 start_at_len);
 
 void
 free_db_results(db_results_t* ptr);
