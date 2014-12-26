@@ -77,7 +77,6 @@ scan :: DB
 
 scan (DB dbPtr _) ro scanRange decoder = do
   cReadOpts <- mkCReadOpts ro
-
   bracket (makeScanFn dbPtr cReadOpts scanRange)
           free_db_results
           (\resultsPtr -> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
@@ -85,10 +84,41 @@ scan (DB dbPtr _) ro scanRange decoder = do
 toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
 toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
 
-foreign import ccall safe "continuum.h scan_entire_keyspace"
+makeScanFn :: LevelDBPtr
+             -> ReadOptionsPtr
+             -> ScanRange
+             -> IO CDbResultsPtr
+makeScanFn db ro EntireKeyspace = scan_entire_keyspace db ro
+makeScanFn db ro (OpenEnd rangeStart) =
+  let rangeStartBytes = packWord64 rangeStart
+  in
+   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
+   scan_open_end db ro start_at_ptr (fromIntegral start_at_len)
+
+makeScanFn db ro (KeyRange rangeStart rangeEnd) =
+  let rangeStartBytes = packWord64 rangeStart
+      rangeEndBytes   = packWord64 rangeEnd
+  in
+   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
+   BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
+     comparator <- mkCmp $ bitwise_compare
+     scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator
+
+makeScanFn db ro (SingleKey key) =
+  let matchKey = packWord64 key
+  in
+   BU.unsafeUseAsCStringLen matchKey $ \(ptr, len) -> do
+     comparator <- mkCmp $ prefix_eq_comparator
+     scan_range db ro ptr (fromIntegral len) ptr (fromIntegral len) comparator
+
+-- |
+-- | Foreign imports
+-- |
+
+foreign import ccall safe "continuum.h"
   scan_entire_keyspace :: LevelDBPtr -> ReadOptionsPtr -> IO CDbResultsPtr
 
-foreign import ccall safe "continuum.h scan_range"
+foreign import ccall safe "continuum.h"
   scan_range :: LevelDBPtr
                 -> ReadOptionsPtr
                 -> CString
@@ -99,10 +129,21 @@ foreign import ccall safe "continuum.h scan_range"
                 -> IO CDbResultsPtr
 
 foreign import ccall safe "continuum.h"
+  scan_open_end :: LevelDBPtr
+                   -> ReadOptionsPtr
+                   -> CString
+                   -> CSize
+                   -> IO CDbResultsPtr
+
+foreign import ccall safe "continuum.h"
   free_db_results :: CDbResultsPtr -> IO ()
 
 foreign import ccall safe "static continuum.h"
   bitwise_compare :: CompareFun
+
+-- |
+-- | Comparator functions
+-- |
 
 bitwise_compare_hs :: CompareFun
 bitwise_compare_hs =
@@ -112,16 +153,12 @@ bitwise_compare_hs =
                    in
                     compare a' b')
 
-makeScanFn :: LevelDBPtr
-             -> ReadOptionsPtr
-             -> ScanRange
-             -> IO CDbResultsPtr
-makeScanFn db ro EntireKeyspace = scan_entire_keyspace db ro
-makeScanFn db ro (KeyRange rangeStart rangeEnd) =
-  let rangeStartBytes = packWord64 rangeStart
-      rangeEndBytes   = packWord64 rangeEnd
-  in
-   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
-     comparator <- mkCmp $ bitwise_compare
-     scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator
+prefix_eq_comparator :: CompareFun
+prefix_eq_comparator =
+  mkCompareFun $ (\a b ->
+                   let a' = BU.unsafeTake 8 a
+                       b' = BU.unsafeTake 8 b
+                   in
+                    if a' == b'
+                    then GT
+                    else LT)

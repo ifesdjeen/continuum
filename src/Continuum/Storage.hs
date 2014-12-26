@@ -179,7 +179,7 @@ stopStorage DbContext{..} = do
   _             <- LDB.close ctxSystemDb
   _             <- LDB.close ctxChunksDb
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
-  _             <- CLDB.leveldb_env_shutdown
+  -- _             <- CLDB.leveldb_env_shutdown
   return ()
   where atomRead = atomically . readTVar
 
