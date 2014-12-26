@@ -3,12 +3,12 @@
 
 module Storage.Test where
 
-import qualified Continuum.Cluster as Server
-import qualified Continuum.NewStorage as NS
+import qualified Continuum.Cluster      as Server
+import qualified Continuum.NewStorage   as NS
 import           Control.Monad.IO.Class ( liftIO )
-import           Data.ByteString      ( ByteString )
-import           Control.Monad        ( forM_ )
-import           System.Process       ( system )
+import           Data.ByteString        ( ByteString )
+import           Control.Monad          ( forM_ )
+import           System.Process         ( system )
 import           Continuum.Folds
 import           Continuum.Storage
 import           Continuum.Common.Types
@@ -30,19 +30,15 @@ main =  hspec $ do
   -- let scantdb = scan testDbName
 
   describe "Basic DB Functionality" $ do
-    it "should put items into the database and retrieve them" $  do
-
+    it "Key Range (single key)" $ do
       res <- runner $ do
         _   <- createDatabase testDbName testSchema
         _   <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
         _   <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+
         ctx <- readT
         liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
-
-      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)]]
-
-
-  describe "Scans" $ do
+      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)]]
 
     it "Single Key Scan " $  do
       res <- runner $ do
@@ -59,9 +55,9 @@ main =  hspec $ do
         ctx <- readT
         liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
 
-      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
-                            RecordRes $ makeRecord 123 [("a", DbInt 2)],
-                            RecordRes $ makeRecord 123 [("a", DbInt 3)]]
+      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)],
+                            makeRecord 123 [("a", DbInt 2)],
+                            makeRecord 123 [("a", DbInt 3)]]
 
 
     it "Key Range (inclusive Range)" $  do
@@ -81,13 +77,13 @@ main =  hspec $ do
         ctx <- readT
         liftIO $ scan ctx testDbName (KeyRange 123 456) Record appendFold
 
-      res `shouldBe` Right [RecordRes $ makeRecord 123 [("a", DbInt 1)],
-                            RecordRes $ makeRecord 124 [("a", DbInt 2)],
-                            RecordRes $ makeRecord 125 [("a", DbInt 3)],
+      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)],
+                            makeRecord 124 [("a", DbInt 2)],
+                            makeRecord 125 [("a", DbInt 3)],
 
-                            RecordRes $ makeRecord 456 [("a", DbInt 1)],
-                            RecordRes $ makeRecord 456 [("a", DbInt 2)],
-                            RecordRes $ makeRecord 456 [("a", DbInt 3)]]
+                            makeRecord 456 [("a", DbInt 1)],
+                            makeRecord 456 [("a", DbInt 2)],
+                            makeRecord 456 [("a", DbInt 3)]]
 
     it "Key Range (inclusive range), when there're records both before and after" $  do
       res <- runner $ do
@@ -106,12 +102,10 @@ main =  hspec $ do
         ctx <- readT
         liftIO $ scan ctx testDbName (KeyRange 300 456) Record appendFold
 
-      res `shouldBe` Right [RecordRes $ makeRecord 456 [("a", DbInt 1)],
-                            RecordRes $ makeRecord 456 [("a", DbInt 2)],
-                            RecordRes $ makeRecord 456 [("a", DbInt 3)]]
+      res `shouldBe` Right [makeRecord 456 [("a", DbInt 1)],
+                            makeRecord 456 [("a", DbInt 2)],
+                            makeRecord 456 [("a", DbInt 3)]]
 
-
-  --   -- it "Open End" $ do -- TODO
 
   describe "Snapshotting" $ do
 
@@ -122,7 +116,7 @@ main =  hspec $ do
 
         readChunks EntireKeyspace
 
-      res `shouldBe` (Right (take 10 $ [(KeyRes $ 10 * x + 1) | x <- [0..]]))
+      res `shouldBe` (Right (take 10 $ [(10 * x + 1) | x <- [0..]]))
 
 
   describe "Queries" $ do
@@ -135,7 +129,7 @@ main =  hspec $ do
         ctx <- readT
         liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep FetchAll)
 
-      res `shouldBe` (Right (ListStep $ (map RecordRes records)))
+      res `shouldBe` (Right $ ListStep records)
 
     -- it "should run FetchAll
     -- FetchAll with limits
@@ -143,35 +137,6 @@ main =  hspec $ do
     -- Min
     -- Max
     -- Combinations
-
-  describe "New Storage" $ do
-    it "should work" $ do
-      let records = take 10 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
-      res <- runner $ do
-        _ <- createDatabase testDbName testSchema
-        _ <- forM_ records putRecordTdb
-
-        ctx <- readT
-
-        res <- liftIO $ NS.scanKeyspace ctx testDbName
-
-        return $ Right EmptyRes
-      return ()
-
-
-  -- describe "New Storage" $ do
-  --   it "should iterate over a large amount of records" $  do
-  --     res <- runner $ do
-  --       _ <- createDatabase testDbName testSchema
-
-  --       forM_ [1..5]
-  --         (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
-  --                                             ("b", DbString "1")])
-
-  --       ctx <- readT
-  --       liftIO $ NS.scanKeyspace ctx testDbName
-
-  --     res `shouldBe` (Right [])
 
   -- describe "Stack Allocations / Thunk Leaks" $ do
   --   it "should iterate over a large amount of records" $  do
@@ -199,8 +164,7 @@ testDbName = "testdb"
 
 cleanup :: IO ()
 cleanup = do
-  print "ASDASDASD"
-  system ("rm -fr " ++ testDbPath) >> system ("mkdir " ++ testDbPath) >> return ()
+  system ("rm -fr " ++ testDbPath) >> return () -- system ("mkdir " ++ testDbPath) >>
 
 putRecordTdb :: DbRecord -> DbState DbResult
 putRecordTdb = putRecord testDbName
