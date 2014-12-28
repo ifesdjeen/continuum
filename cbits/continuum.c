@@ -32,7 +32,7 @@ scan_entire_keyspace(leveldb_t* db,
       kvps[count].val = leveldb_iter_value(iter, &kvps[count].val_len);
 
       count += 1;
-      if(count == RESULTSET_BASE) {
+      if(count % RESULTSET_BASE == 0) {
         kvps = (key_value_pair_t *)realloc(kvps, (count + RESULTSET_BASE) * sizeof(key_value_pair_t));
       }
       leveldb_iter_next(iter);
@@ -78,7 +78,7 @@ scan_range(leveldb_t*             db,
       kvps[count].val     = leveldb_iter_value(iter, &kvps[count].val_len);
       count += 1;
 
-      if(count == RESULTSET_BASE) {
+      if(count % RESULTSET_BASE == 0) {
         kvps = (key_value_pair_t *)realloc(kvps, (count + RESULTSET_BASE) * sizeof(key_value_pair_t));
       }
       leveldb_iter_next(iter);
@@ -111,7 +111,7 @@ scan_open_end(leveldb_t*             db,
       kvps[count].val = leveldb_iter_value(iter, &kvps[count].val_len);
 
       count += 1;
-      if(count == RESULTSET_BASE) {
+      if(count % RESULTSET_BASE == 0) {
         kvps = (key_value_pair_t *)realloc(kvps, (count + RESULTSET_BASE) * sizeof(key_value_pair_t));
       }
       leveldb_iter_next(iter);
