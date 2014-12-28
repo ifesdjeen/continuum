@@ -60,7 +60,7 @@ withTmpStorage :: String
                -> IO ()
                -> DbState a
                -> IO (DbErrorMonad a)
-withTmpStorage path context cleanup subsystem =
+withTmpStorage path context cleanup subsystem = do
   bracket (startStorage path context)
           stop
           runner

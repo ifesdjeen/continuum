@@ -10,7 +10,7 @@
 module Continuum.Storage
        where
 
-import           Debug.Trace                    ( trace )
+-- import           Debug.Trace                    ( trace )
 
 import           Continuum.Context
 import           Continuum.Common.Types
@@ -19,28 +19,17 @@ import           Continuum.Options
 import           Continuum.Common.Serialization
 
 import           Control.Monad.Except
-import           Control.Monad                  ( (=<<) )
 import qualified Continuum.NewStorage           as NewStorage
-
 import qualified Database.LevelDB.Base          as LDB
-import qualified Database.LevelDB.C             as CLDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
+import qualified Control.Foldl                  as L
 
-import           Continuum.Folds                ( appendFold )
-import           Control.Concurrent.STM         ( TVar, newTVar, atomically, readTVar )
-import           Control.Exception.Base         ( bracket )
-import           Control.Foldl                  ( Fold(..) )
-import qualified Control.Foldl as L
 import           Data.Traversable               ( traverse )
 import           System.Process                 ( system )
-import           Data.Maybe                     ( isJust, fromJust )
-import           Control.Applicative            ( Applicative(..) , (<$>), (<*>) )
-import           Data.ByteString                ( ByteString )
-
-import Debug.Trace
+import           Control.Applicative            ( (<$>) )
 
 -- |
 -- | OPERATIONS
@@ -120,8 +109,6 @@ initializeDb path (dbName, sch) = do
   ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) opts
   return (dbName, (sch, ldb))
 
-initializeDb _ _ = error "can't initialize the database"
-
 -- |Create a database if it does not yet exist.
 -- Database is returned in an open state, ready for writes.
 --
@@ -179,15 +166,7 @@ stopStorage DbContext{..} = do
   _             <- LDB.close ctxSystemDb
   _             <- LDB.close ctxChunksDb
   _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
-  -- _             <- CLDB.leveldb_env_shutdown
   return ()
-  where atomRead = atomically . readTVar
-
--- runAppState :: DbContext
---                -> DbState a
---                -> IO (DbErrorMonad a,
---                       DbContext)
--- runAppState = flip runStateT
 
 readChunks :: ScanRange -> DbState [Integer]
 readChunks scanRange = do
@@ -196,12 +175,11 @@ readChunks scanRange = do
   chunks <- lift $ NewStorage.scan db ro scanRange decodeChunkKey
   return chunks
 
-
 scan :: DbContext
         -> DbName
         -> ScanRange
         -> Decoding
-        -> Fold DbRecord acc
+        -> L.Fold DbRecord acc
         -> IO (DbErrorMonad acc)
 
 scan context dbName scanRange decoding foldOp = do
