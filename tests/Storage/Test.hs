@@ -4,7 +4,6 @@
 module Storage.Test where
 
 import qualified Continuum.Cluster      as Server
-import qualified Continuum.NewStorage   as NS
 import           Control.Monad.IO.Class ( liftIO )
 import           Data.ByteString        ( ByteString )
 import           Control.Monad          ( forM_ )
