@@ -148,11 +148,6 @@ data StepResult =
   | GroupStep              (Map.Map DbValue StepResult)
   deriving(Generic, Show, Eq)
 
-toDbResult :: StepResult -> DbResult
-toDbResult (CountStep i) = ValueRes   $ DbInt i
-toDbResult (ListStep i)  = ListResult $ i
-toDbResult (GroupStep i) = MapResult  $ Map.map toDbResult i
-toDbResult _ = ErrorRes $ NoStepToResultConvertor
 
 instance S.Serialize DbResult
 
