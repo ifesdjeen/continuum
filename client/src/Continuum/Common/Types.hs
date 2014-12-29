@@ -75,16 +75,26 @@ data DbValue =
   | DbDouble                Double
   -- DbList [DbValue]
   -- DbMap [Map.Map DbValue DbValue]
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Show)
 
-instance Show DbValue where
-  show EmptyValue   = ""
-  show (DbInt v)    = show v
-  show (DbLong v)   = show v
-  show (DbShort v)  = show v
-  show (DbString v) = unpack v
-  show (DbFloat v)  = show v
-  show (DbDouble v) = show v
+toNumber :: (Fractional a) => DbValue -> Maybe a
+toNumber (DbString _) = Nothing
+toNumber (DbLong a)   = Just (fromInteger a)
+toNumber (DbInt a)    = Just (fromIntegral a)
+toNumber (DbShort a)  = Just (fromIntegral a)
+toNumber (DbByte a)   = Just (fromIntegral a)
+toNumber (DbFloat a)  = Just (realToFrac a)
+toNumber (DbDouble a) = Just (realToFrac a)
+
+-- withNumber :: (Num a) =>
+--               DbResult ->
+--               DbValue ->
+--               (a -> a -> a) ->
+--               DbResult
+
+-- withNumber EmptyRes v _ = EmptyRes
+-- withNumber (ValueRes a) (DbLong b) f = ValueRes (f a b)
+-- withNumber _ _ _ = ErrorRes OtherError
 
 instance S.Serialize DbValue
 
