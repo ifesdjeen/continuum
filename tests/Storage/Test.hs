@@ -137,19 +137,20 @@ main =  hspec $ do
     -- Max
     -- Combinations
 
-  describe "Stack Allocations / Thunk Leaks" $ do
-    it "should iterate over a large amount of records" $  do
-      let res = runner $ do
-            _ <- createDatabase testDbName testSchema
+  -- Slow test
+  -- describe "Stack Allocations / Thunk Leaks" $ do
+  --   it "should iterate over a large amount of records" $  do
+  --     let res = runner $ do
+  --           _ <- createDatabase testDbName testSchema
 
-            forM_ [1..1000000]
-              (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
-                                                  ("b", DbString "1")])
+  --           forM_ [1..1000000]
+  --             (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
+  --                                                 ("b", DbString "1")])
 
-            ctx <- readT
-            liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
+  --           ctx <- readT
+  --           liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
 
-      res `shouldReturn` (Right (CountStep 1000000))
+  --     res `shouldReturn` (Right (CountStep 1000000))
 
 
     -- it "should iterate " $  do
