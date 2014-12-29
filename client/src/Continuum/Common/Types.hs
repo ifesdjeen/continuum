@@ -31,7 +31,7 @@ data DbType =
   | DbtFloat
   | DbtDouble
   | DbtString
-  deriving(Show, Generic, Eq)
+  deriving(Show, Generic, Eq, Ord)
 
 instance S.Serialize DbType
 
