@@ -39,21 +39,16 @@ queryStep (Group fieldName subquery) =
 
 queryStep Count = Fold localStep (CountStep 0) id
   where
-    -- TODO: consider turning DbResult into Functor
-    localStep (CountStep a) _ = CountStep $ a + 1
+    localStep (CountStep a) e = CountStep $ a + 1
+
 queryStep (Min fieldName) = Fold localStep (MinStep EmptyValue) id
   where
     localStep (MinStep EmptyValue) record = MinStep $ (getValue fieldName record)
     localStep (MinStep a) record          = MinStep $ min a (getValue fieldName record)
 
--- queryStep (Skip howMany) = Fold
 queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
-          -- if ((length acc) > 100)
-          -- then ListResult $ acc
-          -- else
 
-  -- where step (ListResult acc) val = ListResult $ acc ++ [val]
 queryStep (Avg fieldName) = Fold step (AvgStep []) id
   where step (AvgStep acc) record = AvgStep $ acc ++ [(getValue fieldName record)]
 
