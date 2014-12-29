@@ -1,14 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Continuum.Http.Encoding where
 
 import qualified Data.Map               as Map
 
 import           Data.Aeson
 import           Data.ByteString             ( ByteString )
-import           Data.ByteString.Lazy.Char8  ( unpack )
 import           Data.Text                   ( pack )
 import           Data.Text.Encoding          ( decodeUtf8 )
 import           Continuum.Common.Types
@@ -37,6 +36,10 @@ instance ToJSON DbValue where
   toJSON (DbString v) = toJSON $ decodeUtf8 v
   toJSON (DbFloat v)  = toJSON v
   toJSON (DbDouble v) = toJSON v
+
+instance ToJSON (DbErrorMonad DbResult) where
+  toJSON (Right e)   = toJSON e
+  toJSON (Left e)    = toJSON e
 
 instance ToJSON DbResult where
   toJSON EmptyRes         = toJSON ("" :: String)
