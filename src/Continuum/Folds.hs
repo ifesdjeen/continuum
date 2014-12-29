@@ -41,6 +41,10 @@ queryStep Count = Fold localStep (CountStep 0) id
   where
     -- TODO: consider turning DbResult into Functor
     localStep (CountStep a) _ = CountStep $ a + 1
+queryStep (Min fieldName) = Fold localStep (MinStep EmptyValue) id
+  where
+    localStep (MinStep EmptyValue) record = MinStep $ (getValue fieldName record)
+    localStep (MinStep a) record          = MinStep $ min a (getValue fieldName record)
 
 -- queryStep (Skip howMany) = Fold
 queryStep FetchAll = Fold step (ListStep []) id
@@ -50,6 +54,8 @@ queryStep FetchAll = Fold step (ListStep []) id
           -- else
 
   -- where step (ListResult acc) val = ListResult $ acc ++ [val]
+queryStep (Avg fieldName) = Fold step (AvgStep []) id
+  where step (AvgStep acc) record = AvgStep $ acc ++ [(getValue fieldName record)]
 
 queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 
@@ -67,6 +73,15 @@ instance Monoid StepResult where
   mappend (CountStep a) (CountStep b) =
     CountStep $! a + b
 
+  mappend (MinStep a) (MinStep b) =
+    MinStep $! min a b
+
+  mappend (AvgStep a) (AvgStep b) =
+    AvgStep $! (a ++ b)
+
+  mappend (ListStep a) (ListStep b) =
+    ListStep $! (a ++ b)
+
   mappend (GroupStep a)  (GroupStep b) =
     GroupStep $! Map.unionWith mappend a b
 
@@ -79,4 +94,9 @@ instance Monoid StepResult where
 -- |
 
 finalize :: StepResult -> DbResult
-finalize = toDbResult
+finalize (CountStep i) = ValueRes   $ DbInt i
+finalize (MinStep i)   = ValueRes   $ i
+finalize (AvgStep i)   = trace (show i) (ValueRes   $ DbInt 1)
+finalize (ListStep i)  = ListResult $ i
+finalize (GroupStep i) = MapResult  $ Map.map finalize i
+finalize _ = ErrorRes $ NoStepToResultConvertor

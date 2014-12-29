@@ -57,7 +57,7 @@ data DbError =
 
 instance S.Serialize DbError
 
-type DbErrorMonad  = Either  DbError
+type DbErrorMonad  = Either DbError
 
 
 -- |
@@ -144,10 +144,11 @@ data StepResult =
   EmptyStepRes
   | ErrorStepRes           DbError
   | CountStep              Integer
+  | MinStep                DbValue
+  | AvgStep                [DbValue]
   | ListStep               [DbRecord]
   | GroupStep              (Map.Map DbValue StepResult)
   deriving(Generic, Show, Eq)
-
 
 instance S.Serialize DbResult
 
@@ -215,8 +216,9 @@ makeSchema stringTypeList =
 
 data SelectQuery =
   Count
+  | Min                    FieldName
+  | Avg                    FieldName
   -- | Distinct
-  -- | Min
   -- | Max
   | Group                  FieldName SelectQuery
   | FetchAll
