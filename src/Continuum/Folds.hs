@@ -27,7 +27,7 @@ queryStep (Group fieldName subquery) =
   case queryStep subquery of
     (Fold subLocalStep subInit subFinalize) ->
       let
-        wrappedSubLocalStep _ Nothing  = return $! subInit
+        wrappedSubLocalStep n Nothing  = return $! (subLocalStep subInit n)
         wrappedSubLocalStep n (Just a) = return $! (subLocalStep a n)
 
         localStep m record =
