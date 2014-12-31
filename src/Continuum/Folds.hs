@@ -91,7 +91,14 @@ instance Monoid StepResult where
 finalize :: StepResult -> DbResult
 finalize (CountStep i) = ValueRes   $ DbInt i
 finalize (MinStep i)   = ValueRes   $ i
-finalize (AvgStep i)   = trace (show i) (ValueRes   $ DbInt 1)
+finalize (AvgStep i)   =
+  case withNumbers i average of
+    (Left a) -> ErrorRes $ a
+    (Right a) -> ValueRes $ DbDouble $ a
+
+  where average nums = trace (show nums) ((sum nums) / (genericLength nums))
+  --do
+  -- trace (show i) (ValueRes $ DbInt 1)
 finalize (ListStep i)  = ListResult $ i
 finalize (GroupStep i) = MapResult  $ Map.map finalize i
 finalize _ = ErrorRes $ NoStepToResultConvertor

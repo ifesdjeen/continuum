@@ -4,6 +4,8 @@
 module Storage.Test where
 
 import qualified Continuum.Cluster      as Server
+import qualified Data.Map                       as Map
+import qualified Continuum.ParallelStorage as PS
 import           Control.Monad.IO.Class ( liftIO )
 import           Data.ByteString        ( ByteString )
 import           Control.Monad          ( forM_ )
@@ -129,6 +131,48 @@ main =  hspec $ do
         liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep FetchAll)
 
       res `shouldBe` (Right $ ListStep records)
+
+    it "should run Min query" $ do
+      let records = take 100 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
+      res <- runner $ do
+        _ <- createDatabase testDbName testSchema
+        _ <- forM_ records putRecordTdb
+
+        ctx <- readT
+
+        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Min "a"))
+
+      res `shouldBe` (Right $ MinStep $ DbInt 10)
+
+    it "should run Group query" $ do
+
+      let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]
+          recordsA    = take 2 [makeRecord i [("a", DbInt $ i + 10),
+                                              ("b", DbString "a")] | i <- [1..]]
+          recordsB    = take 3 [makeRecord (i + 50) [("a", DbInt $ i + 10),
+                                                     ("b", DbString "b")] | i <- [1..]]
+
+      res <- runner $ do
+        _ <- createDatabase testDbName groupSchema
+
+        _ <- forM_ recordsA putRecordTdb
+        _ <- forM_ recordsB putRecordTdb
+
+        ctx <- readT
+        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Group "b" FetchAll))
+
+      res `shouldBe` (Right $ GroupStep $ Map.fromList [(DbString "a", ListStep recordsA),
+                                                        (DbString "b", ListStep recordsB)])
+
+    it "Parallel " $ do
+      let records = take 100 [makeRecord i [("a", DbInt $ i)] | i <- [0..]]
+      res <- runner $ do
+        _ <- createDatabase testDbName testSchema
+        _ <- forM_ records putRecordTdb
+
+        PS.parallelScan testDbName EntireKeyspace Record (Avg "a")
+
+      res `shouldBe` (Right $ ValueRes $ DbDouble 49.5)
 
     -- it "should run FetchAll
     -- FetchAll with limits
