@@ -171,6 +171,10 @@ data ScanRange =
   OpenEnd                  Integer
   | SingleKey              Integer
   | KeyRange               Integer Integer
+  | OpenEndButFirst        Integer
+  | ButFirst               Integer Integer
+  | ButLast                Integer Integer
+  | ExclusiveRange         Integer Integer
   | EntireKeyspace
   deriving(Show, Generic)
 

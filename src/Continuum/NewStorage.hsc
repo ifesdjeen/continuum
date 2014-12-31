@@ -79,7 +79,8 @@ scan (DB dbPtr _) ro scanRange decoder = do
   cReadOpts <- mkCReadOpts ro
   bracket (makeScanFn dbPtr cReadOpts scanRange)
           free_db_results
-          (\resultsPtr -> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
+          (\resultsPtr -> (\i -> dropRangeParts scanRange <$> i) <$> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
+--  where (<<$>>) a b = (\i -> ) <$> b
 
 toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
 toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
@@ -104,12 +105,24 @@ makeScanFn db ro (KeyRange rangeStart rangeEnd) =
      comparator <- mkCmp $ bitwise_compare
      scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator
 
+makeScanFn db ro (OpenEndButFirst rangeStart) = makeScanFn db ro (OpenEnd rangeStart)
+makeScanFn db ro (ButFirst rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+makeScanFn db ro (ButLast rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+makeScanFn db ro (ExclusiveRange rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+
 makeScanFn db ro (SingleKey key) =
   let matchKey = packWord64 key
   in
    BU.unsafeUseAsCStringLen matchKey $ \(ptr, len) -> do
      comparator <- mkCmp $ prefix_eq_comparator
      scan_range db ro ptr (fromIntegral len) ptr (fromIntegral len) comparator
+
+dropRangeParts (OpenEndButFirst _) range = drop 1 $ range
+dropRangeParts (ButFirst _ _) range = drop 1 $ range
+dropRangeParts (ButLast _ _) range = take ((length range) - 1) range
+dropRangeParts (ExclusiveRange _ _) range = drop 1 $ take ((length range) - 1) range
+dropRangeParts _ range = range
+
 
 -- |
 -- | Foreign imports

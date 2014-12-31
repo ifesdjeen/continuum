@@ -51,10 +51,22 @@ parallelRangeScan (Right ranges) op = do
 --
 makeRanges :: [Integer]
               -> [ScanRange]
-makeRanges (f:s:xs) = (KeyRange f s) : makeRanges (s:xs)
+makeRanges (f:s:xs) = (KeyRange f s) : makeButFirstRanges (s:xs)
 makeRanges [a]      = [OpenEnd a]
 makeRanges []       = []
 makeRanges _ = error "should never happen"
+
+makeButFirstRanges :: [Integer]
+                   -> [ScanRange]
+makeButFirstRanges (f:s:xs) = (ButFirst f s) : makeButFirstRanges (s:xs)
+makeButFirstRanges [a]      = [OpenEndButFirst a]
+makeButFirstRanges []       = []
+makeButFirstRanges _ = error "should never happen"
+
+-- dropDuplicates :: [[a]] -> [[a]]
+-- dropDuplicates val@[a] = val
+-- dropDuplicates (s:xs) = s : (map butfirst xs)
+--   where butfirst (x:xs) = xs
 
 adjustRanges :: ScanRange -> [ScanRange] -> [ScanRange]
 adjustRanges v@(OpenEnd _)      ranges    = concat [[v], (tail ranges)]
