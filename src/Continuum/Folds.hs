@@ -3,6 +3,8 @@
 
 module Continuum.Folds where
 
+import           Data.List          ( genericLength )
+import           Debug.Trace
 import           Continuum.Common.Types
 import qualified Data.Map.Strict as Map
 import           Control.Foldl      ( Fold(..), fold )
