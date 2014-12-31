@@ -2,6 +2,7 @@
 
 module Continuum.Common.Types where
 
+import           Control.Applicative            ( (<$>) )
 import           Data.ByteString                ( ByteString )
 import           Data.ByteString.Char8          ( unpack )
 import           GHC.Generics                   ( Generic )
@@ -9,7 +10,6 @@ import           Data.Maybe                     ( fromMaybe )
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
-
 -- |
 -- | ALIASES
 -- |
@@ -52,6 +52,7 @@ data DbError =
   | SchemaDecodingError     String
   | NoStepToResultConvertor
   | OtherError
+  | NumericOperationError
   | NotEnoughInput Int Int
   deriving (Show, Eq, Ord, Generic)
 
@@ -77,14 +78,21 @@ data DbValue =
   -- DbMap [Map.Map DbValue DbValue]
   deriving (Eq, Ord, Generic, Show)
 
-toNumber :: (Fractional a) => DbValue -> Maybe a
-toNumber (DbString _) = Nothing
-toNumber (DbLong a)   = Just (fromInteger a)
-toNumber (DbInt a)    = Just (fromIntegral a)
-toNumber (DbShort a)  = Just (fromIntegral a)
-toNumber (DbByte a)   = Just (fromIntegral a)
-toNumber (DbFloat a)  = Just (realToFrac a)
-toNumber (DbDouble a) = Just (realToFrac a)
+withNumbers :: (Fractional a) =>
+               [DbValue] ->
+               ([a] -> a) ->
+               DbErrorMonad a
+
+withNumbers values op = op <$> mapM toNumber values
+
+toNumber :: (Fractional a) => DbValue -> DbErrorMonad a
+toNumber (DbString _) = Left NumericOperationError
+toNumber (DbLong a)   = Right (fromInteger a)
+toNumber (DbInt a)    = Right (fromIntegral a)
+toNumber (DbShort a)  = Right (fromIntegral a)
+toNumber (DbByte a)   = Right (fromIntegral a)
+toNumber (DbFloat a)  = Right (realToFrac a)
+toNumber (DbDouble a) = Right (realToFrac a)
 
 -- withNumber :: (Num a) =>
 --               DbResult ->
