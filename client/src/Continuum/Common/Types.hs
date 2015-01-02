@@ -155,6 +155,7 @@ data StepResult =
   | MinStep                DbValue
   | AvgStep                [DbValue]
   | ListStep               [DbRecord]
+  | MultiStep              (Map.Map FieldName StepResult)
   | GroupStep              (Map.Map DbValue StepResult)
   deriving(Generic, Show, Eq)
 
@@ -229,10 +230,13 @@ makeSchema stringTypeList =
 data SelectQuery =
   Count
   | Min                    FieldName
+    -- | Max                    FieldName
+    -- | Sum
   | Avg                    FieldName
   -- | Distinct
-  -- | Max
+  | Multi                  [(FieldName, SelectQuery)]
   | Group                  FieldName SelectQuery
+  | TimeGroup              Integer   SelectQuery
   | FetchAll
   | Skip                   Integer
   | Limit                  Integer

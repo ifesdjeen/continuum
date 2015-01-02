@@ -25,15 +25,24 @@ queryStep :: SelectQuery
              -- TODO: Maybe makes sense to add error result here? O_O
              -> Fold DbRecord StepResult
 
+queryStep (Multi steps) = Fold step [] finalize
+  where step acc val = acc ++ [val]
+        finalize vals = MultiStep $
+                        foldr
+                        (\(fieldName, f) m ->
+                          Map.insert fieldName (fold (queryStep f) vals) m)
+                        Map.empty
+                        steps
+
 queryStep (Group fieldName subquery) =
   case queryStep subquery of
-    (Fold subLocalStep subInit subFinalize) ->
+    (Fold subStep subInit subFinalize) ->
       let
-        wrappedSubLocalStep n Nothing  = return $! (subLocalStep subInit n)
-        wrappedSubLocalStep n (Just a) = return $! (subLocalStep a n)
+        wrappedSubStep n Nothing  = return $! (subStep subInit n)
+        wrappedSubStep n (Just a) = return $! (subStep a n)
 
         localStep m record =
-          Map.alter (wrappedSubLocalStep record) (getValue fieldName record) m
+          Map.alter (wrappedSubStep record) (getValue fieldName record) m
 
         finalize g = GroupStep $ Map.map subFinalize g
       in

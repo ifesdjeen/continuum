@@ -144,6 +144,21 @@ main =  hspec $ do
 
       res `shouldBe` (Right $ MinStep $ DbInt 10)
 
+    it "should run Multi query" $ do
+      let records = take 100 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
+      res <- runner $ do
+        _ <- createDatabase testDbName testSchema
+        _ <- forM_ records putRecordTdb
+
+        ctx <- readT
+
+        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Multi [("min", Min "a"),
+                                                                              ("avg", Avg "a")
+                                                                              ]))
+
+      res `shouldBe` (Right $ MinStep $ DbInt 10)
+
+
     it "should run Group query" $ do
 
       let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]
