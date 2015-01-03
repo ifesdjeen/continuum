@@ -110,13 +110,6 @@ makeScanFn db ro (ButFirst rangeStart rangeEnd) = makeScanFn db ro (KeyRange ran
 makeScanFn db ro (ButLast rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
 makeScanFn db ro (ExclusiveRange rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
 
-makeScanFn db ro (SingleKey key) =
-  let matchKey = packWord64 key
-  in
-   BU.unsafeUseAsCStringLen matchKey $ \(ptr, len) -> do
-     comparator <- mkCmp $ prefix_eq_comparator
-     scan_range db ro ptr (fromIntegral len) ptr (fromIntegral len) comparator
-
 dropRangeParts (OpenEndButFirst _) range = drop 1 $ range
 dropRangeParts (ButFirst _ _) range = drop 1 $ range
 dropRangeParts (ButLast _ _) range = take ((length range) - 1) range

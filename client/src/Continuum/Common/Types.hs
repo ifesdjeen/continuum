@@ -94,16 +94,6 @@ toNumber (DbByte a)   = Right (fromIntegral a)
 toNumber (DbFloat a)  = Right (realToFrac a)
 toNumber (DbDouble a) = Right (realToFrac a)
 
--- withNumber :: (Num a) =>
---               DbResult ->
---               DbValue ->
---               (a -> a -> a) ->
---               DbResult
-
--- withNumber EmptyRes v _ = EmptyRes
--- withNumber (ValueRes a) (DbLong b) f = ValueRes (f a b)
--- withNumber _ _ _ = ErrorRes OtherError
-
 instance S.Serialize DbValue
 
 data DbRecord =
@@ -171,7 +161,6 @@ instance S.Serialize DbResult
 -- differently not to make that stuff even more complex.
 data ScanRange =
   OpenEnd                  Integer
-  | SingleKey              Integer
   | KeyRange               Integer Integer
   | OpenEndButFirst        Integer
   | ButFirst               Integer Integer

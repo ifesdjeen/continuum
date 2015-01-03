@@ -31,33 +31,6 @@ main =  hspec $ do
   -- let scantdb = scan testDbName
 
   describe "Basic DB Functionality" $ do
-    -- it "Key Range (single key)" $ do
-    --   res <- runner $ do
-    --     _   <- createDatabase testDbName testSchema
-    --     _   <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
-    --     _   <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
-
-    --     PS.parallelScan testDbName (SingleKey 123) Record FetchAll
-    --   res `shouldBe` (Right $ ListResult $ [makeRecord 123 [("a", DbInt 1)]])
-
-    -- it "Single Key Scan " $  do
-    --   res <- runner $ do
-    --     _ <- createDatabase testDbName testSchema
-
-    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
-    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 2)]
-    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 3)]
-
-    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
-    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
-    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
-
-    --     PS.parallelScan testDbName (SingleKey 123) Record FetchAll
-
-    --   res `shouldBe` (Right $ ListResult [makeRecord 123 [("a", DbInt 1)],
-    --                                       makeRecord 123 [("a", DbInt 2)],
-    --                                       makeRecord 123 [("a", DbInt 3)]])
-
 
     it "Key Range (inclusive Range)" $  do
       res <- runner $ do
