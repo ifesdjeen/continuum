@@ -2,25 +2,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Continuum.ParallelStorage
-       where
+module Continuum.Storage.Parallel (parallelScan) where
 
 import           Control.Concurrent.ParallelIO.Global
 import           Continuum.Context
 import           Continuum.Common.Types
-import           Continuum.Storage
-import           Continuum.Common.Serialization
+import           Continuum.Storage.Engine
 
 import           Data.List                      ( nub )
 import           Data.Monoid                    ( mconcat )
-import           Continuum.Folds                ( appendFold, queryStep, finalize )
-import           Control.Monad.State.Strict     ( get, lift, liftIO, evalStateT )
+import           Continuum.Folds                ( queryStep, finalize )
+import           Control.Monad.State.Strict     ( liftIO )
 import           Control.Applicative            ( (<$>) )
-import           Control.Foldl                  ( Fold(..) )
 
-import qualified Data.Map.Strict                as Map
-
-import Debug.Trace
+-- import Debug.Trace
 
 parallelScan :: DbName
                 -> ScanRange
@@ -31,7 +26,7 @@ parallelScan dbName scanRange decoding query = do
   chunks  <- readChunks scanRange
   context <- readT
 
-  let ranges           = (\i -> trace (show i) i) <$> (constructRanges scanRange) <$> (\i -> trace (show i) i) <$> nub <$> (adjustRanges scanRange) <$> chunks
+  let ranges           = (constructRanges scanRange) <$> nub <$> (adjustRanges scanRange) <$> chunks
       scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
 
   rangeResults <- liftIO $ parallelRangeScan ranges scanChunk
@@ -59,15 +54,14 @@ adjustRanges (ExclusiveRange a b) l = [a] ++ l ++ [b]
 adjustRanges EntireKeyspace l       = l
 
 constructRanges :: ScanRange -> [Integer] -> [ScanRange]
-constructRanges range [] = [range]
-constructRanges range [a] = [range]
-constructRanges range [a, b] = [range]
-constructRanges (OpenEnd _) l          = (slide l) ++ [(OpenEnd $ last l)]
-  where last l = l !! ((length l) - 1)
+constructRanges range []      = [range]
+constructRanges range [_]     = [range]
+constructRanges range [_, _]  = [range]
+constructRanges (OpenEnd _) l = (slide l) ++ [(OpenEnd $ last l)]
 
 constructRanges (KeyRange a b) l       = [KeyRange a (first l)] ++ (slide l) ++ [ButFirst (last l) b]
-  where last l = l !! ((length l) - 1)
-        first (s:xs) = s
+  where first (s:_) = s
+
 -- constructRanges (OpenEndButFirst _) l  = [a] ++ l
 -- constructRanges (ButFirst _ _) l       = [a] ++ l ++ [b]
 -- constructRanges (ButLast _ _) l        = [a] ++ l ++ [b]
@@ -75,7 +69,6 @@ constructRanges (KeyRange a b) l       = [KeyRange a (first l)] ++ (slide l) ++ 
 constructRanges EntireKeyspace l       = [(KeyRange (first l) (second l))] ++ (slide (tail l)) ++ [(OpenEndButFirst $ last l)]
   where first (s:_) = s
         second (_:s:_) = s
-        last l = l !! ((length l) - 1)
 
 -- Edge case: when part of the range equals the searched key part
 slide :: [Integer] -> [ScanRange]

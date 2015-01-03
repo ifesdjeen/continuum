@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
-module Cluster.Test where
+module Server.Test where
 
 import           Continuum.Client.Base
-import           Continuum.Cluster
+import           Continuum.Server
 
 import           Data.ByteString                ( ByteString )
 import           System.Process                 ( system )

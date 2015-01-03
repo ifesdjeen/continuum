@@ -41,10 +41,10 @@ library
   Include-dirs:           cbits
                         , /Users/ifesdjeen/hackage/continuum/leveldb/include
   c-sources:              cbits/continuum.c
-  exposed-modules:        Continuum.Storage
-                        , Continuum.NewStorage
-                        , Continuum.ParallelStorage
-                        , Continuum.Cluster
+  exposed-modules:        Continuum.Storage.C
+                        , Continuum.Storage.Engine
+                        , Continuum.Storage.Parallel
+                        , Continuum.Server
                         , Continuum.Options
                         , Continuum.Context
                         , Continuum.Folds
@@ -83,7 +83,7 @@ test-suite tests
   hs-source-dirs:         tests
 
   other-modules:          Storage.Test
-                          , Cluster.Test
+                          , Server.Test
 
   build-depends:          base                   >= 3 && < 5
                         , continuum              >= 0.1.0.8

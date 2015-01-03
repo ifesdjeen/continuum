@@ -3,10 +3,10 @@
 
 module Main where
 
-import qualified Storage.Test       as Storage
-import qualified Cluster.Test       as Cluster
+import qualified Storage.Test      as Storage
+import qualified Server.Test       as Server
 
 main :: IO ()
 main = do
   Storage.main
-  -- Cluster.main
+  Server.main

@@ -13,7 +13,7 @@ import           Control.Applicative            ( (<$>) )
 import           Continuum.Context
 import           Continuum.Common.Types
 import           Continuum.Http.Encoding
-import           Continuum.ParallelStorage      ( parallelScan )
+import           Continuum.Storage.Parallel     ( parallelScan )
 
 import           Network.Wai.Middleware.Static  ( static, staticPolicy, addBase )
 

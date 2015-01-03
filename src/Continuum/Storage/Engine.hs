@@ -7,19 +7,16 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Continuum.Storage
-       where
-
--- import           Debug.Trace                    ( trace )
+module Continuum.Storage.Engine where
 
 import           Continuum.Context
 import           Continuum.Common.Types
 import           Continuum.Common.Primitive
 import           Continuum.Options
 import           Continuum.Common.Serialization
-
 import           Control.Monad.Except
-import qualified Continuum.NewStorage           as NewStorage
+
+import qualified Continuum.Storage.C            as C
 import qualified Database.LevelDB.Base          as LDB
 import qualified Data.ByteString.Char8          as C8
 import qualified Data.ByteString                as BS
@@ -95,7 +92,7 @@ initializeDbs :: String
                  -> LDB.DB
                  -> IO (DbErrorMonad ContextDbsMap)
 initializeDbs path systemDb = do
-  dbs <- NewStorage.scan systemDb readOpts EntireKeyspace decodeSchema
+  dbs <- C.scan systemDb readOpts EntireKeyspace decodeSchema
   res <- traverse (mapM (initializeDb path)) dbs
   return $ Map.fromList <$> res
 
@@ -128,20 +125,6 @@ createDatabase dbName sch = do
           _    <- modifyCtxDbs $ Map.insert dbName (sch, ldb)
           return $ Right EmptyRes
 
-
--- |
--- | AUXILITARY FUNCTIONS
--- |
-
-liftDbError :: (a -> b -> c)
-              -> DbErrorMonad a
-              -> DbErrorMonad b
-              -> DbErrorMonad c
-liftDbError f (Right a) (Right b) = return $! f a b
-liftDbError _ (Left a)  _         = Left a
-liftDbError _ _         (Left b)  = Left b
-
-
 -- |
 -- | Startup
 -- |
@@ -172,8 +155,12 @@ readChunks :: ScanRange -> DbState [Integer]
 readChunks scanRange = do
   db     <- getCtxChunksDb
   ro     <- getReadOptions
-  chunks <- lift $ NewStorage.scan db ro scanRange decodeChunkKey
+  chunks <- lift $ C.scan db ro scanRange decodeChunkKey
   return chunks
+
+-- |
+-- | Scans
+-- |
 
 scan :: DbContext
         -> DbName
@@ -188,6 +175,6 @@ scan context dbName scanRange decoding foldOp = do
 
   case maybeDb of
     (Just (schema, db)) -> do
-      scanRes <- NewStorage.scan db ro scanRange (decodeRecord decoding schema)
+      scanRes <- C.scan db ro scanRange (decodeRecord decoding schema)
       return $ L.fold foldOp <$> scanRes
     Nothing             -> return $ Left NoSuchDatabaseError

@@ -2,7 +2,7 @@
 
 module Main where
 
-import           Continuum.Cluster              ( startNode )
+import           Continuum.Server               ( startNode )
 import           Control.Concurrent             ( newEmptyMVar, takeMVar, MVar )
 
 main :: IO ()

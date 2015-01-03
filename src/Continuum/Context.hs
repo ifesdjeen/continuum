@@ -67,8 +67,8 @@ type ContextState = TVar DbContext
 -- | Getters / Mappers / Modifiers
 -- |
 
-#define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)         \
-GETTER :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) => m FTYPE                    ; \
+#define ACCESSORS(GETTER, MAPPER, MODIFIER, FIELD, FTYPE)                              \
+GETTER :: (Functor m, MonadIO m, (MonadState (TVar DbContext) m)) => m FTYPE         ; \
 GETTER = FIELD <$> readT                                                             ; \
                                                                                      ; \
 MAPPER :: (FTYPE -> FTYPE) -> DbContext  -> DbContext                                ; \

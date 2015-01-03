@@ -25,14 +25,14 @@ queryStep :: SelectQuery
              -- TODO: Maybe makes sense to add error result here? O_O
              -> Fold DbRecord StepResult
 
-queryStep (Multi steps) = Fold step [] finalize
+queryStep (Multi steps) = Fold step [] done
   where step acc val = acc ++ [val]
-        finalize vals = MultiStep $
-                        foldr
-                        (\(fieldName, f) m ->
-                          Map.insert fieldName (fold (queryStep f) vals) m)
-                        Map.empty
-                        steps
+        done vals    = MultiStep $
+                       foldr
+                       (\(fieldName, f) m ->
+                         Map.insert fieldName (fold (queryStep f) vals) m)
+                       Map.empty
+                       steps
 
 queryStep (Group fieldName subquery) =
   case queryStep subquery of

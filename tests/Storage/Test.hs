@@ -3,18 +3,17 @@
 
 module Storage.Test where
 
-import qualified Continuum.Cluster      as Server
-import qualified Data.Map                       as Map
-import qualified Continuum.ParallelStorage as PS
-import           Control.Monad.IO.Class ( liftIO )
-import           Data.ByteString        ( ByteString )
-import           Control.Monad          ( forM_ )
-import           System.Process         ( system )
-import           Continuum.Folds
-import           Continuum.Storage
+import qualified Continuum.Server           as Server
+import qualified Data.Map                   as Map
+import qualified Continuum.Storage.Parallel as PS
+
+import           Data.ByteString          ( ByteString )
+import           Control.Monad            ( forM_ )
+import           System.Process           ( system )
+import           Continuum.Storage.Engine ( createDatabase, readChunks, putRecord )
+
 import           Continuum.Common.Types
 import           Continuum.Context
-
 import           Test.Hspec
 
 testSchema :: DbSchema
@@ -102,8 +101,6 @@ main =  hspec $ do
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
-
-        ctx <- readT
 
         PS.parallelScan testDbName EntireKeyspace Record (Multi [("min", Min "a"),
                                                                  ("avg", Avg "a")])

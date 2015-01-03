@@ -2,29 +2,33 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE BangPatterns #-}
 
-module Continuum.NewStorage where
+module Continuum.Storage.C where
 
-import Control.Exception ( bracket )
+import qualified Data.ByteString.Unsafe    as BU
 
-import qualified Data.ByteString.Unsafe         as BU
-import           Database.LevelDB.Base          ( ReadOptions(..) )
-import           Database.LevelDB.C             ( CompareFun, LevelDBPtr, ReadOptionsPtr,
+import           Control.Exception         ( bracket )
+import           Database.LevelDB.Base     ( ReadOptions(..) )
+import           Database.LevelDB.C        ( CompareFun, LevelDBPtr, ReadOptionsPtr,
                                                   LevelDBPtr, mkCmp )
-import           Database.LevelDB.Internal      ( DB(..), mkCompareFun, mkCReadOpts )
+import           Database.LevelDB.Internal ( DB(..), mkCompareFun, mkCReadOpts )
+import           Control.Applicative       ( (<*>), (<$>) )
+import           Data.ByteString           ( ByteString, packCStringLen )
 
 import           Continuum.Common.Primitive
 import           Continuum.Common.Types
 
-import           Control.Applicative ( (<*>), (<$>) )
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
-import           Data.ByteString           ( ByteString, packCStringLen )
 
 import Debug.Trace
+
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 #include "continuum.h"
 
+-- |
+-- | C Types
+-- |
 
 data CKeyValuePair = CKeyValuePair ByteString ByteString
                    deriving(Eq, Show)
@@ -34,6 +38,10 @@ type CKeyValuePairPtr = Ptr CKeyValuePair
 data CDbResults = CDbResults [CKeyValuePair] deriving(Eq, Show)
 
 type CDbResultsPtr = Ptr CDbResults
+
+-- |
+-- | FFI Decoding
+-- |
 
 instance Storable CKeyValuePair where
   alignment _ = #{alignment key_value_pair_t}
@@ -80,7 +88,6 @@ scan (DB dbPtr _) ro scanRange decoder = do
   bracket (makeScanFn dbPtr cReadOpts scanRange)
           free_db_results
           (\resultsPtr -> (\i -> dropRangeParts scanRange <$> i) <$> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
---  where (<<$>>) a b = (\i -> ) <$> b
 
 toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
 toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
@@ -105,16 +112,16 @@ makeScanFn db ro (KeyRange rangeStart rangeEnd) =
      comparator <- mkCmp $ bitwise_compare
      scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator
 
-makeScanFn db ro (OpenEndButFirst rangeStart) = makeScanFn db ro (OpenEnd rangeStart)
-makeScanFn db ro (ButFirst rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
-makeScanFn db ro (ButLast rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+makeScanFn db ro (OpenEndButFirst rangeStart)         = makeScanFn db ro (OpenEnd rangeStart)
+makeScanFn db ro (ButFirst rangeStart rangeEnd)       = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+makeScanFn db ro (ButLast rangeStart rangeEnd)        = makeScanFn db ro (KeyRange rangeStart rangeEnd)
 makeScanFn db ro (ExclusiveRange rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
 
-dropRangeParts (OpenEndButFirst _) range = drop 1 $ range
-dropRangeParts (ButFirst _ _) range = drop 1 $ range
-dropRangeParts (ButLast _ _) range = take ((length range) - 1) range
+dropRangeParts (OpenEndButFirst _) range  = drop 1 $ range
+dropRangeParts (ButFirst _ _) range       = drop 1 $ range
+dropRangeParts (ButLast _ _) range        = take ((length range) - 1) range
 dropRangeParts (ExclusiveRange _ _) range = drop 1 $ take ((length range) - 1) range
-dropRangeParts _ range = range
+dropRangeParts _ range                    = range
 
 
 -- |
