@@ -11,6 +11,7 @@ import           Continuum.Common.Types
 import           Continuum.Storage
 import           Continuum.Common.Serialization
 
+import           Data.List                      ( nub )
 import           Data.Monoid                    ( mconcat )
 import           Continuum.Folds                ( appendFold, queryStep, finalize )
 import           Control.Monad.State.Strict     ( get, lift, liftIO, evalStateT )
@@ -30,7 +31,7 @@ parallelScan dbName scanRange decoding query = do
   chunks  <- readChunks scanRange
   context <- readT
 
-  let ranges           = (adjustRanges scanRange) <$> makeRanges <$> chunks
+  let ranges           = (\i -> trace (show i) i) <$> (constructRanges scanRange) <$> (\i -> trace (show i) i) <$> nub <$> (adjustRanges scanRange) <$> chunks
       scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
 
   rangeResults <- liftIO $ parallelRangeScan ranges scanChunk
@@ -47,40 +48,36 @@ parallelRangeScan (Right ranges) op = do
 -- execAsyncIO :: DbContext -> IO (DbErrorMonad acc) -> IO (DbErrorMonad a)
 -- execAsyncIO  st op = evalStateT op $ st
 
--- |Split chunks into ranges (pretty much partitioning with a step of 1)
---
-makeRanges :: [Integer]
-              -> [ScanRange]
-makeRanges (f:s:xs) = (KeyRange f s) : makeButFirstRanges (s:xs)
-makeRanges [a]      = [OpenEnd a]
-makeRanges []       = []
-makeRanges _ = error "should never happen"
+adjustRanges :: ScanRange -> [Integer] -> [Integer]
+adjustRanges (OpenEnd a) l          = [a] ++ l
+adjustRanges (KeyRange a b) l       = [a] ++ l ++ [b]
+-- TODO this is a bug again :/ we have to exclude the first :(
+adjustRanges (OpenEndButFirst a) l  = [a] ++ l
+adjustRanges (ButFirst a b) l       = [a] ++ l ++ [b]
+adjustRanges (ButLast a b) l        = [a] ++ l ++ [b]
+adjustRanges (ExclusiveRange a b) l = [a] ++ l ++ [b]
+adjustRanges EntireKeyspace l       = l
 
-makeButFirstRanges :: [Integer]
-                   -> [ScanRange]
-makeButFirstRanges (f:s:xs) = (ButFirst f s) : makeButFirstRanges (s:xs)
-makeButFirstRanges [a]      = [OpenEndButFirst a]
-makeButFirstRanges []       = []
-makeButFirstRanges _ = error "should never happen"
+constructRanges :: ScanRange -> [Integer] -> [ScanRange]
+constructRanges range [] = [range]
+constructRanges range [a] = [range]
+constructRanges range [a, b] = [range]
+constructRanges (OpenEnd _) l          = (slide l) ++ [(OpenEnd $ last l)]
+  where last l = l !! ((length l) - 1)
 
--- dropDuplicates :: [[a]] -> [[a]]
--- dropDuplicates val@[a] = val
--- dropDuplicates (s:xs) = s : (map butfirst xs)
---   where butfirst (x:xs) = xs
+constructRanges (KeyRange a b) l       = [KeyRange a (first l)] ++ (slide l) ++ [ButFirst (last l) b]
+  where last l = l !! ((length l) - 1)
+        first (s:xs) = s
+-- constructRanges (OpenEndButFirst _) l  = [a] ++ l
+-- constructRanges (ButFirst _ _) l       = [a] ++ l ++ [b]
+-- constructRanges (ButLast _ _) l        = [a] ++ l ++ [b]
+-- constructRanges (ExclusiveRange _ _) l = [a] ++ l ++ [b]
+constructRanges EntireKeyspace l       = [(KeyRange (first l) (second l))] ++ (slide (tail l)) ++ [(OpenEndButFirst $ last l)]
+  where first (s:_) = s
+        second (_:s:_) = s
+        last l = l !! ((length l) - 1)
 
-adjustRanges :: ScanRange -> [ScanRange] -> [ScanRange]
-adjustRanges v@(OpenEnd _)      ranges    = concat [[v], (tail ranges)]
-adjustRanges v@(SingleKey _)    _         = [v]
-adjustRanges v@(KeyRange _ _)   []        = [v]
-
-adjustRanges (KeyRange s e)     [(KeyRange s1 e1)] =
-  [(KeyRange s s1), (KeyRange s1 e1), (KeyRange e1 e)]
-
-adjustRanges (KeyRange s e)     ranges =
-  let count                = length ranges
-      h@(KeyRange hs _)    = head ranges
-      t@(KeyRange _  te)   = last ranges
-      middle               = drop 1 (take (count - 1) ranges)
-  in concat [[(KeyRange s hs), h], middle, [t, (KeyRange te e)]]
-
-adjustRanges EntireKeyspace ranges = ranges
+-- Edge case: when part of the range equals the searched key part
+slide :: [Integer] -> [ScanRange]
+slide (f:s:xs) = (ButFirst f s) : slide (s:xs)
+slide _ = []
