@@ -9,4 +9,4 @@ import qualified Cluster.Test       as Cluster
 main :: IO ()
 main = do
   Storage.main
-  Cluster.main
+  -- Cluster.main

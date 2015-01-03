@@ -133,6 +133,7 @@ data DbResult =
   | ValueRes               DbValue
   | RecordRes              DbRecord
   | ListResult             [DbRecord]
+  | MultiResult            (Map.Map ByteString DbResult)
   | MapResult              (Map.Map DbValue DbResult)
   -- TODO: RAW RESULT
 

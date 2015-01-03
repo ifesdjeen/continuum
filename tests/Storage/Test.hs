@@ -31,34 +31,32 @@ main =  hspec $ do
   -- let scantdb = scan testDbName
 
   describe "Basic DB Functionality" $ do
-    it "Key Range (single key)" $ do
-      res <- runner $ do
-        _   <- createDatabase testDbName testSchema
-        _   <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
-        _   <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+    -- it "Key Range (single key)" $ do
+    --   res <- runner $ do
+    --     _   <- createDatabase testDbName testSchema
+    --     _   <- putRecordTdb $ makeRecord 100 [("a", DbInt 1)]
+    --     _   <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
-      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)]]
+    --     PS.parallelScan testDbName (SingleKey 123) Record FetchAll
+    --   res `shouldBe` (Right $ ListResult $ [makeRecord 123 [("a", DbInt 1)]])
 
-    it "Single Key Scan " $  do
-      res <- runner $ do
-        _ <- createDatabase testDbName testSchema
+    -- it "Single Key Scan " $  do
+    --   res <- runner $ do
+    --     _ <- createDatabase testDbName testSchema
 
-        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
-        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 2)]
-        _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 3)]
+    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
+    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 2)]
+    --     _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 3)]
 
-        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
-        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
-        _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
+    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 1)]
+    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 2)]
+    --     _ <- putRecordTdb $ makeRecord 456 [("a", DbInt 3)]
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName (SingleKey 123) Record appendFold
+    --     PS.parallelScan testDbName (SingleKey 123) Record FetchAll
 
-      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)],
-                            makeRecord 123 [("a", DbInt 2)],
-                            makeRecord 123 [("a", DbInt 3)]]
+    --   res `shouldBe` (Right $ ListResult [makeRecord 123 [("a", DbInt 1)],
+    --                                       makeRecord 123 [("a", DbInt 2)],
+    --                                       makeRecord 123 [("a", DbInt 3)]])
 
 
     it "Key Range (inclusive Range)" $  do
@@ -75,16 +73,15 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 555 [("a", DbInt 3)]
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName (KeyRange 123 456) Record appendFold
+        PS.parallelScan testDbName (KeyRange 123 456) Record FetchAll
 
-      res `shouldBe` Right [makeRecord 123 [("a", DbInt 1)],
-                            makeRecord 124 [("a", DbInt 2)],
-                            makeRecord 125 [("a", DbInt 3)],
+      res `shouldBe` (Right $ ListResult [makeRecord 123 [("a", DbInt 1)],
+                                          makeRecord 124 [("a", DbInt 2)],
+                                          makeRecord 125 [("a", DbInt 3)],
 
-                            makeRecord 456 [("a", DbInt 1)],
-                            makeRecord 456 [("a", DbInt 2)],
-                            makeRecord 456 [("a", DbInt 3)]]
+                                          makeRecord 456 [("a", DbInt 1)],
+                                          makeRecord 456 [("a", DbInt 2)],
+                                          makeRecord 456 [("a", DbInt 3)]])
 
     it "Key Range (inclusive range), when there're records both before and after" $  do
       res <- runner $ do
@@ -100,37 +97,21 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3)]
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName (KeyRange 300 456) Record appendFold
+        PS.parallelScan testDbName (KeyRange 300 456) Record FetchAll
 
-      res `shouldBe` Right [makeRecord 456 [("a", DbInt 1)],
-                            makeRecord 456 [("a", DbInt 2)],
-                            makeRecord 456 [("a", DbInt 3)]]
-
-
-  describe "Snapshotting" $ do
-
-    it "should create snapshots after each 10 records" $  do
-      res <- runner $ do
-        _ <- createDatabase testDbName testSchema
-        _ <- forM_ [1..100] (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1)])
-
-        readChunks EntireKeyspace
-
-      res `shouldBe` (Right (take 10 $ [(10 * x + 1) | x <- [0..]]))
-
+      res `shouldBe` (Right $ ListResult [makeRecord 456 [("a", DbInt 1)],
+                                          makeRecord 456 [("a", DbInt 2)],
+                                          makeRecord 456 [("a", DbInt 3)]])
 
   describe "Queries" $ do
     it "should run FetchAll query" $ do
-      let records = take 1000 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
+      let records = take 100 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
+        PS.parallelScan testDbName EntireKeyspace Record FetchAll
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep FetchAll)
-
-      res `shouldBe` (Right $ ListStep records)
+      res `shouldBe` (Right $ ListResult records)
 
     it "should run Min query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
@@ -138,25 +119,24 @@ main =  hspec $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        ctx <- readT
+        PS.parallelScan testDbName EntireKeyspace Record (Min "a")
 
-        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Min "a"))
-
-      res `shouldBe` (Right $ MinStep $ DbInt 10)
+      res `shouldBe` (Right $ ValueRes $ DbInt 10)
 
     it "should run Multi query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i + 10)] | i <- [0..]]
+
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
         ctx <- readT
 
-        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Multi [("min", Min "a"),
-                                                                              ("avg", Avg "a")
-                                                                              ]))
+        PS.parallelScan testDbName EntireKeyspace Record (Multi [("min", Min "a"),
+                                                                 ("avg", Avg "a")])
 
-      res `shouldBe` (Right $ MinStep $ DbInt 10)
+      res `shouldBe` (Right $ MultiResult $ Map.fromList [("avg",ValueRes (DbDouble 59.5)),
+                                                          ("min",ValueRes (DbInt 10))])
 
 
     it "should run Group query" $ do
@@ -173,13 +153,12 @@ main =  hspec $ do
         _ <- forM_ recordsA putRecordTdb
         _ <- forM_ recordsB putRecordTdb
 
-        ctx <- readT
-        liftIO $ scan ctx testDbName EntireKeyspace Record (queryStep (Group "b" FetchAll))
+        PS.parallelScan testDbName EntireKeyspace Record (Group "b" FetchAll)
 
-      res `shouldBe` (Right $ GroupStep $ Map.fromList [(DbString "a", ListStep recordsA),
-                                                        (DbString "b", ListStep recordsB)])
+      res `shouldBe` (Right $ MapResult $ Map.fromList [(DbString "a", ListResult recordsA),
+                                                        (DbString "b", ListResult recordsB)])
 
-    it "Parallel " $ do
+    it "should run Avg query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i)] | i <- [0..]]
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
@@ -188,6 +167,17 @@ main =  hspec $ do
         PS.parallelScan testDbName EntireKeyspace Record (Avg "a")
 
       res `shouldBe` (Right $ ValueRes $ DbDouble 49.5)
+
+  describe "Snapshotting" $ do
+
+    it "should create snapshots after each 10 records" $  do
+      res <- runner $ do
+        _ <- createDatabase testDbName testSchema
+        _ <- forM_ [1..100] (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1)])
+
+        readChunks EntireKeyspace
+
+      res `shouldBe` (Right (take 10 $ [(10 * x + 1) | x <- [0..]]))
 
     -- it "should run FetchAll
     -- FetchAll with limits

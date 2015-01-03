@@ -91,6 +91,9 @@ instance Monoid StepResult where
   mappend (GroupStep a)  (GroupStep b) =
     GroupStep $! Map.unionWith mappend a b
 
+  mappend (MultiStep a)  (MultiStep b) =
+    MultiStep $! Map.unionWith mappend a b
+
   mappend a EmptyStepRes = a
   mappend EmptyStepRes b = b
   mappend _ _ = ErrorStepRes NoAggregatorAvailable
@@ -111,5 +114,6 @@ finalize (AvgStep i)   =
   --do
   -- trace (show i) (ValueRes $ DbInt 1)
 finalize (ListStep i)  = ListResult $ i
-finalize (GroupStep i) = MapResult  $ Map.map finalize i
-finalize _ = ErrorRes $ NoStepToResultConvertor
+finalize (MultiStep i) = MultiResult $ Map.map finalize i
+finalize (GroupStep i) = MapResult $ Map.map finalize i
+finalize a = trace (show a) (ErrorRes $ NoStepToResultConvertor)
