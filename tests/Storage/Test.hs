@@ -109,7 +109,7 @@ main =  hspec $ do
                                                           ("min",ValueRes (DbInt 10))])
 
 
-    it "should run Group query" $ do
+    it "should run Field Group query" $ do
 
       let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]
           recordsA    = take 2 [makeRecord i [("a", DbInt $ i + 10),
@@ -123,10 +123,30 @@ main =  hspec $ do
         _ <- forM_ recordsA putRecordTdb
         _ <- forM_ recordsB putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (Group "b" FetchAll)
+        PS.parallelScan testDbName EntireKeyspace Record (FieldGroup "b" FetchAll)
 
       res `shouldBe` (Right $ MapResult $ Map.fromList [(DbString "a", ListResult recordsA),
                                                         (DbString "b", ListResult recordsB)])
+
+
+    it "should run Time Group query" $ do
+
+      let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]
+          recordsA    = take 2 [makeRecord (1420471452271 + i) [("a", DbInt $ i + 10),
+                                                                ("b", DbString "a")] | i <- [1..]]
+          recordsB    = take 3 [makeRecord (1420471452271 + 1000 + i) [("a", DbInt $ i + 10),
+                                                                       ("b", DbString "b")] | i <- [1..]]
+
+      res <- runner $ do
+        _ <- createDatabase testDbName groupSchema
+
+        _ <- forM_ recordsA putRecordTdb
+        _ <- forM_ recordsB putRecordTdb
+
+        PS.parallelScan testDbName EntireKeyspace Record (TimeGroup (Seconds 1) FetchAll)
+
+      res `shouldBe` (Right $ MapResult $ Map.fromList [(DbInt 1420471452000, ListResult recordsA),
+                                                        (DbInt 1420471453000, ListResult recordsB)])
 
     it "should run Avg query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i)] | i <- [0..]]
