@@ -75,6 +75,7 @@ data DbValue =
   | DbByte                  Integer
   | DbFloat                 Float
   | DbDouble                Double
+  | DbList                  [DbValue]
   -- DbList [DbValue]
   -- DbMap [Map.Map DbValue DbValue]
   deriving (Eq, Ord, Generic, Show)
@@ -235,9 +236,10 @@ data SelectQuery =
   | Avg                    FieldName
   -- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
-  | Group                  (DbRecord -> DbValue) SelectQuery
-  | FieldGroup             FieldName   SelectQuery
-  | TimeGroup              TimePeriod  SelectQuery
+  | Group                  (DbRecord -> DbValue)  SelectQuery
+  | TimeFieldGroup         FieldName TimePeriod   SelectQuery
+  | FieldGroup             FieldName              SelectQuery
+  | TimeGroup                        TimePeriod   SelectQuery
   | FetchAll
   | Skip                   Integer
   | Limit                  Integer

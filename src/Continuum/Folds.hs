@@ -36,6 +36,8 @@ queryStep (Multi steps) = Fold step [] done
                        Map.empty
                        steps
 
+queryStep (TimeFieldGroup fieldName timePeriod subquery) =
+  queryStep $ Group (\i -> DbList [getValue fieldName i, roundTime timePeriod i]) subquery
 queryStep (FieldGroup fieldName subquery) = queryStep $ Group (getValue fieldName) subquery
 queryStep (TimeGroup  timePeriod subquery) = queryStep $ Group (roundTime timePeriod) subquery
 
