@@ -3,13 +3,15 @@
 
 module Continuum.Folds where
 
-import           Data.List          ( genericLength )
 import           Debug.Trace
 import           Continuum.Common.Types
-import qualified Data.Map.Strict as Map
+
+import           Data.List          ( genericLength )
 import           Control.Foldl      ( Fold(..), fold )
+
 import           Data.Monoid
 
+import qualified Data.Map.Strict as Map
 appendFold :: Fold a [a]
 appendFold = Fold step [] id
   where step acc val = acc ++ [val]
@@ -34,7 +36,10 @@ queryStep (Multi steps) = Fold step [] done
                        Map.empty
                        steps
 
-queryStep (Group fieldName subquery) =
+queryStep (FieldGroup fieldName subquery) = queryStep $ Group (getValue fieldName) subquery
+queryStep (TimeGroup  timePeriod subquery) = queryStep $ Group (roundTime timePeriod) subquery
+
+queryStep (Group groupFn subquery) =
   case queryStep subquery of
     (Fold subStep subInit subFinalize) ->
       let
@@ -42,7 +47,7 @@ queryStep (Group fieldName subquery) =
         wrappedSubStep n (Just a) = return $! (subStep a n)
 
         localStep m record =
-          Map.alter (wrappedSubStep record) (getValue fieldName record) m
+          Map.alter (wrappedSubStep record) (groupFn record) m
 
         finalize g = GroupStep $ Map.map subFinalize g
       in

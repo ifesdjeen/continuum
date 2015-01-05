@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Continuum.Common.Types where
 
@@ -106,6 +107,15 @@ getValue :: FieldName -> DbRecord -> DbValue
 getValue fieldName (DbRecord _ fields) =
   fromMaybe EmptyValue (Map.lookup fieldName fields)
 
+--
+-- Stubs
+--
+instance Show (DbRecord -> DbValue) where
+  show = undefined
+
+instance S.Serialize (DbRecord -> DbValue) where
+  put = undefined
+  get = undefined
 
 -- | Creates a DbRecord from Timestamp and Key/Value pairs
 --
@@ -225,8 +235,9 @@ data SelectQuery =
   | Avg                    FieldName
   -- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
-  | Group                  FieldName SelectQuery
-  | TimeGroup              Integer   SelectQuery
+  | Group                  (DbRecord -> DbValue) SelectQuery
+  | FieldGroup             FieldName   SelectQuery
+  | TimeGroup              TimePeriod  SelectQuery
   | FetchAll
   | Skip                   Integer
   | Limit                  Integer
@@ -254,3 +265,20 @@ data Request =
   deriving(Generic, Show)
 
 instance S.Serialize Request
+
+data TimePeriod =
+  Milliseconds Integer |
+  Seconds      Integer |
+  Minutes      Integer |
+  Hours        Integer |
+  Days         Integer
+  deriving(Generic, Show)
+
+instance S.Serialize TimePeriod
+
+roundTime :: TimePeriod -> DbRecord ->  DbValue
+roundTime (Milliseconds slice) (DbRecord time _) = DbInt $ slice * (time `quot` slice)
+roundTime (Seconds      slice) record            = roundTime (Milliseconds $ slice * 1000) record
+roundTime (Minutes      slice) record            = roundTime (Seconds $ slice * 60) record
+roundTime (Hours        slice) record            = roundTime (Minutes $ slice * 60) record
+roundTime (Days         slice) record            = roundTime (Hours $ slice * 24) record
