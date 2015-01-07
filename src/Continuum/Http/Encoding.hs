@@ -19,10 +19,10 @@ instance ToJSON DbError where
 instance ToJSON ByteString where
   toJSON = toJSON . decodeUtf8
 
-instance (ToJSON a, ToJSON b) => ToJSON (Map.Map a b) where
+instance (ToJSON b) => ToJSON (Map.Map ByteString b) where
   toJSON m = object $
              concat $
-             map (\(k, v) -> [(pack $ show $ toJSON k) .= (toJSON v)]) (Map.toList m)
+             map (\(k, v) -> [(decodeUtf8 k) .= (toJSON v)]) (Map.toList m)
 
 instance ToJSON DbSchema where
   toJSON DbSchema{..} = toJSON $ schemaMappings
