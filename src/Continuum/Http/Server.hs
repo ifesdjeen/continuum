@@ -16,6 +16,8 @@ import           Continuum.Http.Encoding
 import           Continuum.Storage.Parallel     ( parallelScan )
 
 import           Network.Wai.Middleware.Static  ( static, staticPolicy, addBase )
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Char8          ( split )
 
 runWebServer :: (TVar DbContext) -> IO ()
 runWebServer ctxTVar = do
@@ -33,14 +35,31 @@ runWebServer ctxTVar = do
       Scotty.json (Map.map fst res)
 
     Scotty.get "/dbs/:db/range" $ do
-      db   <- Scotty.param "db"
-      from <- maybeParam   "from"
-      to   <- maybeParam   "to"
-      res  <- liftIO $ processRequest (parallelScan db (toRange from to) Record FetchAll)
+      db        <- Scotty.param "db"
+      from      <- maybeParam   "from"
+      to        <- maybeParam   "to"
+
+      timeGroup <- maybeParam   "timeGroup"
+      aggregate <- maybeParam   "aggregate"
+      fields    <- maybeParam   "fields"
+
+      let q = toQuery timeGroup aggregate fields
+
+      res       <- liftIO $ processRequest (parallelScan db (toRange from to) Record q)
       Scotty.json res
 
   return ()
   where
+
+toQuery :: Maybe Integer -> Maybe ByteString -> Maybe ByteString -> SelectQuery
+toQuery (Just timeGroup) (Just aggregate) (Just fieldsStr) =
+  let fields = splitFields fieldsStr
+  in TimeGroup (Milliseconds timeGroup) (Multi (map (\field -> (field, Min field)) fields))
+  where splitFields a = split ',' a
+toQuery _ _ _ = FetchAll
+
+
+
 
 maybeParam :: Scotty.Parsable a => Text -> Scotty.ActionM (Maybe a)
 maybeParam p = (Just <$> Scotty.param p) `Scotty.rescue` (\_ -> (return Nothing))
