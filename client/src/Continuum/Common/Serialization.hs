@@ -58,7 +58,7 @@ decodeSchema :: Decoder (DbName, DbSchema)
 decodeSchema (dbName, encodedSchema) =
   case (decode encodedSchema) of
     (Left err)     -> throwError $ SchemaDecodingError err
-    (Right schema) -> return $ (dbName, schema)
+    (Right schema) -> return $! (dbName, schema)
 
 decodeQuery :: B.ByteString
                -> DbErrorMonad SelectQuery
