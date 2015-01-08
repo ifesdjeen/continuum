@@ -23,11 +23,13 @@ import qualified Data.ByteString                as BS
 import qualified Data.Map.Strict                as Map
 import qualified Continuum.Options              as Opts
 import qualified Control.Foldl                  as L
+import qualified Data.List                      as List
 
 import           Data.Traversable               ( traverse )
 import           System.Process                 ( system )
 import           Control.Applicative            ( (<$>) )
 
+import Debug.Trace
 -- |
 -- | OPERATIONS
 -- |
@@ -45,11 +47,18 @@ putRecord dbName record = do
   case maybeDbDescr of
     (Just (schema, db)) -> do
       wo <- getWriteOptions
-      let (key, value) = encodeRecord schema record sid
-      _  <- LDB.put db wo key value
-
+      when (validateRecord record schema) $ do
+        let (key, value) = encodeRecord schema record sid
+        _  <- LDB.put db wo key value
+        return ()
       return $ return $ EmptyRes
     Nothing             -> return $ Left NoSuchDatabaseError
+
+validateRecord :: DbRecord -> DbSchema -> Bool
+validateRecord (DbRecord _ d) DbSchema{..} =
+  if (List.sort fields) == (List.sort (Map.keys d))
+  then True
+  else False
 
 -- |Insert Schema Record of an existing database by
 -- given name. Databases are re-initialized on startup
