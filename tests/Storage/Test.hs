@@ -15,15 +15,17 @@ import           Continuum.Storage.Engine ( createDatabase, readChunks, putRecor
 import           Continuum.Common.Types
 import           Continuum.Context
 import           Test.Hspec
+import           Control.Monad.IO.Class         ( liftIO )
+import           Debug.Trace
 
 testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt) ]
 
-testDbContext :: DbContext
-testDbContext = defaultDbContext { snapshotAfter = 10 }
+testDbContext :: Integer -> DbContext
+testDbContext sa = defaultDbContext { snapshotAfter = sa }
 
 runner :: DbState a -> IO (DbErrorMonad a)
-runner = Server.withTmpStorage testDbPath testDbContext cleanup
+runner = Server.withTmpStorage testDbPath (testDbContext 10) cleanup
 
 main :: IO ()
 main =  hspec $ do
@@ -34,6 +36,11 @@ main =  hspec $ do
     it "Key Range (inclusive Range)" $  do
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
+  --       _      <- createDatabase "system.cpu" cpuSchema
+  -- _      <- createDatabase "system.mem" memorySchema
+  -- _      <- createDatabase "system.mem.percent" memorySchema
+  -- _      <- createDatabase "system.net" networkSchema
+  -- _      <- createDatabase "system.tcp" tcpSchema
 
         _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
         _ <- putRecordTdb $ makeRecord 124 [("a", DbInt 2)]
@@ -160,7 +167,6 @@ main =  hspec $ do
                          makeRecord (1420471453271) [("a", DbInt 4),
                                                      ("b", DbString "b")]]
 
-
       res <- runner $ do
         _ <- createDatabase testDbName groupSchema
 
@@ -177,8 +183,6 @@ main =  hspec $ do
                         ValueRes $ DbInt 2),
                        (DbList [DbString "b",DbInt 1420471453000],
                         ValueRes $ DbInt 4)])
-
-
 
     it "should run Avg query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i)] | i <- [0..]]
@@ -207,22 +211,6 @@ main =  hspec $ do
     -- Min
     -- Max
     -- Combinations
-
-  -- Slow test
-  -- describe "Stack Allocations / Thunk Leaks" $ do
-  --   it "should iterate over a large amount of records" $  do
-  --     let res = runner $ do
-  --           _ <- createDatabase testDbName testSchema
-
-  --           forM_ [1..1000000]
-  --             (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1),
-  --                                                 ("b", DbString "1")])
-
-  --           ctx <- readT
-  --           liftIO $ scan ctx testDbName EntireKeyspace (Field "a") (queryStep Count)
-
-  --     res `shouldReturn` (Right (CountStep 1000000))
-
 
     -- it "should iterate " $  do
     --   let res = runner testSchema $ do
