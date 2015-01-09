@@ -117,7 +117,7 @@ finalize (AvgStep i)   =
     (Left a) -> ErrorRes $ a
     (Right a) -> ValueRes $ DbDouble $ a
 
-  where average nums = trace (show nums) ((sum nums) / (genericLength nums))
+  where average nums = (sum nums) / (genericLength nums)
   --do
   -- trace (show i) (ValueRes $ DbInt 1)
 finalize (ListStep i)  = ListResult $ i
