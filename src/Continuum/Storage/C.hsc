@@ -20,6 +20,7 @@ import           Continuum.Common.Types
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
+import           Data.IORef                ( IORef(..), newIORef, modifyIORef', readIORef )
 
 import Debug.Trace
 
@@ -27,57 +28,14 @@ import Debug.Trace
 #include "continuum.h"
 
 -- |
--- | C Types
--- |
-
-data CKeyValuePair = CKeyValuePair ByteString ByteString
-                   deriving(Eq, Show)
-
-type CKeyValuePairPtr = Ptr CKeyValuePair
-
-data CDbResults = CDbResults [CKeyValuePair] deriving(Eq, Show)
-
-type CDbResultsPtr = Ptr CDbResults
-
--- |
 -- | FFI Decoding
 -- |
 
-instance Storable CKeyValuePair where
-  alignment _ = #{alignment key_value_pair_t}
-  sizeOf _    = #{size      key_value_pair_t}
-
-  peek p      = do
-    keyLen <- #{peek key_value_pair_t, key_len}  p
-    keyPtr <- #{peek key_value_pair_t, key}      p
-
-    valLen <- #{peek key_value_pair_t, val_len}  p
-    valPtr <- #{peek key_value_pair_t, val}      p
-
-    CKeyValuePair
-      <$> decodeString keyLen keyPtr
-      <*> decodeString valLen valPtr
-
-  poke = undefined -- we never need or use that
-
-instance Storable CDbResults where
-  alignment _ = #{alignment db_results_t}
-  sizeOf _    = #{size      db_results_t}
-
-  peek p      = do
-    kvpsCount  <- #{peek db_results_t, count }  p
-    kvpsPtr    <- #{peek db_results_t, results} p
-    kvps       <- peekArray kvpsCount kvpsPtr
-
-    return $ CDbResults kvps
-
-  poke = undefined -- we never need or use that
-
-decodeString :: CSize -> CString -> IO ByteString
-decodeString len res = packCStringLen (res, fromIntegral len)
+decodeString :: CString -> CSize -> IO ByteString
+decodeString ptr size = packCStringLen (ptr, fromIntegral size)
 {-# INLINE decodeString #-}
 
-scan :: DB
+scan :: (Show a) => DB
         -> ReadOptions
         -> ScanRange
         -> Decoder a
@@ -85,37 +43,38 @@ scan :: DB
 
 scan (DB dbPtr _) ro scanRange decoder = do
   cReadOpts <- mkCReadOpts ro
-  bracket (makeScanFn dbPtr cReadOpts scanRange)
-          free_db_results
-          (\resultsPtr -> (\i -> dropRangeParts scanRange <$> i) <$> (mapM decoder) <$> toByteStringTuple <$> peek resultsPtr)
+  ref       <- newIORef []
+  appendFn  <- makeCAppendFun $ makeAppendFun ref decoder
+  ()        <- doScan dbPtr cReadOpts scanRange appendFn
+  result    <- readIORef ref
+  return $! (\i -> dropRangeParts scanRange <$> i) <$> sequence $ result
 
-toByteStringTuple :: CDbResults -> [(ByteString, ByteString)]
-toByteStringTuple (CDbResults a) = map (\(CKeyValuePair b c) -> (b, c)) a
+doScan :: LevelDBPtr
+              -> ReadOptionsPtr
+              -> ScanRange
+              -> AppendFunPtr
+              -> IO ()
+doScan db ro EntireKeyspace appendFn = scan_entire_keyspace db ro appendFn
 
-makeScanFn :: LevelDBPtr
-             -> ReadOptionsPtr
-             -> ScanRange
-             -> IO CDbResultsPtr
-makeScanFn db ro EntireKeyspace = scan_entire_keyspace db ro
-makeScanFn db ro (OpenEnd rangeStart) =
+doScan db ro (OpenEnd rangeStart) appendFn =
   let rangeStartBytes = packWord64 rangeStart
   in
    BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   scan_open_end db ro start_at_ptr (fromIntegral start_at_len)
+   scan_open_end db ro start_at_ptr (fromIntegral start_at_len) appendFn
 
-makeScanFn db ro (KeyRange rangeStart rangeEnd) =
+doScan db ro (KeyRange rangeStart rangeEnd) appendFn =
   let rangeStartBytes = packWord64 rangeStart
       rangeEndBytes   = packWord64 rangeEnd
   in
    BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
    BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
      comparator <- mkCmp $ bitwise_compare
-     scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator
+     scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
 
-makeScanFn db ro (OpenEndButFirst rangeStart)         = makeScanFn db ro (OpenEnd rangeStart)
-makeScanFn db ro (ButFirst rangeStart rangeEnd)       = makeScanFn db ro (KeyRange rangeStart rangeEnd)
-makeScanFn db ro (ButLast rangeStart rangeEnd)        = makeScanFn db ro (KeyRange rangeStart rangeEnd)
-makeScanFn db ro (ExclusiveRange rangeStart rangeEnd) = makeScanFn db ro (KeyRange rangeStart rangeEnd)
+doScan db ro (OpenEndButFirst rangeStart)         appendFn = doScan db ro (OpenEnd rangeStart) appendFn
+doScan db ro (ButFirst rangeStart rangeEnd)       appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
+doScan db ro (ButLast rangeStart rangeEnd)        appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
+doScan db ro (ExclusiveRange rangeStart rangeEnd) appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
 
 dropRangeParts (OpenEndButFirst _) range  = drop 1 $ range
 dropRangeParts (ButFirst _ _) range       = drop 1 $ range
@@ -123,13 +82,15 @@ dropRangeParts (ButLast _ _) range        = take ((length range) - 1) range
 dropRangeParts (ExclusiveRange _ _) range = drop 1 $ take ((length range) - 1) range
 dropRangeParts _ range                    = range
 
-
 -- |
 -- | Foreign imports
 -- |
 
 foreign import ccall safe "continuum.h"
-  scan_entire_keyspace :: LevelDBPtr -> ReadOptionsPtr -> IO CDbResultsPtr
+  scan_entire_keyspace :: LevelDBPtr
+                          -> ReadOptionsPtr
+                          -> FunPtr AppendFun
+                          -> IO ()
 
 foreign import ccall safe "continuum.h"
   scan_range :: LevelDBPtr
@@ -139,17 +100,16 @@ foreign import ccall safe "continuum.h"
                 -> CString
                 -> CSize
                 -> FunPtr CompareFun
-                -> IO CDbResultsPtr
+                -> FunPtr AppendFun
+                -> IO ()
 
 foreign import ccall safe "continuum.h"
   scan_open_end :: LevelDBPtr
                    -> ReadOptionsPtr
                    -> CString
                    -> CSize
-                   -> IO CDbResultsPtr
-
-foreign import ccall safe "continuum.h"
-  free_db_results :: CDbResultsPtr -> IO ()
+                   -> FunPtr AppendFun
+                   -> IO ()
 
 foreign import ccall safe "static continuum.h"
   bitwise_compare :: CompareFun
@@ -175,3 +135,17 @@ prefix_eq_comparator =
                     if a' == b'
                     then GT
                     else LT)
+
+type AppendFun = CString -> CSize -> CString -> CSize -> IO ()
+
+makeAppendFun :: (Show a) => IORef [DbErrorMonad a] -> Decoder a -> AppendFun
+makeAppendFun ref decoder keyPtr keyLen valPtr valLen = do
+  key <- decodeString keyPtr keyLen
+  val <- decodeString valPtr valLen
+  modifyIORef' ref (\prev -> let next = decoder (key, val)
+                             in seq next (prev ++ [next]))
+
+type AppendFunPtr = FunPtr AppendFun
+
+foreign import ccall safe "wrapper"
+  makeCAppendFun :: AppendFun -> IO AppendFunPtr
