@@ -68,7 +68,7 @@ queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
 
 queryStep (Avg fieldName) = Fold step (AvgStep []) id
-  where step (AvgStep acc) record = AvgStep $ acc ++ [(getValue fieldName record)]
+  where step (AvgStep acc) record = AvgStep $ (getValue fieldName record) : acc
 
 queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 
