@@ -118,7 +118,6 @@ decodeKey = unpackWord64
 
 decodeChunkKey :: Decoder Integer
 decodeChunkKey (x, _) = unpackWord64 (B.take 8 x)
-
 {-# INLINE decodeChunkKey #-}
 
 decodeIndexes :: DbSchema -> B.ByteString -> [Int]
