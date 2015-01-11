@@ -4,9 +4,9 @@
 
 module Continuum.Storage.Parallel (parallelScan) where
 
-import           Control.Concurrent.ParallelIO.Global
+import           Control.Concurrent.ParallelIO.Local
 import           Continuum.Context
-import           Continuum.Common.Types
+import           Continuum.Types
 import           Continuum.Storage.Engine
 
 import           Data.List                      ( nub )
@@ -30,6 +30,7 @@ parallelScan dbName scanRange decoding query = do
       scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
 
   rangeResults <- liftIO $ parallelRangeScan ranges scanChunk
+
   return $ (finalize . mconcat) <$> rangeResults
 
 parallelRangeScan :: DbErrorMonad [ScanRange]
@@ -37,7 +38,8 @@ parallelRangeScan :: DbErrorMonad [ScanRange]
                   -> IO (DbErrorMonad [a])
 parallelRangeScan (Left  err)    _  = return $ Left err
 parallelRangeScan (Right ranges) op = do
-  res <- parallel $ map op ranges
+  print $ ranges
+  res <- withPool 8 $ (\pool -> parallel pool $ map op ranges)
   return $ sequence res
 
 -- execAsyncIO :: DbContext -> IO (DbErrorMonad acc) -> IO (DbErrorMonad a)

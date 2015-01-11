@@ -5,7 +5,7 @@
 module Continuum.Server where
 
 import           Continuum.Context
-import           Continuum.Common.Types
+import           Continuum.Types
 import           Continuum.Storage.Engine
 import           Continuum.Storage.Parallel
 
