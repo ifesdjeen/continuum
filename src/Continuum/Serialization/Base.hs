@@ -97,6 +97,10 @@ decodeRecord Record schema !(k, bs) = do
   decodedVal     <- decodeValues schema bs
   return $! DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
 
+decodeRecord Key schema !(k, bs) = do
+  timestamp      <- decodeKey k
+  return $! DbRecord timestamp (Map.fromList [])
+
 decodeRecord (Fields flds) schema (k, bs) = do
   timestamp     <- decodeKey k
   decodedVals   <- if isJust idxs
@@ -131,6 +135,7 @@ decodeValues schema bs = mapM (\(t, s) -> fastDecodeValue t s) (zip (schemaTypes
     indices                  = decodeIndexes schema bs
     bytestrings              = snd (foldl step (B.drop (length indices) bs, []) indices)
     step (remaining', acc) n = (B.drop n remaining', acc ++ [B.take n remaining'])
+{-# INLINE decodeValues #-}
 
 -- | Decodes field by index
 decodeFieldByIndex :: DbSchema
