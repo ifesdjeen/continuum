@@ -4,7 +4,8 @@
 module Continuum.Folds where
 
 import           Debug.Trace
-import           Continuum.Common.Types
+import           Continuum.Types
+import           Continuum.Context
 
 import           Data.List          ( genericLength )
 import           Control.Foldl      ( Fold(..), fold )
@@ -15,6 +16,7 @@ import qualified Data.Map.Strict as Map
 appendFold :: Fold a [a]
 appendFold = Fold step [] id
   where step acc val = acc ++ [val]
+
 
 -- |
 -- | QUERY STEP
@@ -57,7 +59,8 @@ queryStep (Group groupFn subquery) =
 
 queryStep Count = Fold localStep (CountStep 0) id
   where
-    localStep (CountStep a) e = CountStep $ a + 1
+    localStep (CountStep a) e = let next = a + 1
+                                in seq next (CountStep $ next)
 
 queryStep (Min fieldName) = Fold localStep (MinStep EmptyValue) id
   where
@@ -116,10 +119,10 @@ finalize (AvgStep i)   =
   case withNumbers i average of
     (Left a) -> ErrorRes $ a
     (Right a) -> ValueRes $ DbDouble $ a
-
   where average nums = (sum nums) / (genericLength nums)
   --do
   -- trace (show i) (ValueRes $ DbInt 1)
+
 finalize (ListStep i)  = ListResult $ i
 finalize (MultiStep i) = MultiResult $ Map.map finalize i
 finalize (GroupStep i) = MapResult $ Map.map finalize i
