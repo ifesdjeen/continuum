@@ -14,14 +14,20 @@ import           Database.LevelDB.Internal ( DB(..), mkCompareFun, mkCReadOpts )
 import           Control.Applicative       ( (<*>), (<$>) )
 import           Data.ByteString           ( ByteString, packCStringLen )
 
-import           Continuum.Common.Primitive
-import           Continuum.Common.Types
+import           Continuum.Serialization.Primitive
+import           Continuum.Types
 
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
 import           Data.IORef                ( IORef(..), newIORef, modifyIORef', readIORef )
 
+import           Control.Monad ( when )
+
+import qualified Control.Foldl                  as L
+import qualified Data.Map.Strict                as Map
+import           Continuum.Serialization.Base
+import           Continuum.Context
 import Debug.Trace
 
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
@@ -35,25 +41,43 @@ decodeString :: CString -> CSize -> IO ByteString
 decodeString ptr size = packCStringLen (ptr, fromIntegral size)
 {-# INLINE decodeString #-}
 
-scan :: (Show a) => DB
+scan :: DB
         -> ReadOptions
         -> ScanRange
         -> Decoder a
-        -> IO (DbErrorMonad [a])
+        -> L.Fold a acc
+        -> IO (DbErrorMonad acc)
 
-scan (DB dbPtr _) ro scanRange decoder = do
+scan (DB dbPtr _) ro scanRange decoder (L.Fold step start done) = do
   cReadOpts <- mkCReadOpts ro
-  ref       <- newIORef []
-  appendFn  <- makeCAppendFun $ makeAppendFun ref decoder
-  ()        <- doScan dbPtr cReadOpts scanRange appendFn
-  result    <- readIORef ref
-  return $! (\i -> dropRangeParts scanRange <$> i) <$> sequence $ result
+
+  ref      <- newIORef (Right start)
+  appendFn <- makeCStepFun $ makeStepFun ref decoder step
+  scanRes  <- doScan dbPtr cReadOpts scanRange appendFn
+  result   <- readIORef ref
+  return $! done <$> result
+  -- return $! (\i -> dropRangeParts scanRange <$> i) <$> done <$> result
+
+
+-- scan :: DB
+--         -> ReadOptions
+--         -> ScanRange
+--         -> Decoder a
+--         -> IO (DbErrorMonad [a])
+
+-- scan (DB dbPtr _) ro scanRange decoder = do
+--   cReadOpts <- mkCReadOpts ro
+--   ref       <- newIORef []
+--   appendFn  <- makeCStepFun $ makeStepFun ref decoder
+--   ()        <- doScan dbPtr cReadOpts scanRange appendFn
+--   result    <- readIORef ref
+--   return $! (\i -> dropRangeParts scanRange <$> i) <$> sequence $ result
 
 doScan :: LevelDBPtr
-              -> ReadOptionsPtr
-              -> ScanRange
-              -> AppendFunPtr
-              -> IO ()
+          -> ReadOptionsPtr
+          -> ScanRange
+          -> StepFunPtr
+          -> IO ()
 doScan db ro EntireKeyspace appendFn = scan_entire_keyspace db ro appendFn
 
 doScan db ro (OpenEnd rangeStart) appendFn =
@@ -89,7 +113,7 @@ dropRangeParts _ range                    = range
 foreign import ccall safe "continuum.h"
   scan_entire_keyspace :: LevelDBPtr
                           -> ReadOptionsPtr
-                          -> FunPtr AppendFun
+                          -> FunPtr StepFun
                           -> IO ()
 
 foreign import ccall safe "continuum.h"
@@ -100,7 +124,7 @@ foreign import ccall safe "continuum.h"
                 -> CString
                 -> CSize
                 -> FunPtr CompareFun
-                -> FunPtr AppendFun
+                -> FunPtr StepFun
                 -> IO ()
 
 foreign import ccall safe "continuum.h"
@@ -108,7 +132,7 @@ foreign import ccall safe "continuum.h"
                    -> ReadOptionsPtr
                    -> CString
                    -> CSize
-                   -> FunPtr AppendFun
+                   -> FunPtr StepFun
                    -> IO ()
 
 foreign import ccall safe "static continuum.h"
@@ -136,16 +160,16 @@ prefix_eq_comparator =
                     then GT
                     else LT)
 
-type AppendFun = CString -> CSize -> CString -> CSize -> IO ()
+type StepFun = CString -> CSize -> CString -> CSize -> IO ()
 
-makeAppendFun :: (Show a) => IORef [DbErrorMonad a] -> Decoder a -> AppendFun
-makeAppendFun ref decoder keyPtr keyLen valPtr valLen = do
+makeStepFun :: IORef (DbErrorMonad x) -> Decoder a -> (x -> a -> x) -> StepFun
+makeStepFun ref decoder step keyPtr keyLen valPtr valLen = do
   key <- decodeString keyPtr keyLen
   val <- decodeString valPtr valLen
-  modifyIORef' ref (\prev -> let next = decoder (key, val)
-                             in seq next (prev ++ [next]))
+  modifyIORef' ref (\prev -> step <$> prev <*> (decoder (key, val))) -- Do we need forcing seq here?
+{-# INLINE makeStepFun #-}
 
-type AppendFunPtr = FunPtr AppendFun
+type StepFunPtr = FunPtr StepFun
 
 foreign import ccall safe "wrapper"
-  makeCAppendFun :: AppendFun -> IO AppendFunPtr
+  makeCStepFun :: StepFun -> IO StepFunPtr
