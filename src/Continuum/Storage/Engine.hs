@@ -10,10 +10,11 @@
 module Continuum.Storage.Engine where
 
 import           Continuum.Context
-import           Continuum.Common.Types
-import           Continuum.Common.Primitive
+import           Continuum.Types
+import           Continuum.Serialization.Primitive
+import           Continuum.Serialization.Base
 import           Continuum.Options
-import           Continuum.Common.Serialization
+import           Continuum.Folds
 import           Control.Monad.Except
 
 import qualified Continuum.Storage.C            as C
@@ -101,7 +102,7 @@ initializeDbs :: String
                  -> LDB.DB
                  -> IO (DbErrorMonad ContextDbsMap)
 initializeDbs path systemDb = do
-  dbs <- C.scan systemDb readOpts EntireKeyspace decodeSchema
+  dbs <- C.scan systemDb readOpts EntireKeyspace decodeSchema appendFold
   res <- traverse (mapM (initializeDb path)) dbs
   return $ Map.fromList <$> res
 
@@ -164,7 +165,7 @@ readChunks :: ScanRange -> DbState [Integer]
 readChunks scanRange = do
   db     <- getCtxChunksDb
   ro     <- getReadOptions
-  chunks <- lift $ C.scan db ro scanRange decodeChunkKey
+  chunks <- lift $ C.scan db ro scanRange decodeChunkKey appendFold
   return chunks
 
 -- |
@@ -184,6 +185,7 @@ scan context dbName scanRange decoding foldOp = do
 
   case maybeDb of
     (Just (schema, db)) -> do
-      scanRes <- C.scan db ro scanRange (decodeRecord decoding schema)
-      return $ L.fold foldOp <$> scanRes
+      -- scanRes <- C.scan db ro scanRange (decodeRecord decoding schema)
+      scanRes <- C.scan db ro scanRange (decodeRecord decoding schema) foldOp
+      return $ scanRes
     Nothing             -> return $ Left NoSuchDatabaseError
