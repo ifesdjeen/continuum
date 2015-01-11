@@ -21,9 +21,13 @@ import           Foreign.Ptr            ( castPtr )
 -- |
 
 word8Size  = sizeOf (undefined :: Word8)
+{-# INLINE word8Size #-}
 word16Size = sizeOf (undefined :: Word16)
+{-# INLINE word16Size #-}
 word32Size = sizeOf (undefined :: Word32)
+{-# INLINE word32Size #-}
 word64Size = sizeOf (undefined :: Word64)
+{-# INLINE word64Size #-}
 
 -- |
 -- | PACKING
@@ -31,24 +35,30 @@ word64Size = sizeOf (undefined :: Word64)
 
 packWord8      :: (Integral a) => a -> ByteString
 packWord8 w    = B.pack [(fromIntegral w)]
+{-# INLINE packWord8 #-}
 
 packWord16     :: (Integral a) => a -> ByteString
 packWord16 w16 = let conv = (fromIntegral w16) :: Word16
                  in  writeNBytes word16Size (\i -> fromIntegral $ conv `shiftR` i)
+{-# INLINE packWord16 #-}
 
 packWord32     :: (Integral a) => a -> ByteString
 packWord32 w32 = let conv = (fromIntegral w32) :: Word32
                  in  writeNBytes word32Size (\i -> fromIntegral $ conv `shiftR` i)
+{-# INLINE packWord32 #-}
 
 packWord64     :: (Integral a) => a -> ByteString
 packWord64 w64 = let conv = (fromIntegral w64) :: Word64
                  in  writeNBytes word64Size (\i -> fromIntegral $ conv `shiftR` i)
+{-# INLINE packWord64 #-}
 
 packFloat      :: Float   -> ByteString
 packFloat      = (packWord32 :: Word32 -> ByteString) . fromFloat
+{-# INLINE packFloat #-}
 
 packDouble     :: Double   -> ByteString
 packDouble     = (packWord64 :: Word64 -> ByteString) . fromFloat
+{-# INLINE packDouble #-}
 
 -- |
 -- | UNPACKING
@@ -56,21 +66,27 @@ packDouble     = (packWord64 :: Word64 -> ByteString) . fromFloat
 
 unpackWord8  :: (Num a) => ByteString -> DbErrorMonad a
 unpackWord8 w = fromIntegral <$> Unsafe.unsafeHead <$> safeTake word8Size w
+{-# INLINE unpackWord8 #-}
 
 unpackWord16 :: (Num a) => ByteString -> DbErrorMonad a
 unpackWord16 w = fromIntegral <$> (readNBytes word16Size w :: DbErrorMonad Word16)
+{-# INLINE unpackWord16 #-}
 
 unpackWord32 :: (Num a) => ByteString -> DbErrorMonad a
 unpackWord32 w = fromIntegral <$> (readNBytes word32Size w :: DbErrorMonad Word32)
+{-# INLINE unpackWord32 #-}
 
 unpackWord64 :: (Num a) => ByteString -> DbErrorMonad a
 unpackWord64 w = fromIntegral <$> (readNBytes word64Size w :: DbErrorMonad Word64)
+{-# INLINE unpackWord64 #-}
 
 unpackFloat :: ByteString -> DbErrorMonad Float
 unpackFloat  = readNBytes word32Size
+{-# INLINE unpackFloat #-}
 
 unpackDouble :: ByteString -> DbErrorMonad Double
 unpackDouble  = readNBytes word64Size
+{-# INLINE unpackDouble #-}
 
 -- |
 -- | Helper Functions
