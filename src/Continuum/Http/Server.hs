@@ -11,7 +11,7 @@ import qualified Web.Scotty as Scotty
 import           Control.Monad.IO.Class         ( liftIO )
 import           Control.Applicative            ( (<$>) )
 import           Continuum.Context
-import           Continuum.Common.Types
+import           Continuum.Types
 import           Continuum.Http.Encoding
 import           Continuum.Storage.Parallel     ( parallelScan )
 

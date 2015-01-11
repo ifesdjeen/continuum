@@ -10,7 +10,7 @@ import           Data.Aeson
 import           Data.ByteString             ( ByteString )
 import           Data.Text                   ( pack )
 import           Data.Text.Encoding          ( decodeUtf8 )
-import           Continuum.Common.Types
+import           Continuum.Types
 
 instance ToJSON DbError where
   toJSON (NotEnoughInput should was) = toJSON $ "Not Enough Input: " ++ (show should) ++ ", but was: " ++ (show was)

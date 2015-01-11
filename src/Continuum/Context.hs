@@ -4,7 +4,7 @@
 
 module Continuum.Context where
 
-import           Continuum.Common.Types
+import           Continuum.Types
 
 import qualified Continuum.Options              as Opts
 import qualified Data.Map                       as Map
