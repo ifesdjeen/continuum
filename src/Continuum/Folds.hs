@@ -5,7 +5,6 @@ module Continuum.Folds where
 
 import           Debug.Trace
 import           Continuum.Types
-import           Continuum.Context
 
 import           Data.List          ( genericLength )
 import           Control.Foldl      ( Fold(..), fold )
@@ -53,9 +52,9 @@ queryStep (Group groupFn subquery) =
         localStep m record =
           Map.alter (wrappedSubStep record) (groupFn record) m
 
-        finalize g = GroupStep $ Map.map subFinalize g
+        done g = GroupStep $ Map.map subFinalize g
       in
-       Fold localStep Map.empty finalize
+       Fold localStep Map.empty done
 
 queryStep Count = Fold localStep (CountStep 0) id
   where

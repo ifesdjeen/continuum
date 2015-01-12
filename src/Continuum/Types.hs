@@ -5,7 +5,6 @@ module Continuum.Types where
 
 import           Control.Applicative            ( (<$>) )
 import           Data.ByteString                ( ByteString )
-import           Data.ByteString.Char8          ( unpack )
 import           GHC.Generics                   ( Generic )
 import           Data.Maybe                     ( fromMaybe )
 
@@ -176,7 +175,6 @@ data ScanRange =
   | OpenEndButFirst        Integer
   | ButFirst               Integer Integer
   | ButLast                Integer Integer
-  | ExclusiveRange         Integer Integer
   | EntireKeyspace
   deriving(Show, Generic)
 

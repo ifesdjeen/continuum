@@ -176,7 +176,6 @@ data ScanRange =
   | OpenEndButFirst        Integer
   | ButFirst               Integer Integer
   | ButLast                Integer Integer
-  | ExclusiveRange         Integer Integer
   | EntireKeyspace
   deriving(Show, Generic)
 

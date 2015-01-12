@@ -52,7 +52,6 @@ adjustRanges (KeyRange a b) l       = [a] ++ l ++ [b]
 adjustRanges (OpenEndButFirst a) l  = [a] ++ l
 adjustRanges (ButFirst a b) l       = [a] ++ l ++ [b]
 adjustRanges (ButLast a b) l        = [a] ++ l ++ [b]
-adjustRanges (ExclusiveRange a b) l = [a] ++ l ++ [b]
 adjustRanges EntireKeyspace l       = l
 
 constructRanges :: ScanRange -> [Integer] -> [ScanRange]
@@ -64,10 +63,6 @@ constructRanges (OpenEnd _) l = (slide l) ++ [(OpenEnd $ last l)]
 constructRanges (KeyRange a b) l       = [KeyRange a (first l)] ++ (slide l) ++ [ButFirst (last l) b]
   where first (s:_) = s
 
--- constructRanges (OpenEndButFirst _) l  = [a] ++ l
--- constructRanges (ButFirst _ _) l       = [a] ++ l ++ [b]
--- constructRanges (ButLast _ _) l        = [a] ++ l ++ [b]
--- constructRanges (ExclusiveRange _ _) l = [a] ++ l ++ [b]
 constructRanges EntireKeyspace l       = [(KeyRange (first l) (second l))] ++ (slide (tail l)) ++ [(OpenEndButFirst $ last l)]
   where first (s:_) = s
         second (_:s:_) = s

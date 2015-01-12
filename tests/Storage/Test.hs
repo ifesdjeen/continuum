@@ -12,7 +12,7 @@ import           Control.Monad            ( forM_ )
 import           System.Process           ( system )
 import           Continuum.Storage.Engine ( createDatabase, readChunks, putRecord )
 
-import           Continuum.Common.Types
+import           Continuum.Types
 import           Continuum.Context
 import           Test.Hspec
 import           Control.Monad.IO.Class         ( liftIO )
@@ -36,11 +36,6 @@ main =  hspec $ do
     it "Key Range (inclusive Range)" $  do
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
-  --       _      <- createDatabase "system.cpu" cpuSchema
-  -- _      <- createDatabase "system.mem" memorySchema
-  -- _      <- createDatabase "system.mem.percent" memorySchema
-  -- _      <- createDatabase "system.net" networkSchema
-  -- _      <- createDatabase "system.tcp" tcpSchema
 
         _ <- putRecordTdb $ makeRecord 123 [("a", DbInt 1)]
         _ <- putRecordTdb $ makeRecord 124 [("a", DbInt 2)]
