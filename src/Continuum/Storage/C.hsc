@@ -6,13 +6,13 @@ module Continuum.Storage.C where
 
 import qualified Data.ByteString.Unsafe    as BU
 
-import           Control.Exception         ( bracket )
 import           Database.LevelDB.Base     ( ReadOptions(..) )
 import           Database.LevelDB.C        ( CompareFun, LevelDBPtr, ReadOptionsPtr,
                                                   LevelDBPtr, mkCmp )
 import           Database.LevelDB.Internal ( DB(..), mkCompareFun, mkCReadOpts )
 import           Control.Applicative       ( (<*>), (<$>) )
 import           Data.ByteString           ( ByteString, packCStringLen )
+import           Data.IORef                ( IORef, newIORef, modifyIORef', readIORef )
 
 import           Continuum.Serialization.Primitive
 import           Continuum.Types
@@ -20,15 +20,9 @@ import           Continuum.Types
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
-import           Data.IORef                ( IORef(..), newIORef, modifyIORef', readIORef )
-
-import           Control.Monad ( when )
 
 import qualified Control.Foldl                  as L
-import qualified Data.Map.Strict                as Map
-import           Continuum.Serialization.Base
-import           Continuum.Context
-import Debug.Trace
+--import Debug.Trace
 
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 #include "continuum.h"
@@ -53,25 +47,9 @@ scan (DB dbPtr _) ro scanRange decoder (L.Fold step start done) = do
 
   ref      <- newIORef (Right start)
   appendFn <- makeCStepFun $ makeStepFun ref decoder step
-  scanRes  <- doScan dbPtr cReadOpts scanRange appendFn
+  _        <- doScan dbPtr cReadOpts scanRange appendFn
   result   <- readIORef ref
   return $! done <$> result
-  -- return $! (\i -> dropRangeParts scanRange <$> i) <$> done <$> result
-
-
--- scan :: DB
---         -> ReadOptions
---         -> ScanRange
---         -> Decoder a
---         -> IO (DbErrorMonad [a])
-
--- scan (DB dbPtr _) ro scanRange decoder = do
---   cReadOpts <- mkCReadOpts ro
---   ref       <- newIORef []
---   appendFn  <- makeCStepFun $ makeStepFun ref decoder
---   ()        <- doScan dbPtr cReadOpts scanRange appendFn
---   result    <- readIORef ref
---   return $! (\i -> dropRangeParts scanRange <$> i) <$> sequence $ result
 
 doScan :: LevelDBPtr
           -> ReadOptionsPtr
@@ -95,16 +73,22 @@ doScan db ro (KeyRange rangeStart rangeEnd) appendFn =
      comparator <- mkCmp $ bitwise_compare
      scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
 
-doScan db ro (OpenEndButFirst rangeStart)         appendFn = doScan db ro (OpenEnd rangeStart) appendFn
-doScan db ro (ButFirst rangeStart rangeEnd)       appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
-doScan db ro (ButLast rangeStart rangeEnd)        appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
-doScan db ro (ExclusiveRange rangeStart rangeEnd) appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
+doScan db ro (ButFirst rangeStart rangeEnd)       appendFn =
+  let rangeStartBytes = packWord64 rangeStart
+      rangeEndBytes   = packWord64 rangeEnd
+  in
+   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
+   BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
+     comparator <- mkCmp $ bitwise_compare
+     scan_range_butfirst db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
 
-dropRangeParts (OpenEndButFirst _) range  = drop 1 $ range
-dropRangeParts (ButFirst _ _) range       = drop 1 $ range
-dropRangeParts (ButLast _ _) range        = take ((length range) - 1) range
-dropRangeParts (ExclusiveRange _ _) range = drop 1 $ take ((length range) - 1) range
-dropRangeParts _ range                    = range
+doScan db ro (OpenEndButFirst rangeStart)         appendFn =
+  let rangeStartBytes = packWord64 rangeStart
+  in
+   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
+   scan_open_end_butfirst db ro start_at_ptr (fromIntegral start_at_len) appendFn
+
+doScan db ro (ButLast rangeStart rangeEnd)        appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
 
 -- |
 -- | Foreign imports
@@ -128,12 +112,31 @@ foreign import ccall safe "continuum.h"
                 -> IO ()
 
 foreign import ccall safe "continuum.h"
+  scan_range_butfirst :: LevelDBPtr
+                      -> ReadOptionsPtr
+                      -> CString
+                      -> CSize
+                      -> CString
+                      -> CSize
+                      -> FunPtr CompareFun
+                      -> FunPtr StepFun
+                      -> IO ()
+
+foreign import ccall safe "continuum.h"
   scan_open_end :: LevelDBPtr
                    -> ReadOptionsPtr
                    -> CString
                    -> CSize
                    -> FunPtr StepFun
                    -> IO ()
+
+foreign import ccall safe "continuum.h"
+  scan_open_end_butfirst :: LevelDBPtr
+                         -> ReadOptionsPtr
+                         -> CString
+                         -> CSize
+                         -> FunPtr StepFun
+                         -> IO ()
 
 foreign import ccall safe "static continuum.h"
   bitwise_compare :: CompareFun
