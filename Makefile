@@ -44,3 +44,6 @@ $(CONFIGURED): cabal.sandbox.config deps $(NAME).cabal
 reconf:
 	cabal install -fBinaries --enable-tests --only-dependencies && \
 	cabal configure -fBinaries --enable-tests
+
+bench:
+	.//dist/build/continuum-bench/continuum-bench +RTS -N8 -RTS
