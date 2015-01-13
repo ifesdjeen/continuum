@@ -7,6 +7,7 @@ import           Control.Applicative            ( (<$>) )
 import           Data.ByteString                ( ByteString )
 import           GHC.Generics                   ( Generic )
 import           Data.Maybe                     ( fromMaybe )
+import           Data.ByteString.Char8          ( unpack )
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
@@ -77,7 +78,7 @@ data DbValue =
   | DbList                  [DbValue]
   -- DbList [DbValue]
   -- DbMap [Map.Map DbValue DbValue]
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic)
 
 withNumbers :: (Fractional a) =>
                [DbValue] ->
@@ -94,6 +95,16 @@ toNumber (DbShort a)  = Right (fromIntegral a)
 toNumber (DbByte a)   = Right (fromIntegral a)
 toNumber (DbFloat a)  = Right (realToFrac a)
 toNumber (DbDouble a) = Right (realToFrac a)
+
+instance Show DbValue where
+  show EmptyValue   = ""
+  show (DbInt v)    = show v
+  show (DbLong v)   = show v
+  show (DbShort v)  = show v
+  show (DbString v) = unpack v
+  show (DbFloat v)  = show v
+  show (DbDouble v) = show v
+  show (DbList v) =   unwords $ map show v
 
 instance S.Serialize DbValue
 

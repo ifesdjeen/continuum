@@ -8,9 +8,12 @@ import qualified Data.Map               as Map
 
 import           Data.Aeson
 import           Data.ByteString             ( ByteString )
-import           Data.Text                   ( pack )
+import           Data.Text                   ( Text(), pack )
 import           Data.Text.Encoding          ( decodeUtf8 )
 import           Continuum.Types
+
+asdasd = ("asdasd"  :: ByteString)
+
 
 instance ToJSON DbError where
   toJSON (NotEnoughInput should was) = toJSON $ "Not Enough Input: " ++ (show should) ++ ", but was: " ++ (show was)
@@ -36,6 +39,7 @@ instance ToJSON DbValue where
   toJSON (DbString v) = toJSON $ decodeUtf8 v
   toJSON (DbFloat v)  = toJSON v
   toJSON (DbDouble v) = toJSON v
+  toJSON (DbList v)   = toJSON v
 
 instance ToJSON (DbErrorMonad DbResult) where
   toJSON (Right e)   = toJSON e
@@ -47,7 +51,10 @@ instance ToJSON DbResult where
   toJSON (ListResult r)   = toJSON r
   toJSON (MapResult vals) = object $
                             concat $
-                            map (\(k, v) -> [(pack (show k)) .= v]) (Map.toList vals)
+                            map (\(k, v) -> [(pack (show k)) .= (toJSON v)]) (Map.toList vals)
+  toJSON (MultiResult vals) = object $
+                              concat $
+                              map (\(k, v) -> [(decodeUtf8 k) .= (toJSON v)]) (Map.toList vals)
   toJSON (RecordRes a)    = toJSON a
   toJSON a = toJSON $ show a
 
