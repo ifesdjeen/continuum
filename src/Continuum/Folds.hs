@@ -67,6 +67,11 @@ queryStep (Min fieldName) = Fold localStep (MinStep EmptyValue) id
     localStep (MinStep EmptyValue) record = MinStep $ (getValue fieldName record)
     localStep (MinStep a) record          = MinStep $ min a (getValue fieldName record)
 
+queryStep (Max fieldName) = Fold localStep (MaxStep EmptyValue) id
+  where
+    localStep (MaxStep EmptyValue) record = MaxStep $ (getValue fieldName record)
+    localStep (MaxStep a) record          = MaxStep $ max a (getValue fieldName record)
+
 queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
 
@@ -97,8 +102,9 @@ instance Monoid StepResult where
   mappend (MinStep a) (MinStep b) =
     MinStep $! min a b
 
-  mappend (AvgStep a) (AvgStep b) =
-    AvgStep $! (a ++ b)
+  mappend (MaxStep a) (MaxStep b) =
+    MaxStep $! max a b
+
   mappend (MeanStep sum1 total1) (MeanStep sum2 total2) =
     let sum    = (+) <$> sum1 <*> sum2
         total  = total1 + total2
