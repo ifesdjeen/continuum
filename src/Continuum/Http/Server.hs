@@ -54,9 +54,13 @@ runWebServer ctxTVar = do
 toQuery :: Maybe Integer -> Maybe ByteString -> Maybe ByteString -> SelectQuery
 toQuery (Just timeGroup) (Just aggregate) (Just fieldsStr) =
   let fields = splitFields fieldsStr
-  in TimeGroup (Milliseconds timeGroup) (Multi (map (\field -> (field, Min field)) fields))
+  in TimeGroup (Milliseconds timeGroup) (Multi (map (\field -> (field, toAggregate aggregate field)) fields))
   where splitFields a = split ',' a
+        toAggregate "min" = Min
+        toAggregate "max" = Max
+        toAggregate "mean" = Mean
 toQuery _ _ _ = FetchAll
+
 
 
 
