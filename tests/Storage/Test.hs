@@ -105,7 +105,7 @@ main =  hspec $ do
         _ <- forM_ records putRecordTdb
 
         PS.parallelScan testDbName EntireKeyspace Record (Multi [("min", Min "a"),
-                                                                 ("avg", Avg "a")])
+                                                                 ("avg", Mean "a")])
 
       res `shouldBe` (Right $ MultiResult $ Map.fromList [("avg",ValueRes (DbDouble 59.5)),
                                                           ("min",ValueRes (DbInt 10))])
@@ -179,13 +179,13 @@ main =  hspec $ do
                        (DbList [DbString "b",DbInt 1420471453000],
                         ValueRes $ DbInt 4)])
 
-    it "should run Avg query" $ do
+    it "should run Mean query" $ do
       let records = take 100 [makeRecord i [("a", DbInt $ i)] | i <- [0..]]
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (Avg "a")
+        PS.parallelScan testDbName EntireKeyspace Record (Mean "a")
 
       res `shouldBe` (Right $ ValueRes $ DbDouble 49.5)
 
