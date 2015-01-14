@@ -164,8 +164,11 @@ data StepResult =
   EmptyStepRes
   | ErrorStepRes           DbError
   | CountStep              Integer
+
   | MinStep                DbValue
-  | AvgStep                [DbValue]
+  | MaxStep                DbValue
+  | MapStep                DbValue
+  | MeanStep               (DbErrorMonad Double) Integer
   | ListStep               [DbRecord]
   | MultiStep              (Map.Map FieldName StepResult)
   | GroupStep              (Map.Map DbValue StepResult)
@@ -240,9 +243,9 @@ makeSchema stringTypeList =
 data SelectQuery =
   Count
   | Min                    FieldName
-    -- | Max                    FieldName
+  | Max                    FieldName
     -- | Sum
-  | Avg                    FieldName
+  | Mean                    FieldName
   -- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
   | Group                  (DbRecord -> DbValue)  SelectQuery
