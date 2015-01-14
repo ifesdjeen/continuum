@@ -6,12 +6,13 @@ module Continuum.Folds where
 import           Debug.Trace
 import           Continuum.Types
 
-import           Data.List          ( genericLength )
-import           Control.Foldl      ( Fold(..), fold )
+import           Data.List           ( genericLength )
+import           Control.Foldl       ( Fold(..), fold )
+import           Control.Applicative ( (<*>), (<$>) )
 
 import           Data.Monoid
-
 import qualified Data.Map.Strict as Map
+
 appendFold :: Fold a [a]
 appendFold = Fold step [] id
   where step acc val = acc ++ [val]
@@ -69,8 +70,13 @@ queryStep (Min fieldName) = Fold localStep (MinStep EmptyValue) id
 queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
 
-queryStep (Avg fieldName) = Fold step (AvgStep []) id
-  where step (AvgStep acc) record = AvgStep $ (getValue fieldName record) : acc
+queryStep (Mean fieldName) = Fold step start id
+  where
+    start                            = MeanStep (Right 0) 0
+    getNumber f r                    = toNumber $ getValue f r
+    step (MeanStep sum count) record =
+      MeanStep ((+) <$> (getNumber fieldName record) <*> sum) (count + 1)
+
 
 queryStep v = error ("NOT IMPLEMENTED: " ++ show v)
 
@@ -93,6 +99,10 @@ instance Monoid StepResult where
 
   mappend (AvgStep a) (AvgStep b) =
     AvgStep $! (a ++ b)
+  mappend (MeanStep sum1 total1) (MeanStep sum2 total2) =
+    let sum    = (+) <$> sum1 <*> sum2
+        total  = total1 + total2
+    in MeanStep sum total
 
   mappend (ListStep a) (ListStep b) =
     ListStep $! (a ++ b)
@@ -114,12 +124,13 @@ instance Monoid StepResult where
 finalize :: StepResult -> DbResult
 finalize (CountStep i) = ValueRes   $ DbInt i
 finalize (MinStep i)   = ValueRes   $ i
-finalize (AvgStep i)   =
-  case withNumbers i average of
+finalize (MaxStep i)   = ValueRes   $ i
+finalize (MeanStep msum nums)   =
+  case msum of
     (Left a) -> ErrorRes $ a
-    (Right a) -> ValueRes $ DbDouble $ a
-  where average nums = (sum nums) / (genericLength nums)
-  --do
+    (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
+
+--do
   -- trace (show i) (ValueRes $ DbInt 1)
 
 finalize (ListStep i)  = ListResult $ i
