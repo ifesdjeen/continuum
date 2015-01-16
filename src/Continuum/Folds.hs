@@ -1,5 +1,6 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 module Continuum.Folds where
 
@@ -127,11 +128,11 @@ instance Monoid StepResult where
 -- | FINALIZERS
 -- |
 
-finalize :: StepResult -> DbResult
-finalize (CountStep i) = ValueRes   $ DbInt i
-finalize (MinStep i)   = ValueRes   $ i
-finalize (MaxStep i)   = ValueRes   $ i
-finalize (MeanStep msum nums)   =
+finalize :: SelectQuery -> StepResult -> DbResult
+finalize Count (CountStep i) = ValueRes   $ DbInt i
+finalize (Min _) (MinStep i)   = ValueRes   $ i
+finalize (Max _) (MaxStep i)   = ValueRes   $ i
+finalize (Mean _) (MeanStep msum nums)   =
   case msum of
     (Left a) -> ErrorRes $ a
     (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
@@ -139,7 +140,18 @@ finalize (MeanStep msum nums)   =
 --do
   -- trace (show i) (ValueRes $ DbInt 1)
 
-finalize (ListStep i)  = ListResult $ i
-finalize (MultiStep i) = MultiResult $ Map.map finalize i
-finalize (GroupStep i) = MapResult $ Map.map finalize i
-finalize a = trace (show a) (ErrorRes $ NoStepToResultConvertor)
+finalize FetchAll (ListStep i)  = ListResult $ i
+finalize (Multi subqueries) (MultiStep result) = MultiResult $ Map.fromList $ map f subqueries
+  where f (field, subquery) = (field,) $
+          case (Map.lookup field result) of
+            (Just r) -> finalize subquery r
+            Nothing  -> ErrorRes OtherError
+
+  -- MultiResult $ map finalize i
+
+finalize (Group _ q)            (GroupStep i) = MapResult $ Map.map (finalize q) i
+finalize (FieldGroup _ q)       (GroupStep i) = MapResult $ Map.map (finalize q) i
+finalize (TimeGroup _ q)        (GroupStep i) = MapResult $ Map.map (finalize q) i
+finalize (TimeFieldGroup _ _ q) (GroupStep i) = MapResult $ Map.map (finalize q) i
+
+finalize a b = trace ((show a) ++ " ::: " ++ (show b)) (ErrorRes $ NoStepToResultConvertor)
