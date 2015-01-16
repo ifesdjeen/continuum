@@ -169,6 +169,7 @@ data StepResult =
   | MaxStep                DbValue
   | MapStep                DbValue
   | MeanStep               (DbErrorMonad Double) Integer
+  | MedianStep             [DbRecord]
   | ListStep               [DbRecord]
   | MultiStep              (Map.Map FieldName StepResult)
   | GroupStep              (Map.Map DbValue StepResult)
@@ -245,7 +246,8 @@ data SelectQuery =
   | Min                    FieldName
   | Max                    FieldName
     -- | Sum
-  | Mean                    FieldName
+  | Mean                   FieldName
+  | Median                 FieldName
   -- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
   | Group                  (DbRecord -> DbValue)  SelectQuery
