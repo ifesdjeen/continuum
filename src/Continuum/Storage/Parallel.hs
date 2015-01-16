@@ -28,10 +28,10 @@ parallelScan dbName scanRange decoding query = do
 
   let ranges           = (constructRanges scanRange) <$> nub <$> (adjustRanges scanRange) <$> chunks
       scanChunk chunk  = scan context dbName chunk decoding (queryStep query)
-
+      finalizer        = finalize query
   rangeResults <- liftIO $ parallelRangeScan ranges scanChunk
 
-  return $ (finalize . mconcat) <$> rangeResults
+  return $ (finalizer . mconcat) <$> rangeResults
 
 parallelRangeScan :: DbErrorMonad [ScanRange]
                   -> (ScanRange -> IO (DbErrorMonad a))
