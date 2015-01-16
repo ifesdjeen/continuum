@@ -61,11 +61,9 @@ library
                         , mtl                    >= 2.1.2
                         , containers             > 0.5
                         , time                   >=1.4.2
-                        , timers                 >=0.2.0.0
                         , stm                    >=2.4.3
-                        , suspend                >=0.1.0.1
                         , leveldb-haskell-fork   >= 0.3.4.4
-                        , resourcet              >= 1.1.2.2
+                        , statistics             >= 0.13.2.1
                         , bytestring             >= 0.10.4.0
                         , parallel-io            >= 0.3.3
                         , cereal                 >= 0.4.0.1
