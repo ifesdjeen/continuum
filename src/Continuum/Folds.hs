@@ -7,7 +7,7 @@ module Continuum.Folds where
 import           Debug.Trace
 import           Continuum.Types
 
-import           Data.List           ( genericLength )
+import           Data.List           ( foldl', sort, genericLength )
 import           Control.Foldl       ( Fold(..), fold )
 import           Control.Applicative ( (<*>), (<$>) )
 
@@ -73,6 +73,9 @@ queryStep (Max fieldName) = Fold localStep (MaxStep EmptyValue) id
     localStep (MaxStep EmptyValue) record = MaxStep $ (getValue fieldName record)
     localStep (MaxStep a) record          = MaxStep $ max a (getValue fieldName record)
 
+queryStep (Median field)  = Fold step (MedianStep []) id
+  where step (MedianStep acc) val = MedianStep $ acc :: (getValue val)
+
 queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
 
@@ -129,16 +132,20 @@ instance Monoid StepResult where
 -- |
 
 finalize :: SelectQuery -> StepResult -> DbResult
-finalize Count (CountStep i) = ValueRes   $ DbInt i
-finalize (Min _) (MinStep i)   = ValueRes   $ i
-finalize (Max _) (MaxStep i)   = ValueRes   $ i
-finalize (Mean _) (MeanStep msum nums)   =
+finalize Count    (CountStep i)        = ValueRes   $ DbInt i
+finalize (Min _)  (MinStep i)          = ValueRes   $ i
+finalize (Max _)  (MaxStep i)          = ValueRes   $ i
+finalize (Mean _) (MeanStep msum nums) =
   case msum of
     (Left a) -> ErrorRes $ a
     (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
 
---do
-  -- trace (show i) (ValueRes $ DbInt 1)
+finalize (Median _) (MedianStep vals) | odd n = ValueRes $  head  $ drop (n `div` 2) vals'
+                                      | even n = (flip withNumbers) mean $ take 2 $ drop i vals'
+  where i      = (length vals' `div` 2) - 1
+        vals'  = sort vals
+        n      = length vals
+        mean x = fst $ foldl' (\(!m, !n) x -> (m+(x-m)/(n+1),n+1)) (0,0) x
 
 finalize FetchAll (ListStep i)  = ListResult $ i
 finalize (Multi subqueries) (MultiStep result) = MultiResult $ Map.fromList $ map f subqueries

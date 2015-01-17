@@ -169,7 +169,8 @@ data StepResult =
   | MaxStep                DbValue
   | MapStep                DbValue
   | MeanStep               (DbErrorMonad Double) Integer
-  | MedianStep             [DbRecord]
+--  | MedianStep             [DbRecord]
+  | MedianStep             [DbValue]
   | ListStep               [DbRecord]
   | MultiStep              (Map.Map FieldName StepResult)
   | GroupStep              (Map.Map DbValue StepResult)
