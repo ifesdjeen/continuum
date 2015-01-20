@@ -84,8 +84,12 @@ withNumbers :: (Fractional a) =>
                [DbValue] ->
                ([a] -> a) ->
                DbErrorMonad a
-
 withNumbers values op = op <$> mapM toNumber values
+
+numToResult :: DbErrorMonad Double ->
+               DbResult
+numToResult (Right i) = ValueRes $ DbDouble i
+numToResult (Left i) = ErrorRes i
 
 toNumber :: (Fractional a) => DbValue -> DbErrorMonad a
 toNumber (DbString _) = Left NumericOperationError
@@ -95,6 +99,8 @@ toNumber (DbShort a)  = Right (fromIntegral a)
 toNumber (DbByte a)   = Right (fromIntegral a)
 toNumber (DbFloat a)  = Right (realToFrac a)
 toNumber (DbDouble a) = Right (realToFrac a)
+
+-- toDbResult :: DbErrorMonad
 
 instance Show DbValue where
   show EmptyValue   = ""
@@ -246,10 +252,10 @@ data SelectQuery =
   Count
   | Min                    FieldName
   | Max                    FieldName
-    -- | Sum
+-- | Sum
   | Mean                   FieldName
   | Median                 FieldName
-  -- | Distinct
+-- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
   | Group                  (DbRecord -> DbValue)  SelectQuery
   | TimeFieldGroup         FieldName TimePeriod   SelectQuery

@@ -74,7 +74,7 @@ queryStep (Max fieldName) = Fold localStep (MaxStep EmptyValue) id
     localStep (MaxStep a) record          = MaxStep $ max a (getValue fieldName record)
 
 queryStep (Median field)  = Fold step (MedianStep []) id
-  where step (MedianStep acc) val = MedianStep $ acc :: (getValue val)
+  where step (MedianStep acc) val = MedianStep ((getValue field val) : acc)
 
 queryStep FetchAll = Fold step (ListStep []) id
   where step (ListStep acc) val = ListStep $ acc ++ [val]
@@ -140,8 +140,8 @@ finalize (Mean _) (MeanStep msum nums) =
     (Left a) -> ErrorRes $ a
     (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
 
-finalize (Median _) (MedianStep vals) | odd n = ValueRes $  head  $ drop (n `div` 2) vals'
-                                      | even n = (flip withNumbers) mean $ take 2 $ drop i vals'
+finalize (Median _) (MedianStep vals) | odd n = ValueRes  $ head $ drop (n `div` 2) vals'
+                                      | even n = numToResult $ (flip withNumbers) sum [DbInt 1, DbInt 2]
   where i      = (length vals' `div` 2) - 1
         vals'  = sort vals
         n      = length vals
