@@ -57,7 +57,7 @@ scan_range(leveldb_t*             db,
     size_t current_key_len;
     const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-    if(bitwise_compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
+    if(compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
       break;
     }
 
@@ -93,7 +93,7 @@ scan_range_butfirst(leveldb_t*             db,
       size_t current_key_len;
       const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-      if(bitwise_compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
+      if(compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
         break;
       }
 
@@ -128,7 +128,7 @@ scan_range_butlast(leveldb_t*             db,
     size_t current_key_len;
     const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-    if(bitwise_compare(NULL, current_key, current_key_len, end_at, end_at_len) == 0) {
+    if(compare(NULL, current_key, current_key_len, end_at, end_at_len) == 0) {
       break;
     }
 
