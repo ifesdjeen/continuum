@@ -33,7 +33,7 @@ main = do
     -- _ <- forM_ [1..1000000]
     --      (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1)])
     start <- liftIO $ Clock.getPOSIXTime
-    res <- PS.parallelScan testDbName EntireKeyspace Key Count
+    res <- PS.parallelScan testDbName AllTime Key Count
     end <- liftIO $  Clock.getPOSIXTime
     liftIO $ print (end - start)
     return res

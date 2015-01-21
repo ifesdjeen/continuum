@@ -69,7 +69,7 @@ toQuery _ _ _ = FetchAll
 maybeParam :: Scotty.Parsable a => Text -> Scotty.ActionM (Maybe a)
 maybeParam p = (Just <$> Scotty.param p) `Scotty.rescue` (\_ -> (return Nothing))
 
-toRange :: Maybe Integer -> Maybe Integer -> ScanRange
-toRange (Just from) (Just to) = KeyRange from to
-toRange (Just from) Nothing   = OpenEnd from
-toRange Nothing Nothing       = EntireKeyspace
+toRange :: Maybe Integer -> Maybe Integer -> TimeRange
+toRange (Just from) (Just to) = TimeBetween from to
+toRange (Just from) Nothing   = TimeAfter from
+toRange Nothing Nothing       = AllTime

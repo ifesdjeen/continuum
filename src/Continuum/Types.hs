@@ -191,16 +191,23 @@ instance S.Serialize DbResult
 -- Maybe someday we'll need a ByteBuffer scan ranges. For now all keys are always
 -- integers. Maybe iterators for something like indexes should be done somehow
 -- differently not to make that stuff even more complex.
-data ScanRange =
-  OpenEnd                  Integer
-  | KeyRange               Integer Integer
-  | OpenEndButFirst        Integer
-  | ButFirst               Integer Integer
-  | ButLast                Integer Integer
-  | EntireKeyspace
+data TimeRange =
+  TimeAfter                   Integer
+  | TimeBetween               Integer Integer
+  | AllTime
   deriving(Show, Generic)
 
-instance S.Serialize ScanRange
+data ScanRange =
+  OpenEnd                  ByteString
+  | KeyRange               ByteString ByteString
+  | OpenEndButFirst        ByteString
+  | ButFirst               ByteString ByteString
+  | ButLast                ByteString ByteString
+  | EntireKeyspace
+  | Prefixed               ByteString ScanRange
+  deriving(Show, Generic)
+
+instance S.Serialize TimeRange
 
 -- |
 -- | AGGREGATES

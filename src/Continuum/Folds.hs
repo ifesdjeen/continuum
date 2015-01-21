@@ -6,6 +6,7 @@ module Continuum.Folds where
 
 import           Debug.Trace
 import           Continuum.Types
+-- import           Continuum.Helpers
 
 import           Data.List           ( foldl', sort, genericLength )
 import           Control.Foldl       ( Fold(..), fold )
@@ -41,6 +42,7 @@ queryStep (Multi steps) = Fold step [] done
 
 queryStep (TimeFieldGroup fieldName timePeriod subquery) =
   queryStep $ Group (\i -> DbList [getValue fieldName i, roundTime timePeriod i]) subquery
+
 queryStep (FieldGroup fieldName subquery) = queryStep $ Group (getValue fieldName) subquery
 queryStep (TimeGroup  timePeriod subquery) = queryStep $ Group (roundTime timePeriod) subquery
 

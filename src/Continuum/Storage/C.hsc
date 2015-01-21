@@ -59,34 +59,24 @@ doScan :: LevelDBPtr
 doScan db ro EntireKeyspace appendFn = scan_entire_keyspace db ro appendFn
 
 doScan db ro (OpenEnd rangeStart) appendFn =
-  let rangeStartBytes = packWord64 rangeStart
-  in
-   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   scan_open_end db ro start_at_ptr (fromIntegral start_at_len) appendFn
+  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
+  scan_open_end db ro start_at_ptr (fromIntegral start_at_len) appendFn
 
 doScan db ro (KeyRange rangeStart rangeEnd) appendFn =
-  let rangeStartBytes = packWord64 rangeStart
-      rangeEndBytes   = packWord64 rangeEnd
-  in
-   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
-     comparator <- mkCmp $ bitwise_compare
-     scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
+  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
+  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len) -> do
+    comparator <- mkCmp $ bitwise_compare
+    scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
 
 doScan db ro (ButFirst rangeStart rangeEnd)       appendFn =
-  let rangeStartBytes = packWord64 rangeStart
-      rangeEndBytes   = packWord64 rangeEnd
-  in
-   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   BU.unsafeUseAsCStringLen rangeEndBytes   $ \(end_at_ptr, end_at_len) -> do
-     comparator <- mkCmp $ bitwise_compare
-     scan_range_butfirst db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
+  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
+  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len) -> do
+    comparator <- mkCmp $ bitwise_compare
+    scan_range_butfirst db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
 
 doScan db ro (OpenEndButFirst rangeStart)         appendFn =
-  let rangeStartBytes = packWord64 rangeStart
-  in
-   BU.unsafeUseAsCStringLen rangeStartBytes $ \(start_at_ptr, start_at_len) ->
-   scan_open_end_butfirst db ro start_at_ptr (fromIntegral start_at_len) appendFn
+  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
+  scan_open_end_butfirst db ro start_at_ptr (fromIntegral start_at_len) appendFn
 
 doScan db ro (ButLast rangeStart rangeEnd)        appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
 

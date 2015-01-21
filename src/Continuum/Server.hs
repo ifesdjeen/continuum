@@ -53,7 +53,7 @@ processRequest _ Shutdown = return ()
 runQuery :: DbName
             -> SelectQuery
             -> DbState DbResult
-runQuery dbName query = parallelScan dbName EntireKeyspace Record query
+runQuery dbName query = parallelScan dbName AllTime Record query
 
 withTmpStorage :: String
                -> DbContext
