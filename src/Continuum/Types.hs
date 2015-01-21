@@ -3,14 +3,16 @@
 
 module Continuum.Types where
 
-import           Control.Applicative            ( (<$>) )
-import           Data.ByteString                ( ByteString )
-import           GHC.Generics                   ( Generic )
-import           Data.Maybe                     ( fromMaybe )
-import           Data.ByteString.Char8          ( unpack )
+import           Control.Applicative               ( (<$>) )
+
+import           Data.ByteString                   ( ByteString )
+import           GHC.Generics                      ( Generic )
+import           Data.Maybe                        ( fromMaybe )
+import           Data.ByteString.Char8             ( unpack )
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
+
 -- |
 -- | ALIASES
 -- |
@@ -79,6 +81,10 @@ data DbValue =
   -- DbList [DbValue]
   -- DbMap [Map.Map DbValue DbValue]
   deriving (Eq, Ord, Generic)
+
+-- |
+-- | Number Conversion
+-- |
 
 withNumbers :: (Fractional a) =>
                [DbValue] ->
@@ -297,11 +303,11 @@ data Request =
 instance S.Serialize Request
 
 data TimePeriod =
-  Milliseconds Integer |
-  Seconds      Integer |
-  Minutes      Integer |
-  Hours        Integer |
-  Days         Integer
+  Milliseconds   Integer
+  | Seconds      Integer
+  | Minutes      Integer
+  | Hours        Integer
+  | Days         Integer
   deriving(Generic, Show)
 
 instance S.Serialize TimePeriod
