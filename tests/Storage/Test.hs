@@ -47,7 +47,7 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 555 [("a", DbInt 3)]
 
-        PS.parallelScan testDbName (KeyRange 123 456) Record FetchAll
+        PS.parallelScan testDbName (TimeBetween 123 456) Record FetchAll
 
       res `shouldBe` (Right $ ListResult [makeRecord 123 [("a", DbInt 1)],
                                           makeRecord 124 [("a", DbInt 2)],
@@ -71,7 +71,7 @@ main =  hspec $ do
 
         _ <- putRecordTdb $ makeRecord 700 [("a", DbInt 3)]
 
-        PS.parallelScan testDbName (KeyRange 300 456) Record FetchAll
+        PS.parallelScan testDbName (TimeBetween 300 456) Record FetchAll
 
       res `shouldBe` (Right $ ListResult [makeRecord 456 [("a", DbInt 1)],
                                           makeRecord 456 [("a", DbInt 2)],
@@ -83,7 +83,7 @@ main =  hspec $ do
       res <- runner $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
-        PS.parallelScan testDbName EntireKeyspace Record FetchAll
+        PS.parallelScan testDbName AllTime Record FetchAll
 
       res `shouldBe` (Right $ ListResult records)
 
@@ -93,7 +93,7 @@ main =  hspec $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (Min "a")
+        PS.parallelScan testDbName AllTime Record (Min "a")
 
       res `shouldBe` (Right $ ValueRes $ DbInt 10)
 
@@ -104,7 +104,7 @@ main =  hspec $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (Multi [("min", Min "a"),
+        PS.parallelScan testDbName AllTime Record (Multi [("min", Min "a"),
                                                                  ("avg", Mean "a")])
 
       res `shouldBe` (Right $ MultiResult $ Map.fromList [("avg",ValueRes (DbDouble 59.5)),
@@ -125,7 +125,7 @@ main =  hspec $ do
         _ <- forM_ recordsA putRecordTdb
         _ <- forM_ recordsB putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (FieldGroup "b" FetchAll)
+        PS.parallelScan testDbName AllTime Record (FieldGroup "b" FetchAll)
 
       res `shouldBe` (Right $ MapResult $ Map.fromList [(DbString "a", ListResult recordsA),
                                                         (DbString "b", ListResult recordsB)])
@@ -145,7 +145,7 @@ main =  hspec $ do
         _ <- forM_ recordsA putRecordTdb
         _ <- forM_ recordsB putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (TimeGroup (Seconds 1) FetchAll)
+        PS.parallelScan testDbName AllTime Record (TimeGroup (Seconds 1) FetchAll)
 
       res `shouldBe` (Right $ MapResult $ Map.fromList [(DbInt 1420471452000, ListResult recordsA),
                                                         (DbInt 1420471453000, ListResult recordsB)])
@@ -167,7 +167,7 @@ main =  hspec $ do
 
         _ <- forM_ records putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (TimeFieldGroup "b" (Seconds 1) (Min "a"))
+        PS.parallelScan testDbName AllTime Record (TimeFieldGroup "b" (Seconds 1) (Min "a"))
 
       res `shouldBe` (Right $ MapResult $ Map.fromList
                       [(DbList [DbString "a",DbInt 1420471452000],
@@ -185,7 +185,7 @@ main =  hspec $ do
         _ <- createDatabase testDbName testSchema
         _ <- forM_ records putRecordTdb
 
-        PS.parallelScan testDbName EntireKeyspace Record (Mean "a")
+        PS.parallelScan testDbName AllTime Record (Mean "a")
 
       res `shouldBe` (Right $ ValueRes $ DbDouble 49.5)
 
