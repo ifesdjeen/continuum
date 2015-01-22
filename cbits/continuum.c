@@ -43,13 +43,10 @@ scan_range(leveldb_t*             db,
            leveldb_readoptions_t* roptions,
            const char*            start_at,
            size_t                 start_at_len,
-           const char*            end_at,
-           size_t                 end_at_len,
            int (*compare)(void*,
-                          const char* a, size_t alen,
-                          const char* b, size_t blen),
+                          const char* a, size_t alen),
            void (*append)(const char* key, size_t key_len,
-                         const char* val, size_t val_len)) {
+                          const char* val, size_t val_len)) {
   leveldb_iterator_t* iter = leveldb_create_iterator(db, roptions);
   leveldb_iter_seek(iter, start_at, start_at_len);
 
@@ -57,7 +54,7 @@ scan_range(leveldb_t*             db,
     size_t current_key_len;
     const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-    if(compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
+    if(compare(NULL, current_key, current_key_len) > 0) {
       break;
     }
 
@@ -77,11 +74,8 @@ scan_range_butfirst(leveldb_t*             db,
                     leveldb_readoptions_t* roptions,
                     const char*            start_at,
                     size_t                 start_at_len,
-                    const char*            end_at,
-                    size_t                 end_at_len,
                     int (*compare)(void*,
-                                   const char* a, size_t alen,
-                                   const char* b, size_t blen),
+                                   const char* a, size_t alen),
                     void (*append)(const char* key, size_t key_len,
                                    const char* val, size_t val_len)) {
   leveldb_iterator_t* iter = leveldb_create_iterator(db, roptions);
@@ -93,7 +87,7 @@ scan_range_butfirst(leveldb_t*             db,
       size_t current_key_len;
       const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-      if(compare(NULL, current_key, current_key_len, end_at, end_at_len) > 0) {
+      if(compare(NULL, current_key, current_key_len) > 0) {
         break;
       }
 
@@ -114,11 +108,8 @@ scan_range_butlast(leveldb_t*             db,
                    leveldb_readoptions_t* roptions,
                    const char*            start_at,
                    size_t                 start_at_len,
-                   const char*            end_at,
-                   size_t                 end_at_len,
                    int (*compare)(void*,
-                                  const char* a, size_t alen,
-                                  const char* b, size_t blen),
+                                  const char* a, size_t alen),
                    void (*append)(const char* key, size_t key_len,
                                   const char* val, size_t val_len)) {
   leveldb_iterator_t* iter = leveldb_create_iterator(db, roptions);
@@ -128,7 +119,7 @@ scan_range_butlast(leveldb_t*             db,
     size_t current_key_len;
     const char* current_key = leveldb_iter_key(iter, &current_key_len);
 
-    if(compare(NULL, current_key, current_key_len, end_at, end_at_len) == 0) {
+    if(compare(NULL, current_key, current_key_len) == 0) {
       break;
     }
 
