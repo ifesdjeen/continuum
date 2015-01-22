@@ -59,7 +59,6 @@ adjustRanges (KeyRange a b) l       = [a] ++ l ++ [b]
 -- TODO this is a bug again :/ we have to exclude the first :(
 adjustRanges (OpenEndButFirst a) l  = [a] ++ l
 adjustRanges (ButFirst a b) l       = [a] ++ l ++ [b]
-adjustRanges (ButLast a b) l        = [a] ++ l ++ [b]
 adjustRanges EntireKeyspace l       = l
 
 constructRanges :: ScanRange -> [ByteString] -> [ScanRange]

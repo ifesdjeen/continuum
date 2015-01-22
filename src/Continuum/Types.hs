@@ -203,12 +203,13 @@ data TimeRange =
   | AllTime
   deriving(Show, Generic)
 
+-- The only reason to have ButFirst and OpenEndButFirst is to be able to skip a single
+-- returned entry without appending it.
 data ScanRange =
   OpenEnd                  ByteString
   | KeyRange               ByteString ByteString
   | OpenEndButFirst        ByteString
   | ButFirst               ByteString ByteString
-  | ButLast                ByteString ByteString
   | EntireKeyspace
   | Prefixed               ByteString ScanRange
   deriving(Show, Generic)
