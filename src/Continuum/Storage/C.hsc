@@ -8,8 +8,8 @@ import qualified Data.ByteString.Unsafe    as BU
 
 import           Database.LevelDB.Base     ( ReadOptions(..) )
 import           Database.LevelDB.C        ( CompareFun, LevelDBPtr, ReadOptionsPtr,
-                                                  LevelDBPtr, mkCmp )
-import           Database.LevelDB.Internal ( DB(..), mkCompareFun, mkCReadOpts )
+                                                  LevelDBPtr )
+import           Database.LevelDB.Internal ( DB(..), mkCReadOpts )
 import           Control.Applicative       ( (<*>), (<$>) )
 import           Data.ByteString           ( ByteString, packCStringLen )
 import           Data.IORef                ( IORef, newIORef, modifyIORef', readIORef )
@@ -20,6 +20,7 @@ import           Continuum.Types
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
+import           Foreign.Ptr
 
 import qualified Control.Foldl                  as L
 --import Debug.Trace
@@ -64,21 +65,25 @@ doScan db ro (OpenEnd rangeStart) appendFn =
 
 doScan db ro (KeyRange rangeStart rangeEnd) appendFn =
   BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len) -> do
-    comparator <- mkCmp $ bitwise_compare
-    scan_range db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
+  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len)     -> do
+    let start_at_len' = fromIntegral start_at_len
+        end_at_len'   = fromIntegral end_at_len
+    comparator <- mkCmp $ (\p1 l1 -> bitwiseCompare p1 l1 end_at_ptr end_at_len')
+    scan_range db ro start_at_ptr start_at_len' comparator appendFn
 
-doScan db ro (ButFirst rangeStart rangeEnd)       appendFn =
+doScan db ro (ButFirst rangeStart rangeEnd) appendFn =
   BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len) -> do
-    comparator <- mkCmp $ bitwise_compare
-    scan_range_butfirst db ro start_at_ptr (fromIntegral start_at_len) end_at_ptr (fromIntegral end_at_len) comparator appendFn
+  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len)     -> do
+    let start_at_len' = fromIntegral start_at_len
+        end_at_len'   = fromIntegral end_at_len
+    comparator <- mkCmp $ (\p1 l1 -> bitwiseCompare p1 l1 end_at_ptr end_at_len')
+    scan_range_butfirst db ro start_at_ptr start_at_len' comparator appendFn
 
-doScan db ro (OpenEndButFirst rangeStart)         appendFn =
+doScan db ro (OpenEndButFirst rangeStart) appendFn =
   BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
   scan_open_end_butfirst db ro start_at_ptr (fromIntegral start_at_len) appendFn
 
-doScan db ro (ButLast rangeStart rangeEnd)        appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
+-- doScan db ro (ButLast rangeStart rangeEnd) appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
 
 -- |
 -- | Foreign imports
@@ -95,9 +100,7 @@ foreign import ccall safe "continuum.h"
                 -> ReadOptionsPtr
                 -> CString
                 -> CSize
-                -> CString
-                -> CSize
-                -> FunPtr CompareFun
+                -> FunPtr CurriedCompareFun
                 -> FunPtr StepFun
                 -> IO ()
 
@@ -106,9 +109,7 @@ foreign import ccall safe "continuum.h"
                       -> ReadOptionsPtr
                       -> CString
                       -> CSize
-                      -> CString
-                      -> CSize
-                      -> FunPtr CompareFun
+                      -> FunPtr CurriedCompareFun
                       -> FunPtr StepFun
                       -> IO ()
 
@@ -128,30 +129,27 @@ foreign import ccall safe "continuum.h"
                          -> FunPtr StepFun
                          -> IO ()
 
-foreign import ccall safe "static continuum.h"
-  bitwise_compare :: CompareFun
+foreign import ccall safe "continuum.h bitwise_compare"
+  ___bitwise_compare :: CompareFun
+
+bitwiseCompare :: CString -> CSize -> CString -> CSize -> IO CInt
+bitwiseCompare p1 s1 p2 s2 = do
+  p <- peek $ nullPtr
+  ___bitwise_compare p p1 s1 p2 s2
 
 -- |
 -- | Comparator functions
 -- |
 
-bitwise_compare_hs :: CompareFun
-bitwise_compare_hs =
-  mkCompareFun $ (\a b ->
-                   let a' = BU.unsafeTake 8 a
-                       b' = BU.unsafeTake 8 b
-                   in
-                    compare a' b')
-
-prefix_eq_comparator :: CompareFun
-prefix_eq_comparator =
-  mkCompareFun $ (\a b ->
-                   let a' = BU.unsafeTake 8 a
-                       b' = BU.unsafeTake 8 b
-                   in
-                    if a' == b'
-                    then GT
-                    else LT)
+-- prefix_eq_comparator :: CompareFun
+-- prefix_eq_comparator =
+--   mkCompareFun $ (\a b ->
+--                    let a' = BU.unsafeTake 8 a
+--                        b' = BU.unsafeTake 8 b
+--                    in
+--                     if a' == b'
+--                     then GT
+--                     else LT)
 
 type StepFun = CString -> CSize -> CString -> CSize -> IO ()
 
@@ -164,5 +162,8 @@ makeStepFun ref decoder step keyPtr keyLen valPtr valLen = do
 
 type StepFunPtr = FunPtr StepFun
 
-foreign import ccall safe "wrapper"
-  makeCStepFun :: StepFun -> IO StepFunPtr
+foreign import ccall safe "wrapper" makeCStepFun :: StepFun -> IO StepFunPtr
+
+type CurriedCompareFun = CString -> CSize -> IO CInt
+
+foreign import ccall "wrapper" mkCmp :: CurriedCompareFun -> IO (FunPtr CurriedCompareFun)
