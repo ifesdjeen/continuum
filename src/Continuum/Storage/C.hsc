@@ -23,7 +23,7 @@ import           Foreign.C.String
 import           Foreign.Ptr
 
 import qualified Control.Foldl                  as L
---import Debug.Trace
+import Debug.Trace
 
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 #include "continuum.h"
@@ -57,85 +57,74 @@ doScan :: LevelDBPtr
           -> ScanRange
           -> StepFunPtr
           -> IO ()
-doScan db ro EntireKeyspace appendFn = scan_entire_keyspace db ro appendFn
 
-doScan db ro (OpenEnd rangeStart) appendFn =
-  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  scan_open_end db ro start_at_ptr (fromIntegral start_at_len) appendFn
+doScan db ro range appendFn = do
+  let sp = startingPoint range
+      ec = exitCondition range
+      sf = skipFirst range
 
-doScan db ro (KeyRange rangeStart rangeEnd) appendFn =
-  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len)     -> do
-    let start_at_len' = fromIntegral start_at_len
-        end_at_len'   = fromIntegral end_at_len
-    comparator <- mkCmp $ (\p1 l1 -> bitwiseCompare p1 l1 end_at_ptr end_at_len')
-    scan_range db ro start_at_ptr start_at_len' comparator appendFn
+  compareFun <- mkCmp ec
 
-doScan db ro (ButFirst rangeStart rangeEnd) appendFn =
-  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  BU.unsafeUseAsCStringLen rangeEnd   $ \(end_at_ptr, end_at_len)     -> do
-    let start_at_len' = fromIntegral start_at_len
-        end_at_len'   = fromIntegral end_at_len
-    comparator <- mkCmp $ (\p1 l1 -> bitwiseCompare p1 l1 end_at_ptr end_at_len')
-    scan_range_butfirst db ro start_at_ptr start_at_len' comparator appendFn
+  case sp of
+    Nothing   -> c_scan db ro nullPtr (fromIntegral 0) compareFun appendFn sf
+    (Just bs) ->
+      BU.unsafeUseAsCStringLen bs $ \(start_at_ptr, start_at_len) ->
+      c_scan db ro start_at_ptr (fromIntegral start_at_len) compareFun appendFn sf
 
-doScan db ro (OpenEndButFirst rangeStart) appendFn =
-  BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-  scan_open_end_butfirst db ro start_at_ptr (fromIntegral start_at_len) appendFn
+-- Actually, if we do it this way, we could even introduce some scanning / filtering
+class DbScanSetup a where
+  startingPoint  :: a -> Maybe ByteString
+  exitCondition  :: a -> CurriedCompareFun
+  skipFirst      :: a -> CInt
 
--- doScan db ro (ButLast rangeStart rangeEnd) appendFn = doScan db ro (KeyRange rangeStart rangeEnd) appendFn
+instance DbScanSetup ScanRange where
+  startingPoint (OpenEnd bs)         = Just bs
+  startingPoint (OpenEndButFirst bs) = Just bs
+  startingPoint EntireKeyspace       = Nothing
+  startingPoint (KeyRange bs _)      = Just bs
+  startingPoint (ButFirst bs _)      = Just bs
+
+  exitCondition (OpenEnd bs)          = constantlyTrue
+  exitCondition (OpenEndButFirst bs)  = constantlyTrue
+  exitCondition EntireKeyspace        = constantlyTrue
+  exitCondition (ButFirst _ rangeEnd) =
+    (\p1 l1 ->
+      BU.unsafeUseAsCStringLen rangeEnd $ \(end_at_ptr, end_at_len) -> do
+        bitwiseCompare p1 l1 end_at_ptr (fromIntegral end_at_len))
+  exitCondition (KeyRange _ rangeEnd) =
+    (\p1 l1 ->
+      BU.unsafeUseAsCStringLen rangeEnd $ \(end_at_ptr, end_at_len) -> do
+        bitwiseCompare p1 l1 end_at_ptr (fromIntegral end_at_len))
+
+  skipFirst (OpenEnd _)         = fromIntegral 0
+  skipFirst (OpenEndButFirst _) = fromIntegral 1
+  skipFirst EntireKeyspace      = fromIntegral 0
+  skipFirst (KeyRange _ _)      = fromIntegral 0
+  skipFirst (ButFirst _ _)      = fromIntegral 1
+  -- exitCondition (ButFirst bs _)      = Just bs
 
 -- |
 -- | Foreign imports
 -- |
 
-foreign import ccall safe "continuum.h"
-  scan_entire_keyspace :: LevelDBPtr
-                          -> ReadOptionsPtr
-                          -> FunPtr StepFun
-                          -> IO ()
-
-foreign import ccall safe "continuum.h"
-  scan_range :: LevelDBPtr
-                -> ReadOptionsPtr
-                -> CString
-                -> CSize
-                -> FunPtr CurriedCompareFun
-                -> FunPtr StepFun
-                -> IO ()
-
-foreign import ccall safe "continuum.h"
-  scan_range_butfirst :: LevelDBPtr
-                      -> ReadOptionsPtr
-                      -> CString
-                      -> CSize
-                      -> FunPtr CurriedCompareFun
-                      -> FunPtr StepFun
-                      -> IO ()
-
-foreign import ccall safe "continuum.h"
-  scan_open_end :: LevelDBPtr
-                   -> ReadOptionsPtr
-                   -> CString
-                   -> CSize
-                   -> FunPtr StepFun
-                   -> IO ()
-
-foreign import ccall safe "continuum.h"
-  scan_open_end_butfirst :: LevelDBPtr
-                         -> ReadOptionsPtr
-                         -> CString
-                         -> CSize
-                         -> FunPtr StepFun
-                         -> IO ()
+foreign import ccall safe "continuum.h scan"
+  c_scan :: LevelDBPtr
+            -> ReadOptionsPtr
+            -> CString
+            -> CSize
+            -> FunPtr CurriedCompareFun
+            -> FunPtr StepFun
+            -> CInt
+            -> IO ()
 
 foreign import ccall safe "continuum.h bitwise_compare"
   ___bitwise_compare :: CompareFun
 
+foreign import ccall safe "continuum.h constantly_true"
+  constantlyTrue :: CurriedCompareFun
+
 bitwiseCompare :: CString -> CSize -> CString -> CSize -> IO CInt
-bitwiseCompare p1 s1 p2 s2 = do
-  p <- peek $ nullPtr
-  ___bitwise_compare p p1 s1 p2 s2
+bitwiseCompare = ___bitwise_compare nullPtr
 
 -- |
 -- | Comparator functions

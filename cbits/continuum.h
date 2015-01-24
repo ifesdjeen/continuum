@@ -17,8 +17,7 @@ scan_range(leveldb_t*             db,
            leveldb_readoptions_t* roptions,
            const char*            start_at,
            size_t                 start_at_len,
-           int (*compare)(void*,
-                          const char* a, size_t alen),
+           int (*compare)(const char* a, size_t alen),
            void (*append)(const char* key, size_t key_len,
                           const char* val, size_t val_len));
 
@@ -27,8 +26,7 @@ scan_range_butfirst(leveldb_t*             db,
                     leveldb_readoptions_t* roptions,
                     const char*            start_at,
                     size_t                 start_at_len,
-                    int (*compare)(void*,
-                                   const char* a, size_t alen),
+                    int (*compare)(const char* a, size_t alen),
                     void (*append)(const char* key, size_t key_len,
                                    const char* val, size_t val_len));
 void
@@ -52,4 +50,13 @@ bitwise_compare(void* shared,
                 const char* a, size_t alen,
                 const char* b, size_t blen);
 
+void
+scan(leveldb_t*             db,
+     leveldb_readoptions_t* roptions,
+     const char*            start_at,
+     size_t                 start_at_len,
+     int (*compare)(const char* a, size_t alen),
+     void (*append)(const char* key, size_t key_len,
+                    const char* val, size_t val_len),
+     int                    skip_first);
 #endif /* CONTINUUM_H */
