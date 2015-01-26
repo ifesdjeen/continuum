@@ -12,9 +12,7 @@ bitwise_compare(void* shared,
                 const char* b, size_t blen);
 
 int
-constantly_true(const char* b, size_t blen) {
-  return 0;
-}
+constantly_true(const char* b, size_t blen);
 
 void
 scan(leveldb_t*             db,
