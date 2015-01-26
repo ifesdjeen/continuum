@@ -59,6 +59,7 @@ toQuery (Just timeGroup) (Just aggregate) (Just fieldsStr) =
         toAggregate "min" = Min
         toAggregate "max" = Max
         toAggregate "mean" = Mean
+        toAggregate "median" = Median
         toAggregate "none" = (\_ -> FetchAll)
 toQuery _ _ _ = FetchAll
 
