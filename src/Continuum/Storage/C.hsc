@@ -5,6 +5,7 @@
 module Continuum.Storage.C where
 
 import qualified Data.ByteString.Unsafe    as BU
+import qualified Data.ByteString           as B
 
 import           Database.LevelDB.Base     ( ReadOptions(..) )
 import           Database.LevelDB.C        ( CompareFun, LevelDBPtr, ReadOptionsPtr,
@@ -59,49 +60,63 @@ doScan :: LevelDBPtr
           -> IO ()
 
 doScan db ro range appendFn = do
-  let sp = startingPoint range
-      ec = exitCondition range
-      sf = skipFirst range
+  let sp     = startingPoint range
+      cf     = compareFun range
+      sf     = skipFirst range
+      scanFn = case sp of
+        Nothing           -> (\compareFun -> c_scan db ro nullPtr (fromIntegral 0) compareFun appendFn sf)
+        (Just rangeStart) -> (\compareFun ->
+                       BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
+                       c_scan db ro start_at_ptr (fromIntegral start_at_len) compareFun appendFn sf)
+  cmp <- mkCmp cf
+  scanFn cmp
 
-  compareFun <- mkCmp ec
 
-  case sp of
-    Nothing   -> c_scan db ro nullPtr (fromIntegral 0) compareFun appendFn sf
-    (Just bs) ->
-      BU.unsafeUseAsCStringLen bs $ \(start_at_ptr, start_at_len) ->
-      c_scan db ro start_at_ptr (fromIntegral start_at_len) compareFun appendFn sf
+
 
 -- Actually, if we do it this way, we could even introduce some scanning / filtering
+-- limit could/should be added to append function.
 class DbScanSetup a where
   startingPoint  :: a -> Maybe ByteString
-  exitCondition  :: a -> CurriedCompareFun
+  exitPoint      :: a -> Maybe ByteString
+  compareFun     :: a -> CurriedCompareFun
   skipFirst      :: a -> CInt
 
 instance DbScanSetup ScanRange where
   startingPoint (OpenEnd bs)         = Just bs
+  startingPoint (ButFirst bs _)      = Just bs
   startingPoint (OpenEndButFirst bs) = Just bs
   startingPoint EntireKeyspace       = Nothing
   startingPoint (KeyRange bs _)      = Just bs
-  startingPoint (ButFirst bs _)      = Just bs
+  startingPoint (Prefixed prefix subscan)   =
+    Just $
+    case (startingPoint subscan) of
+      Nothing -> prefix
+      (Just bs) -> B.concat [prefix, bs]
 
-  exitCondition (OpenEnd bs)          = constantlyTrue
-  exitCondition (OpenEndButFirst bs)  = constantlyTrue
-  exitCondition EntireKeyspace        = constantlyTrue
-  exitCondition (ButFirst _ rangeEnd) =
-    (\p1 l1 ->
-      BU.unsafeUseAsCStringLen rangeEnd $ \(end_at_ptr, end_at_len) -> do
-        bitwiseCompare p1 l1 end_at_ptr (fromIntegral end_at_len))
-  exitCondition (KeyRange _ rangeEnd) =
-    (\p1 l1 ->
-      BU.unsafeUseAsCStringLen rangeEnd $ \(end_at_ptr, end_at_len) -> do
-        bitwiseCompare p1 l1 end_at_ptr (fromIntegral end_at_len))
+  exitPoint (OpenEnd _)         = Nothing
+  exitPoint (ButFirst _ end)    = Just end
+  exitPoint (OpenEndButFirst _) = Nothing
+  exitPoint EntireKeyspace      = Nothing
+  exitPoint (KeyRange _ end)    = Just end
+  exitPoint (Prefixed prefix subscan) = undefined
 
-  skipFirst (OpenEnd _)         = fromIntegral 0
-  skipFirst (OpenEndButFirst _) = fromIntegral 1
-  skipFirst EntireKeyspace      = fromIntegral 0
-  skipFirst (KeyRange _ _)      = fromIntegral 0
-  skipFirst (ButFirst _ _)      = fromIntegral 1
-  -- exitCondition (ButFirst bs _)      = Just bs
+  compareFun (Prefixed prefix subscan) = case (exitPoint subscan) of
+    Nothing         -> prefixEqualCmp prefix
+    (Just rangeEnd) -> bitwiseCompareHs (B.concat [prefix, rangeEnd])
+
+  compareFun range                  = case (exitPoint range) of
+    Nothing         -> constantlyTrue
+    (Just rangeEnd) -> bitwiseCompareHs rangeEnd
+
+  skipFirst (OpenEnd _)           = fromIntegral 0
+  skipFirst (OpenEndButFirst _)   = fromIntegral 1
+  skipFirst EntireKeyspace        = fromIntegral 0
+  skipFirst (KeyRange _ _)        = fromIntegral 0
+  skipFirst (ButFirst _ _)        = fromIntegral 1
+  skipFirst (Prefixed _ subrange) = skipFirst subrange
+
+  -- startingPoint (Prefixed prefix subscan)   = Just $
 
 -- |
 -- | Foreign imports
@@ -123,22 +138,31 @@ foreign import ccall safe "continuum.h bitwise_compare"
 foreign import ccall safe "continuum.h constantly_true"
   constantlyTrue :: CurriedCompareFun
 
-bitwiseCompare :: CString -> CSize -> CString -> CSize -> IO CInt
+type HsCompareFun = CString -> CSize -> CString -> CSize -> IO CInt
+
+bitwiseCompare :: HsCompareFun
 bitwiseCompare = ___bitwise_compare nullPtr
 
 -- |
 -- | Comparator functions
 -- |
 
--- prefix_eq_comparator :: CompareFun
--- prefix_eq_comparator =
---   mkCompareFun $ (\a b ->
---                    let a' = BU.unsafeTake 8 a
---                        b' = BU.unsafeTake 8 b
---                    in
---                     if a' == b'
---                     then GT
---                     else LT)
+bitwiseCompareHs :: ByteString -> CurriedCompareFun
+bitwiseCompareHs end ptr size = do
+  current <- BU.unsafePackCStringLen (ptr, (fromIntegral size))
+  return $ orderToInt $ compare (BU.unsafeTake 8 current) (BU.unsafeTake 8 end)
+
+prefixEqualCmp :: ByteString -> CurriedCompareFun
+prefixEqualCmp prefix ptr size = do
+  current <- BU.unsafePackCStringLen (ptr, (fromIntegral size))
+  if ((B.take (B.length prefix) current) == prefix)
+    then return 0
+    else return 1
+
+orderToInt :: Ordering -> CInt
+orderToInt LT = -1
+orderToInt GT = 1
+orderToInt EQ = 0
 
 type StepFun = CString -> CSize -> CString -> CSize -> IO ()
 
