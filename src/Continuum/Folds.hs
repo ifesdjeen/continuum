@@ -143,7 +143,7 @@ finalize (Mean _) (MeanStep msum nums) =
     (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
 
 finalize (Median _) (MedianStep vals) | odd n = ValueRes  $ head $ drop (n `div` 2) vals'
-                                      | even n = numToResult $ (flip withNumbers) sum [DbInt 1, DbInt 2]
+                                      | even n = numToResult $ (flip withNumbers) mean vals'
   where i      = (length vals' `div` 2) - 1
         vals'  = sort vals
         n      = length vals
