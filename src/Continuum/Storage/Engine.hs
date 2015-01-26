@@ -31,6 +31,7 @@ import           System.Process                 ( system )
 import           Control.Applicative            ( (<$>) )
 
 import Debug.Trace
+
 -- |
 -- | OPERATIONS
 -- |
@@ -156,9 +157,9 @@ startStorage path ctx = do
 
 stopStorage :: DbContext -> IO ()
 stopStorage DbContext{..} = do
-  _             <- LDB.close ctxSystemDb
-  _             <- LDB.close ctxChunksDb
-  _             <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
+  _ <- LDB.close ctxSystemDb
+  _ <- LDB.close ctxChunksDb
+  _ <- mapM (\(_, (_, db)) -> LDB.close db) (Map.toList ctxDbs)
   return ()
 
 readChunks :: ScanRange -> DbState [Integer]
@@ -185,7 +186,6 @@ scan context dbName scanRange decoding foldOp = do
 
   case maybeDb of
     (Just (schema, db)) -> do
-      -- scanRes <- C.scan db ro scanRange (decodeRecord decoding schema)
       scanRes <- C.scan db ro scanRange (decodeRecord decoding schema) foldOp
       return $ scanRes
     Nothing             -> return $ Left NoSuchDatabaseError
