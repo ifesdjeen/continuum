@@ -15,7 +15,7 @@ import           Continuum.Folds                ( queryStep, finalize )
 import           Control.Monad.State.Strict     ( liftIO )
 import           Control.Applicative            ( (<$>) )
 import           Continuum.Serialization.Primitive ( packWord64 )
-import           Data.ByteString                ( ByteString(..) )
+import           Data.ByteString                ( ByteString )
 
 -- import Debug.Trace
 
