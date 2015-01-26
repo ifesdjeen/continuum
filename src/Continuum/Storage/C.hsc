@@ -4,6 +4,7 @@
 
 module Continuum.Storage.C where
 
+import qualified Control.Foldl             as L
 import qualified Data.ByteString.Unsafe    as BU
 import qualified Data.ByteString           as B
 
@@ -15,16 +16,14 @@ import           Control.Applicative       ( (<*>), (<$>) )
 import           Data.ByteString           ( ByteString, packCStringLen )
 import           Data.IORef                ( IORef, newIORef, modifyIORef', readIORef )
 
-import           Continuum.Serialization.Primitive
 import           Continuum.Types
 
 import           Foreign
 import           Foreign.C.Types
 import           Foreign.C.String
-import           Foreign.Ptr
 
-import qualified Control.Foldl                  as L
-import Debug.Trace
+
+-- import Debug.Trace
 
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 #include "continuum.h"
@@ -64,14 +63,12 @@ doScan db ro range appendFn = do
       cf     = compareFun range
       sf     = skipFirst range
       scanFn = case sp of
-        Nothing           -> (\compareFun -> c_scan db ro nullPtr (fromIntegral 0) compareFun appendFn sf)
-        (Just rangeStart) -> (\compareFun ->
+        Nothing           -> (\cmp -> c_scan db ro nullPtr (fromIntegral (0 :: Integer)) cmp appendFn sf)
+        (Just rangeStart) -> (\cmp ->
                        BU.unsafeUseAsCStringLen rangeStart $ \(start_at_ptr, start_at_len) ->
-                       c_scan db ro start_at_ptr (fromIntegral start_at_len) compareFun appendFn sf)
+                       c_scan db ro start_at_ptr (fromIntegral start_at_len) cmp appendFn sf)
   cmp <- mkCmp cf
   scanFn cmp
-
-
 
 
 -- Actually, if we do it this way, we could even introduce some scanning / filtering
@@ -99,7 +96,7 @@ instance DbScanSetup ScanRange where
   exitPoint (OpenEndButFirst _) = Nothing
   exitPoint EntireKeyspace      = Nothing
   exitPoint (KeyRange _ end)    = Just end
-  exitPoint (Prefixed prefix subscan) = undefined
+  exitPoint (Prefixed _ _)      = undefined
 
   compareFun (Prefixed prefix subscan) = case (exitPoint subscan) of
     Nothing         -> prefixEqualCmp prefix
@@ -109,11 +106,11 @@ instance DbScanSetup ScanRange where
     Nothing         -> constantlyTrue
     (Just rangeEnd) -> bitwiseCompareHs rangeEnd
 
-  skipFirst (OpenEnd _)           = fromIntegral 0
-  skipFirst (OpenEndButFirst _)   = fromIntegral 1
-  skipFirst EntireKeyspace        = fromIntegral 0
-  skipFirst (KeyRange _ _)        = fromIntegral 0
-  skipFirst (ButFirst _ _)        = fromIntegral 1
+  skipFirst (OpenEnd _)           = fromIntegral (0 :: Integer)
+  skipFirst (OpenEndButFirst _)   = fromIntegral (1 :: Integer)
+  skipFirst EntireKeyspace        = fromIntegral (0 :: Integer)
+  skipFirst (KeyRange _ _)        = fromIntegral (0 :: Integer)
+  skipFirst (ButFirst _ _)        = fromIntegral (1 :: Integer)
   skipFirst (Prefixed _ subrange) = skipFirst subrange
 
   -- startingPoint (Prefixed prefix subscan)   = Just $
