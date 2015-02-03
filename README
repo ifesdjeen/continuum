@@ -14,6 +14,70 @@ ldconfig
 cabal install --allow-newer
 ```
 
+## Query Model
+
+```
+-- Returns the list of records. Can't be persisted or used as an aggregate
+-- query, because they do not aggregate anything (yolo)
+scan <dbname> (TimeBetween 123 456) Record FetchAll
+scan <dbname  (TimeBetween 300 456) Record FetchAll
+
+-- Returns a single result, or multiple results. Can't be persisted or used
+-- as an aggregate query because even though they do aggregate something,
+-- period is fixed by the given range of query rather than aggregate.
+scan <dbname>  AllTime Record (Min "a")
+scan <dbname>  AllTime Record (Mean "a")
+scan <dbname>  AllTime Record (Multi [("min", Min "a"),
+                                      ("avg", Mean "a")])
+
+-- All the groupers should be promoted into a special type of query.
+--
+scan <dbname>  AllTime Record (TimeGroup (Seconds 1) FetchAll)
+scan <dbname>  AllTime Record (TimeFieldGroup "b" (Seconds 1) (Min "a"))
+```
+
+So query may respond with:
+
+  * kvp with a timestamp
+  * kvp with a primary key of anything other than the timestmap
+
+Technically, record is always persisted the same way, we just have different keys that we
+have to take care of.
+
+__Problems:__
+
+  * not every query directly translates to key/value pairs
+  * not every query has a timestamp, in the end, so can't be
+
+__How to solve it?__
+
+  * Every `DbResult` has to have it's `DBRecord` counterpart:
+    * value result is basically a record with just one field
+    * if the timeframe is known (time grouping)
+
+  * Grouping queries only make sense when they're combined
+    with some kind of an aggregate.
+    * `select max(a) from tbl` type queries should return a
+    time _when_ the max time actually ocurred, for that we
+    need a new type of aggregate
+
+
+# Random ideas:
+
+  * How to run a query, feeding two collections at a time
+simultaneously, possibly just allowing a rolling time slice
+starting with a date and split for specific time intervals.
+E.g. we could normalize it by the "how many `whole` 10 minute
+intevals has elapsed since X time period`
+
+
+
+
+
+
+
+Current inconsistencies in Continuum:
+
 ## License
 
 Copyright (c) Alex Petrov
