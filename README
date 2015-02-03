@@ -31,7 +31,8 @@ scan <dbname>  AllTime Record (Multi [("min", Min "a"),
                                       ("avg", Mean "a")])
 
 -- All the groupers should be promoted into a special type of query.
---
+-- Since groupers will _always_ operate on a key/value pairs, they also
+-- can _absolutely always_ be translated into a record.
 scan <dbname>  AllTime Record (TimeGroup (Seconds 1) FetchAll)
 scan <dbname>  AllTime Record (TimeFieldGroup "b" (Seconds 1) (Min "a"))
 ```
