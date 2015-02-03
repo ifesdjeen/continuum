@@ -119,6 +119,9 @@ instance Monoid StepResult where
   mappend (ListStep a) (ListStep b) =
     ListStep $! (a ++ b)
 
+  mappend (MedianStep a) (MedianStep b) =
+    MedianStep $! (a ++ b)
+
   mappend (GroupStep a)  (GroupStep b) =
     GroupStep $! Map.unionWith mappend a b
 
