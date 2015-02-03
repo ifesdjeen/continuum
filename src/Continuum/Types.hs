@@ -13,6 +13,7 @@ import           Data.ByteString.Char8             ( unpack )
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
+import Debug.Trace
 -- |
 -- | ALIASES
 -- |
@@ -95,7 +96,7 @@ withNumbers values op = op <$> mapM toNumber values
 numToResult :: DbErrorMonad Double ->
                DbResult
 numToResult (Right i) = ValueRes $ DbDouble i
-numToResult (Left i) = ErrorRes i
+numToResult (Left i) = trace (show i) (ErrorRes i)
 
 toNumber :: (Fractional a) => DbValue -> DbErrorMonad a
 toNumber (DbString _) = Left NumericOperationError
@@ -150,9 +151,9 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 -- |
 
 data DbResult =
+  -- TODO: Rename everything to `result`, no shortcuts
   EmptyRes
   | ErrorRes               DbError
-  | KeyRes                 Integer
   | ValueRes               DbValue
   | RecordRes              DbRecord
   | ListResult             [DbRecord]
@@ -163,9 +164,6 @@ data DbResult =
   -- It looks like in the end, we can only get an empty result, error result,
   -- "raw" result (that covers things like key res and all other special cases),
   -- and record result (which overs both single and multi-field scenarios).
-
-  -- TODO: Split Step and Res ??
-  | DbSchemaResult         (DbName, DbSchema)
   deriving(Generic, Show, Eq)
 
 -- It (only) seems to me that this split makes sense. For example, when
@@ -263,6 +261,7 @@ makeSchema stringTypeList =
 -- |
 
 data SelectQuery =
+  -- TODO: split Aggregates, because they do not belong here
   Count
   | Min                    FieldName
   | Max                    FieldName
@@ -271,8 +270,14 @@ data SelectQuery =
   | Median                 FieldName
 -- | Distinct
   | Multi                  [(FieldName, SelectQuery)]
+    -- TODO: split groupers, because they're different from queries
   | Group                  (DbRecord -> DbValue)  SelectQuery
   | TimeFieldGroup         FieldName TimePeriod   SelectQuery
+    -- TODO: remove field grouping at all, because it doesn't make sense
+    -- in combination with new features. We'll only provide time queries,
+    -- and you'll technically still be able to find out responses for
+    -- "eternity" by just providing a 1 millisecond timer resolution,
+    -- so this one is absolutely senseless.
   | FieldGroup             FieldName              SelectQuery
   | TimeGroup                        TimePeriod   SelectQuery
   | FetchAll
@@ -316,6 +321,6 @@ instance S.Serialize TimePeriod
 roundTime :: TimePeriod -> DbRecord ->  DbValue
 roundTime (Milliseconds slice) (DbRecord time _) = DbInt $ slice * (time `quot` slice)
 roundTime (Seconds      slice) record            = roundTime (Milliseconds $ slice * 1000) record
-roundTime (Minutes      slice) record            = roundTime (Seconds $ slice * 60) record
-roundTime (Hours        slice) record            = roundTime (Minutes $ slice * 60) record
-roundTime (Days         slice) record            = roundTime (Hours $ slice * 24) record
+roundTime (Minutes      slice) record            = roundTime (Seconds      $ slice * 60) record
+roundTime (Hours        slice) record            = roundTime (Minutes      $ slice * 60) record
+roundTime (Days         slice) record            = roundTime (Hours        $ slice * 24) record

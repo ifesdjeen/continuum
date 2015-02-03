@@ -130,7 +130,7 @@ instance Monoid StepResult where
 
   mappend a EmptyStepRes = a
   mappend EmptyStepRes b = b
-  mappend _ _ = ErrorStepRes NoAggregatorAvailable
+  mappend a b = trace ((show a) ++ " ::: " ++ (show b)) (ErrorStepRes NoAggregatorAvailable)
 
 -- |
 -- | FINALIZERS
@@ -145,7 +145,7 @@ finalize (Mean _) (MeanStep msum nums) =
     (Left a) -> ErrorRes $ a
     (Right sum) -> ValueRes $ DbDouble $ sum / (fromIntegral nums)
 
-finalize (Median _) (MedianStep vals) | odd n = ValueRes  $ head $ drop (n `div` 2) vals'
+finalize (Median _) (MedianStep vals) | odd n = ValueRes $ head $ drop (n `div` 2) vals'
                                       | even n = numToResult $ (flip withNumbers) mean vals'
   where i      = (length vals' `div` 2) - 1
         vals'  = sort vals
