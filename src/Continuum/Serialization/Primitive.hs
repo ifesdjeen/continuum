@@ -6,26 +6,30 @@ import qualified Data.ByteString           as B
 import qualified Data.ByteString.Internal  as S
 import qualified Data.ByteString.Unsafe    as Unsafe
 
-import           Continuum.Types        ( DbErrorMonad(..), DbError(..) )
+import           Continuum.Types        ( DbErrorMonad, DbError(..) )
 import           Data.Word              ( Word8, Word16, Word32, Word64 )
 import           Data.ByteString        ( ByteString )
 import           Control.Applicative    ( (<$>) )
-import           Control.Monad.Except   ( forM_, throwError )
-import           Foreign                ( Storable, Ptr, sizeOf, poke, peek, castPtr, plusPtr, shiftR, shiftL, alloca )
-import           Foreign.C.Types        ( CSize(..) )
+import           Control.Monad.Except   ( throwError )
+import           Foreign                ( Storable, sizeOf, poke, peek, castPtr, plusPtr, shiftR, alloca )
 import           Foreign.ForeignPtr     ( withForeignPtr )
-import           Foreign.Ptr            ( castPtr )
 
 -- |
 -- | SIZES
 -- |
-
+word8Size :: Int
 word8Size  = sizeOf (undefined :: Word8)
 {-# INLINE word8Size #-}
+
+word16Size :: Int
 word16Size = sizeOf (undefined :: Word16)
 {-# INLINE word16Size #-}
+
+word32Size :: Int
 word32Size = sizeOf (undefined :: Word32)
 {-# INLINE word32Size #-}
+
+word64Size :: Int
 word64Size = sizeOf (undefined :: Word64)
 {-# INLINE word64Size #-}
 

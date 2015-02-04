@@ -7,7 +7,6 @@
 
 module Continuum.Serialization.Base where
 
-import           Foreign
 import           Continuum.Types
 import           Continuum.Serialization.Primitive
 
@@ -21,7 +20,7 @@ import           Data.Maybe           ( isJust, fromJust, catMaybes )
 import           Control.Monad.Except ( forM_, throwError )
 import           Control.Monad        ( join )
 
-import Debug.Trace
+-- import Debug.Trace
 
 data Success = Success
 
@@ -33,23 +32,15 @@ data Success = Success
 -- |
 
 encodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
-encodeRecord schema (DbRecord timestamp vals) sid = (encodeKey, encodeValue)
-  where encodeKey = B.concat [(packWord64 timestamp), (packWord64 sid)]
-        encodedParts = fmap fastEncodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
+encodeRecord schema (DbRecord timestamp vals) sid = (encodedKey, encodedValue)
+  where encodedKey = B.concat [(packWord64 timestamp), (packWord64 sid)]
+        encodedParts = fmap encodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
         lengths = B.length <$> encodedParts
-        encodeValue = runPut $ do
+        encodedValue = runPut $ do
           -- Change to B.Pack
           forM_ lengths (putWord8 . fromIntegral)
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
-
-encodeBeginTimestamp :: Integer -> B.ByteString
-encodeBeginTimestamp timestamp =
-  B.concat [(packWord64 timestamp), (packWord64 0)]
-
-encodeEndTimestamp :: Integer -> B.ByteString
-encodeEndTimestamp timestamp =
-  B.concat [(packWord64 timestamp), (packWord64 999999)]
 
 encodeSchema :: DbSchema -> B.ByteString
 encodeSchema = encode
@@ -97,7 +88,7 @@ decodeRecord Record schema !(k, bs) = do
   decodedVal     <- decodeValues schema bs
   return $! DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
 
-decodeRecord Key schema !(k, bs) = do
+decodeRecord Key _ !(k, _) = do
   timestamp      <- decodeKey k
   return $! DbRecord timestamp (Map.fromList [])
 
@@ -130,7 +121,7 @@ decodeIndexes schema bs =
 {-# INLINE decodeIndexes #-}
 
 decodeValues :: DbSchema -> B.ByteString -> DbErrorMonad [DbValue]
-decodeValues schema bs = mapM (\(t, s) -> fastDecodeValue t s) (zip (schemaTypes schema) bytestrings)
+decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
     indices                  = decodeIndexes schema bs
     bytestrings              = snd (foldl step (B.drop (length indices) bs, []) indices)
@@ -143,7 +134,7 @@ decodeFieldByIndex :: DbSchema
                       -> Int
                       -> B.ByteString
                       -> DbErrorMonad DbValue
-decodeFieldByIndex schema indices idx bs = fastDecodeValue ((schemaTypes schema) !! idx) bytestring
+decodeFieldByIndex schema indices idx bs = decodeValue ((schemaTypes schema) !! idx) bytestring
   where
     {-# INLINE bytestring #-}
     bytestring = B.take (indices !! idx) $ B.drop startFrom bs
@@ -156,20 +147,20 @@ decodeFieldByIndex schema indices idx bs = fastDecodeValue ((schemaTypes schema)
 -- | "FAST" CUSTOM SERIALIZATION
 -- |
 
-fastEncodeValue :: DbValue -> B.ByteString
-fastEncodeValue (DbLong   value) = packWord64 value
-fastEncodeValue (DbInt    value) = packWord32 value
-fastEncodeValue (DbShort  value) = packWord16 value
-fastEncodeValue (DbByte   value) = packWord8  value
-fastEncodeValue (DbFloat  value) = packFloat value
-fastEncodeValue (DbDouble value) = packDouble value
-fastEncodeValue (DbString value) = value
+encodeValue :: DbValue -> B.ByteString
+encodeValue (DbLong   value) = packWord64 value
+encodeValue (DbInt    value) = packWord32 value
+encodeValue (DbShort  value) = packWord16 value
+encodeValue (DbByte   value) = packWord8  value
+encodeValue (DbFloat  value) = packFloat value
+encodeValue (DbDouble value) = packDouble value
+encodeValue (DbString value) = value
 
-fastDecodeValue :: DbType -> B.ByteString -> DbErrorMonad DbValue
-fastDecodeValue DbtLong    bs  = DbLong   <$> (unpackWord64 bs)
-fastDecodeValue DbtInt     bs  = DbInt    <$> (unpackWord32 bs)
-fastDecodeValue DbtShort   bs  = DbShort  <$> (unpackWord16 bs)
-fastDecodeValue DbtByte    bs  = DbByte   <$> (unpackWord8 bs)
-fastDecodeValue DbtFloat   bs  = DbFloat  <$> (unpackFloat bs)
-fastDecodeValue DbtDouble  bs  = DbDouble <$> (unpackDouble bs)
-fastDecodeValue DbtString  bs  = return $ DbString bs
+decodeValue :: DbType -> B.ByteString -> DbErrorMonad DbValue
+decodeValue DbtLong    bs  = DbLong   <$> (unpackWord64 bs)
+decodeValue DbtInt     bs  = DbInt    <$> (unpackWord32 bs)
+decodeValue DbtShort   bs  = DbShort  <$> (unpackWord16 bs)
+decodeValue DbtByte    bs  = DbByte   <$> (unpackWord8 bs)
+decodeValue DbtFloat   bs  = DbFloat  <$> (unpackFloat bs)
+decodeValue DbtDouble  bs  = DbDouble <$> (unpackDouble bs)
+decodeValue DbtString  bs  = return $ DbString bs
