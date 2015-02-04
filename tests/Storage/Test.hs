@@ -111,26 +111,6 @@ main =  hspec $ do
                                                           ("min",ValueRes (DbInt 10))])
 
 
-    it "should run Field Group query" $ do
-
-      let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]
-          recordsA    = take 2 [makeRecord i [("a", DbInt $ i + 10),
-                                              ("b", DbString "a")] | i <- [1..]]
-          recordsB    = take 3 [makeRecord (i + 50) [("a", DbInt $ i + 10),
-                                                     ("b", DbString "b")] | i <- [1..]]
-
-      res <- runner $ do
-        _ <- createDatabase testDbName groupSchema
-
-        _ <- forM_ recordsA putRecordTdb
-        _ <- forM_ recordsB putRecordTdb
-
-        PS.parallelScan testDbName AllTime Record (FieldGroup "b" FetchAll)
-
-      res `shouldBe` (Right $ MapResult $ Map.fromList [(DbString "a", ListResult recordsA),
-                                                        (DbString "b", ListResult recordsB)])
-
-
     it "should run Time Group query" $ do
 
       let groupSchema = makeSchema [ ("a", DbtInt), ("b", DbtString) ]

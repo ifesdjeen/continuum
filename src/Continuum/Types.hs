@@ -99,19 +99,19 @@ numToResult (Right i) = ValueRes $ DbDouble i
 numToResult (Left i) = trace (show i) (ErrorRes i)
 
 toNumber :: (Fractional a) => DbValue -> DbErrorMonad a
-toNumber (DbString _) = Left NumericOperationError
 toNumber (DbLong a)   = Right (fromInteger a)
 toNumber (DbInt a)    = Right (fromIntegral a)
 toNumber (DbShort a)  = Right (fromIntegral a)
 toNumber (DbByte a)   = Right (fromIntegral a)
 toNumber (DbFloat a)  = Right (realToFrac a)
 toNumber (DbDouble a) = Right (realToFrac a)
-
+toNumber _            = Left NumericOperationError
 -- toDbResult :: DbErrorMonad
 
 instance Show DbValue where
   show EmptyValue   = ""
   show (DbInt v)    = show v
+  show (DbByte v)   = show v
   show (DbLong v)   = show v
   show (DbShort v)  = show v
   show (DbString v) = unpack v
@@ -121,6 +121,9 @@ instance Show DbValue where
 
 instance S.Serialize DbValue
 
+-- data DbKey = TimestampKey Integer
+--            | TsValueKey Integer
+
 data DbRecord =
   DbRecord Integer (Map.Map ByteString DbValue)
   deriving(Generic, Show, Eq)
@@ -128,8 +131,8 @@ data DbRecord =
 instance S.Serialize DbRecord
 
 getValue :: FieldName -> DbRecord -> DbValue
-getValue fieldName (DbRecord _ fields) =
-  fromMaybe EmptyValue (Map.lookup fieldName fields)
+getValue fieldName (DbRecord _ recordFields) =
+  fromMaybe EmptyValue (Map.lookup fieldName recordFields)
 
 --
 -- Stubs
@@ -273,12 +276,6 @@ data SelectQuery =
     -- TODO: split groupers, because they're different from queries
   | Group                  (DbRecord -> DbValue)  SelectQuery
   | TimeFieldGroup         FieldName TimePeriod   SelectQuery
-    -- TODO: remove field grouping at all, because it doesn't make sense
-    -- in combination with new features. We'll only provide time queries,
-    -- and you'll technically still be able to find out responses for
-    -- "eternity" by just providing a 1 millisecond timer resolution,
-    -- so this one is absolutely senseless.
-  | FieldGroup             FieldName              SelectQuery
   | TimeGroup                        TimePeriod   SelectQuery
   | FetchAll
   | Skip                   Integer

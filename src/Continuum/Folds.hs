@@ -43,7 +43,6 @@ queryStep (Multi steps) = Fold step [] done
 queryStep (TimeFieldGroup fieldName timePeriod subquery) =
   queryStep $ Group (\i -> DbList [getValue fieldName i, roundTime timePeriod i]) subquery
 
-queryStep (FieldGroup fieldName subquery) = queryStep $ Group (getValue fieldName) subquery
 queryStep (TimeGroup  timePeriod subquery) = queryStep $ Group (roundTime timePeriod) subquery
 
 queryStep (Group groupFn subquery) =
@@ -159,10 +158,7 @@ finalize (Multi subqueries) (MultiStep result) = MultiResult $ Map.fromList $ ma
             (Just r) -> finalize subquery r
             Nothing  -> ErrorRes OtherError
 
-  -- MultiResult $ map finalize i
-
 finalize (Group _ q)            (GroupStep i) = MapResult $ Map.map (finalize q) i
-finalize (FieldGroup _ q)       (GroupStep i) = MapResult $ Map.map (finalize q) i
 finalize (TimeGroup _ q)        (GroupStep i) = MapResult $ Map.map (finalize q) i
 finalize (TimeFieldGroup _ _ q) (GroupStep i) = MapResult $ Map.map (finalize q) i
 
