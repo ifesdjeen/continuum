@@ -9,4 +9,4 @@ import qualified Server.Test       as Server
 main :: IO ()
 main = do
   Storage.main
-  -- Server.main
+  Server.main
