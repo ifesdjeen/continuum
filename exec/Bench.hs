@@ -29,9 +29,10 @@ runner = Server.withTmpStorage testDbPath (testDbContext 10) cleanup
 main :: IO ()
 main = do
   res <- Server.withTmpStorage testDbPath (testDbContext 100000) cleanup $ do
-    -- _ <- createDatabase testDbName testSchema
-    -- _ <- forM_ [1..1000000]
-    --      (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1)])
+    _ <- createDatabase testDbName testSchema
+    _ <- forM_ [1..1000000]
+         (\i -> putRecordTdb $ makeRecord i [("a", DbInt 1)])
+
     start <- liftIO $ Clock.getPOSIXTime
     res <- PS.parallelScan testDbName AllTime Key Count
     end <- liftIO $  Clock.getPOSIXTime
@@ -42,7 +43,7 @@ main = do
   return ()
 
 testDbPath :: String
-testDbPath = "/tmp/haskell-leveldb-tests"
+testDbPath = "/tmp/haskell-bench"
 
 testDbName :: ByteString
 testDbName = "testdb"
