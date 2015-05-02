@@ -1,6 +1,0 @@
-language: haskell
-ghc:
-  - 7.6
-before_install:
-  - make travis
-script: export LD_LIBRARY_PATH="/usr/local/lib" && cabal configure --enable-tests && cabal build && cabal test
