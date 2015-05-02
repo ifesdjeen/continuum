@@ -1,6 +1,21 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
-module Continuum.Serialization.Primitive where
+module Continuum.Serialization.Primitive
+       (
+         packWord8
+       , packWord16
+       , packWord32
+       , packWord64
+       , packFloat
+       , packDouble
+
+       , unpackWord8
+       , unpackWord16
+       , unpackWord32
+       , unpackWord64
+       , unpackFloat
+       , unpackDouble
+       ) where
 
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Internal  as S
@@ -9,11 +24,10 @@ import qualified Data.ByteString.Unsafe    as Unsafe
 import           Continuum.Types        ( DbErrorMonad, DbError(..) )
 import           Data.Word              ( Word8, Word16, Word32, Word64 )
 import           Data.ByteString        ( ByteString )
-import           Control.Applicative    ( (<$>) )
 import           Control.Monad.Except   ( throwError )
 import           Foreign                ( Storable, sizeOf, poke, peek, castPtr, plusPtr, shiftR, alloca )
 import           Foreign.ForeignPtr     ( withForeignPtr )
-
+import           System.IO.Unsafe       ( unsafePerformIO )
 -- |
 -- | SIZES
 -- |
@@ -118,11 +132,11 @@ readNBytes :: Storable a => Int -> ByteString -> DbErrorMonad a
 readNBytes n bs = do
   (fp,o,_) <- S.toForeignPtr `fmap` B.reverse `fmap` (safeTake n bs)
   let k p = peek (castPtr (p `plusPtr` o))
-  return $ S.inlinePerformIO (withForeignPtr fp k)
+  return $ unsafePerformIO (withForeignPtr fp k)
 {-# INLINE readNBytes #-}
 
 fromFloat :: (Storable f, Storable w) => f -> w
-fromFloat float = S.inlinePerformIO $ alloca $ \buf -> do
+fromFloat float = unsafePerformIO $ alloca $ \buf -> do
   poke (castPtr buf) float
   peek buf
 {-# INLINE fromFloat #-}

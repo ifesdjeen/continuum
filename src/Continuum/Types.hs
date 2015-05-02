@@ -3,17 +3,12 @@
 
 module Continuum.Types where
 
-import           Control.Applicative               ( (<$>) )
-
 import           Data.ByteString                   ( ByteString )
 import           GHC.Generics                      ( Generic )
-import           Data.Maybe                        ( fromMaybe )
-import           Data.ByteString.Char8             ( unpack )
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
-import Debug.Trace
 -- |
 -- | ALIASES
 -- |
@@ -27,6 +22,7 @@ type Decoder a     = (ByteString, ByteString) -> DbErrorMonad a
 -- | INTERNAL DB TYPES
 -- |
 
+-- | DBType represent Schema types
 data DbType =
   DbtLong
   | DbtInt
@@ -37,7 +33,48 @@ data DbType =
   | DbtString
   deriving(Show, Generic, Eq, Ord)
 
-instance S.Serialize DbType
+-- | DBValue represen Schema instances of Schema types
+data DbValue =
+  DbString                  ByteString
+  | DbLong                  Integer
+  | DbInt                   Integer
+  | DbShort                 Integer
+  | DbByte                  Integer
+  | DbFloat                 Float
+  | DbDouble                Double
+  deriving (Eq, Show, Ord, Generic)
+
+-- |
+-- | DB SCHEMA
+-- |
+
+data DbRecord =
+  DbRecord Integer (Map.Map ByteString DbValue)
+  deriving(Generic, Show, Eq)
+
+-- |
+-- | DB SCHEMA
+-- |
+
+data DbSchema = DbSchema
+    { fieldMappings  :: Map.Map ByteString Int
+    , fields         :: [ByteString]
+    , indexMappings  :: Map.Map Int ByteString
+    , schemaMappings :: Map.Map ByteString DbType
+    , schemaTypes    :: [DbType]
+    } deriving (Generic, Show, Eq)
+
+-- |
+-- | DB Error
+-- |
+
+data Decoding =
+  Field                    ByteString
+  | Fields                 [ByteString]
+  | Key
+  | Record
+  deriving(Generic, Show)
+
 
 -- |
 -- | DB Error
@@ -60,264 +97,11 @@ data DbError =
   | NotEnoughInput Int Int
   deriving (Show, Eq, Ord, Generic)
 
-instance S.Serialize DbError
-
 type DbErrorMonad  = Either DbError
 
-
 -- |
--- | DB VALUE
--- |
-
-data DbValue =
-  EmptyValue
-  | DbString                ByteString
-  | DbLong                  Integer
-  | DbInt                   Integer
-  | DbShort                 Integer
-  | DbByte                  Integer
-  | DbFloat                 Float
-  | DbDouble                Double
-  | DbList                  [DbValue]
-  -- DbList [DbValue]
-  -- DbMap [Map.Map DbValue DbValue]
-  deriving (Eq, Ord, Generic)
-
--- |
--- | Number Conversion
+-- | Serialize Instances
 -- |
 
-withNumbers :: (Fractional a) =>
-               [DbValue] ->
-               ([a] -> a) ->
-               DbErrorMonad a
-withNumbers values op = op <$> mapM toNumber values
-
-numToResult :: DbErrorMonad Double ->
-               DbResult
-numToResult (Right i) = ValueRes $ DbDouble i
-numToResult (Left i) = trace (show i) (ErrorRes i)
-
-toNumber :: (Fractional a) => DbValue -> DbErrorMonad a
-toNumber (DbLong a)   = Right (fromInteger a)
-toNumber (DbInt a)    = Right (fromIntegral a)
-toNumber (DbShort a)  = Right (fromIntegral a)
-toNumber (DbByte a)   = Right (fromIntegral a)
-toNumber (DbFloat a)  = Right (realToFrac a)
-toNumber (DbDouble a) = Right (realToFrac a)
-toNumber _            = Left NumericOperationError
--- toDbResult :: DbErrorMonad
-
-instance Show DbValue where
-  show EmptyValue   = ""
-  show (DbInt v)    = show v
-  show (DbByte v)   = show v
-  show (DbLong v)   = show v
-  show (DbShort v)  = show v
-  show (DbString v) = unpack v
-  show (DbFloat v)  = show v
-  show (DbDouble v) = show v
-  show (DbList v) =   unwords $ map show v
-
-instance S.Serialize DbValue
-
--- data DbKey = TimestampKey Integer
---            | TsValueKey Integer
-
-data DbRecord =
-  DbRecord Integer (Map.Map ByteString DbValue)
-  deriving(Generic, Show, Eq)
-
-instance S.Serialize DbRecord
-
-getValue :: FieldName -> DbRecord -> DbValue
-getValue fieldName (DbRecord _ recordFields) =
-  fromMaybe EmptyValue (Map.lookup fieldName recordFields)
-
---
--- Stubs
---
-instance Show (DbRecord -> DbValue) where
-  show = undefined
-
-instance S.Serialize (DbRecord -> DbValue) where
-  put = undefined
-  get = undefined
-
--- | Creates a DbRecord from Timestamp and Key/Value pairs
---
-makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
-makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
-
--- |
--- | DB RESULT
--- |
-
-data DbResult =
-  -- TODO: Rename everything to `result`, no shortcuts
-  EmptyRes
-  | ErrorRes               DbError
-  | ValueRes               DbValue
-  | RecordRes              DbRecord
-  | ListResult             [DbRecord]
-  | MultiResult            (Map.Map ByteString DbResult)
-  | MapResult              (Map.Map DbValue DbResult)
-  -- TODO: RAW RESULT
-
-  -- It looks like in the end, we can only get an empty result, error result,
-  -- "raw" result (that covers things like key res and all other special cases),
-  -- and record result (which overs both single and multi-field scenarios).
-  deriving(Generic, Show, Eq)
-
--- It (only) seems to me that this split makes sense. For example, when
--- we have things like Limit or Skip steps that should keep some internal
--- state and then discard it after the step is finished. I'm not entirely
--- sure if we can avoid using the intermediate structure... Maybe we can tho.
-data StepResult =
-  EmptyStepRes
-  | ErrorStepRes           DbError
-  | CountStep              Integer
-
-  | MinStep                DbValue
-  | MaxStep                DbValue
-  | MapStep                DbValue
-  | MeanStep               (DbErrorMonad Double) Integer
---  | MedianStep             [DbRecord]
-  | MedianStep             [DbValue]
-  | ListStep               [DbRecord]
-  | MultiStep              (Map.Map FieldName StepResult)
-  | GroupStep              (Map.Map DbValue StepResult)
-  deriving(Generic, Show, Eq)
-
-instance S.Serialize DbResult
-
--- |
--- | RANGE
--- |
-
--- Maybe someday we'll need a ByteBuffer scan ranges. For now all keys are always
--- integers. Maybe iterators for something like indexes should be done somehow
--- differently not to make that stuff even more complex.
-data TimeRange =
-  TimeAfter                   Integer
-  | TimeBetween               Integer Integer
-  | AllTime
-  deriving(Show, Generic)
-
--- The only reason to have ButFirst and OpenEndButFirst is to be able to skip a single
--- returned entry without appending it.
-data ScanRange =
-  OpenEnd                  ByteString
-  | KeyRange               ByteString ByteString
-  | OpenEndButFirst        ByteString
-  | ButFirst               ByteString ByteString
-  | EntireKeyspace
-  | Prefixed               ByteString ScanRange
-  deriving(Show, Generic)
-
-instance S.Serialize TimeRange
-
--- |
--- | AGGREGATES
--- |
-
-data Decoding =
-  Field                    ByteString
-  | Fields                 [ByteString]
-  | Key
-  | Record
-  deriving(Generic, Show)
-
-instance S.Serialize Decoding
-
--- |
--- | DB SCHEMA
--- |
-
-data DbSchema = DbSchema
-    { fieldMappings  :: Map.Map ByteString Int
-    , fields         :: [ByteString]
-    , indexMappings  :: Map.Map Int ByteString
-    , schemaMappings :: Map.Map ByteString DbType
-    , schemaTypes    :: [DbType]
-    } deriving (Generic, Show, Eq)
-
+instance S.Serialize DbType
 instance S.Serialize DbSchema
-
--- | Creates a DbSchema out of Schema Definition (name/type pairs)
---
-makeSchema :: [(ByteString, DbType)] -> DbSchema
-makeSchema stringTypeList =
-  DbSchema { fieldMappings  = fMappings
-           , fields         = fields'
-           , schemaMappings = Map.fromList stringTypeList
-           , indexMappings  = iMappings
-           , schemaTypes    = schemaTypes'}
-  where fields'      = fmap fst stringTypeList
-        schemaTypes' = fmap snd stringTypeList
-        fMappings    = Map.fromList $ zip fields' iterateFrom0
-        iMappings    = Map.fromList $ zip iterateFrom0 fields'
-        iterateFrom0 = (iterate (1+) 0)
-
--- |
--- | QUERIES
--- |
-
-data SelectQuery =
-  -- TODO: split Aggregates, because they do not belong here
-  Count
-  | Min                    FieldName
-  | Max                    FieldName
--- | Sum
-  | Mean                   FieldName
-  | Median                 FieldName
--- | Distinct
-  | Multi                  [(FieldName, SelectQuery)]
-    -- TODO: split groupers, because they're different from queries
-  | Group                  (DbRecord -> DbValue)  SelectQuery
-  | TimeFieldGroup         FieldName TimePeriod   SelectQuery
-  | TimeGroup                        TimePeriod   SelectQuery
-  | FetchAll
-  | Skip                   Integer
-  | Limit                  Integer
-  deriving (Generic, Show)
-
-instance S.Serialize SelectQuery
-
--- |
--- | External Protocol Specification
--- |
-
--- TODO: Split client and server requests
-
-data Node = Node String String
-          deriving(Generic, Show, Eq, Ord)
-
-instance S.Serialize Node
-
-data Request =
-  Shutdown
-  | Insert                DbName DbRecord
-  | CreateDb              DbName DbSchema
-  -- TODO: Add ByteString here, never encode it inside of SelectQuery itself
-  | Select                DbName SelectQuery
-  deriving(Generic, Show)
-
-instance S.Serialize Request
-
-data TimePeriod =
-  Milliseconds   Integer
-  | Seconds      Integer
-  | Minutes      Integer
-  | Hours        Integer
-  | Days         Integer
-  deriving(Generic, Show)
-
-instance S.Serialize TimePeriod
-
-roundTime :: TimePeriod -> DbRecord ->  DbValue
-roundTime (Milliseconds slice) (DbRecord time _) = DbInt $ slice * (time `quot` slice)
-roundTime (Seconds      slice) record            = roundTime (Milliseconds $ slice * 1000) record
-roundTime (Minutes      slice) record            = roundTime (Seconds      $ slice * 60) record
-roundTime (Hours        slice) record            = roundTime (Minutes      $ slice * 60) record
-roundTime (Days         slice) record            = roundTime (Hours        $ slice * 24) record

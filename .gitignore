@@ -15,3 +15,4 @@ cabal.sandbox.config
 docsets
 *.js
 last_bench_results
+/src/Continuum/Storage/Parallel.hs

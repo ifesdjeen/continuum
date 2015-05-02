@@ -1,6 +1,6 @@
 name:                   continuum
 stability:              experimental
-description:            Continuum Database Client
+description:            Continuum Database
 version:                0.1.0.8
 license:                MIT
 license-file:           LICENSE
@@ -9,128 +9,49 @@ maintainer:             alexp@coffeenco.de
 build-type:             Simple
 cabal-version:          >=1.10
 
-Flag Binaries
-  description:          Build examples
-  default:              False
-  manual:               True
-
-Flag Profiling
-  description:          Profiling mode
-  default:              False
-  manual:               True
-
 source-repository head
   type:     git
   location: https://github.com/ifesdjeen/continuum.git
 
 library
   default-language:     Haskell2010
-  -- if flag(Profiling)
-  --   ghc-options:        -fprof-auto -rtsopts -rtsopts -O2 -Wall -optc-O3
-  -- else
   ghc-options:          -Wall -O2 -rtsopts -threaded
 
   hs-source-dirs:       src
-  extra-libraries:      leveldb
-
   other-extensions:       CPP
                         , ForeignFunctionInterface
                         , MagicHash
 
-  extra-lib-dirs:              /Users/ifesdjeen/hackage/continuum/leveldb
-  Include-dirs:           cbits
-                        , /Users/ifesdjeen/hackage/continuum/leveldb/include
-  c-sources:              cbits/continuum.c
-  exposed-modules:        Continuum.Storage.C
-                        , Continuum.Storage.Engine
-                        , Continuum.Storage.Parallel
-                        , Continuum.Serialization.Primitive
-                        , Continuum.Serialization.Base
-                        , Continuum.Types
-                        , Continuum.Server
-                        , Continuum.Client.Base
-                        , Continuum.Options
-                        , Continuum.Context
-                        , Continuum.Folds
-                        , Continuum.Http.Server
-                        , Continuum.Http.Encoding
+  exposed-modules:      Continuum.Types
+                      , Continuum.Core
+                      , Continuum.Serialization.Primitive
+                      , Continuum.Serialization.DbValue
+                      , Continuum.Serialization.DbRecord
+                      , Continuum.Serialization.Base
 
+  other-modules:        Continuum.Schema
+                        , Continuum.Record
   build-depends:          base                   >= 4 && < 5
                         , process                >= 1.2.0.0
-                        , foldl                  >= 1.0.5
-                        , mtl                    >= 2.1.2
-                        , containers             > 0.5
-                        , time                   >=1.4.2
-                        , stm                    >=2.4.3
-                        , leveldb-haskell-fork   >= 0.3.4.4
-                        , statistics             >= 0.13.2.1
-                        , bytestring             >= 0.10.4.0
-                        , parallel-io            >= 0.3.3
-                        , cereal                 >= 0.4.0.1
-                        , data-default-class     >= 0.0.1
-                        , transformers           >= 0.4.1.0
-                        , transformers-base      >= 0.4.1 && < 0.5
-                        , nanomsg-haskell        >= 0.2.2
-                        , scotty                 >= 0.9.0
-                        , text                   >=1.2.0.0
-                        , aeson                  >= 0.8.0.2
-                        , wai-middleware-static  >= 0.6.0
+                        , bytestring             >= 0.10.6.0
+                        , containers             >= 0.5.6.3
+                        , transformers           >= 0.4.3.0
+                        , mtl                    >= 2.2.1
+                        , cereal                 >= 0.4.1.1
 
 test-suite tests
   default-language:       Haskell2010
   type:                   exitcode-stdio-1.0
   ghc-options:            -Wall -O2 -threaded
-  main-is:                Main.hs
+  main-is:                Spec.hs
   hs-source-dirs:         tests
 
-  other-modules:          Storage.Test
-                          , Server.Test
-
-  build-depends:          base                   >= 3 && < 5
-                        , continuum              >= 0.1.0.8
-                        , containers             > 0.5
-                        , hspec                  >= 2.1.2
-                        , process                >= 1.2.0.0
-                        , bytestring             >= 0.10.4.0
-                        , mtl                    >= 2.1.2
-                        , transformers           >= 0.4.1.0
-                        , QuickCheck             >= 2.7.6
-                        , hspec-expectations     >= 0.6.0.1
-
-executable continuum-server
-  default-language:       Haskell2010
-  hs-source-dirs:         exec/
-
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-
-  if flag(Profiling)
-    ghc-options:          -fprof-auto -rtsopts -rtsopts -O2 -Wall +RTS -xc
-  else
-    ghc-options:          -Wall -rtsopts -O2 -threaded
-
-  main-is:                Server.hs
-
-  build-depends:          base                   >= 4 && < 5
-                        , continuum              >= 0.1.0.8
-
-executable continuum-bench
-  default-language:       Haskell2010
-  hs-source-dirs:         exec/
-
-  if flag(Binaries)
-    buildable:      True
-  else
-    buildable:      False
-
-  ghc-options:           -Wall -rtsopts -O2 -threaded -optc-O3
-
-  main-is:                Bench.hs
+  other-modules:          Continuum.Serialization.PrimitiveSpec,
+                          Continuum.Serialization.DbRecordSpec
 
   build-depends:          base                   >= 4 && < 5
                         , continuum              >= 0.1.0.8
                         , bytestring             >= 0.10.4.0
-                        , transformers           >= 0.4.1.0
-                        , time                   >= 1.4.2
+                        , QuickCheck             >= 2.8.1
+                        , hspec-expectations     >= 0.6.1.1
+                        , hspec                  >= 2.1.7
