@@ -28,6 +28,7 @@ import           Control.Monad.Except   ( throwError )
 import           Foreign                ( Storable, sizeOf, poke, peek, castPtr, plusPtr, shiftR, alloca )
 import           Foreign.ForeignPtr     ( withForeignPtr )
 import           System.IO.Unsafe       ( unsafePerformIO )
+
 -- |
 -- | SIZES
 -- |
@@ -95,7 +96,7 @@ unpackWord32 w = fromIntegral <$> (readNBytes word32Size w :: DbErrorMonad Word3
 {-# INLINE unpackWord32 #-}
 
 unpackWord64 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord64 w = fromIntegral <$> (readNBytes word64Size w :: DbErrorMonad Word64)
+unpackWord64 w = fixBound <$> (readNBytes word64Size w :: DbErrorMonad Word64)
 {-# INLINE unpackWord64 #-}
 
 unpackFloat :: ByteString -> DbErrorMonad Float
@@ -140,3 +141,9 @@ fromFloat float = unsafePerformIO $ alloca $ \buf -> do
   poke (castPtr buf) float
   peek buf
 {-# INLINE fromFloat #-}
+
+fixBound :: (Integral a, Bounded a, Num b) => a -> b
+fixBound i = if i > maxBound `quot` 2
+             then (-1) * (fromIntegral $ ((maxBound - i) + 1))
+             else fromIntegral i
+{-# INLINE fixBound #-}
