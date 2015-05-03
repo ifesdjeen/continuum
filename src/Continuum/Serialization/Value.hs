@@ -1,4 +1,4 @@
-module Continuum.Serialization.DbValue
+module Continuum.Serialization.Value
        (
          encodeValue
        , decodeValue

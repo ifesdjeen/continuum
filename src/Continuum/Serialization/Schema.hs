@@ -5,19 +5,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Continuum.Serialization.Base where
+module Continuum.Serialization.Schema where
 
 import           Continuum.Types
-import           Continuum.Serialization.DbValue ( encodeValue, decodeValue )
 import           Continuum.Serialization.Primitive
 
 import qualified Data.ByteString      as B
-import qualified Data.Map             as Map
 
-import           Data.Serialize       ( runPut, putWord8, putByteString, encode, decode )
-import           Data.List            ( elemIndex )
-import           Data.Maybe           ( isJust, fromJust, catMaybes )
-import           Control.Monad.Except ( forM_, throwError )
+import           Data.Serialize       ( encode, decode )
+import           Control.Monad.Except ( throwError )
 
 -- import Debug.Trace
 

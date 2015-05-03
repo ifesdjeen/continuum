@@ -1,12 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Continuum.Serialization.DbRecordSpec where
+{-# OPTIONS_GHC -fno-warn-orphans            #-}
+
+module Continuum.Serialization.RecordSpec where
 
 import           Data.ByteString       ( ByteString )
 import           Data.ByteString.Char8 ( pack )
-import           Control.Applicative   ( (<$>) )
-import Continuum.Serialization.DbRecord
+import Continuum.Serialization.Record
 import Continuum.Types
 import Continuum.Core
 
@@ -20,6 +21,7 @@ testSchema :: DbSchema
 testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)
                         , ("c", DbtString) ]
+
 
 instance Arbitrary DbType where
   arbitrary = elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]

@@ -1,11 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 
-module Continuum.Serialization.DbRecord where
+module Continuum.Serialization.Record where
 
 import qualified Data.ByteString      as B
 
 import Continuum.Serialization.Primitive
-import Continuum.Serialization.DbValue
+import Continuum.Serialization.Value
 
 import           Data.Serialize       ( runPut, putWord8, putByteString )
 import           Control.Monad.Except ( forM_, throwError )
