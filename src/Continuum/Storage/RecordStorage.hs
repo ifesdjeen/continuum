@@ -11,7 +11,7 @@ import Data.ByteString        (ByteString)
 import Data.Either ( either )
 import Database.LevelDB.Base
 
-import Prelude (Bool (..), Either (..), Eq (..), Functor (..), Int, Integer,
+import Prelude (Bool (..), Either (..), Eq (..), Functor (..), Int, Integer, Show(..),
                 Integral (..), Maybe (..), Num (..), Ord (..), Ordering (..),
                 error, flip, not, otherwise, undefined, ($), (&&), (.), (||))
 
@@ -28,6 +28,7 @@ type Value = ByteString
 type Entry = (Key, Value)
 
 data StepError = EmptyStepError
+                 deriving(Eq, Show)
 
 data Step   a  s
    = Yield  a !s
