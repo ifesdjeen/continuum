@@ -74,6 +74,18 @@ foldl f z0 (Stream next s0) = loop z0 =<< s0
 
   #-}
 
+toList :: (Functor m, Monad m) => Stream m a -> m (Either StepError [a])
+toList (Stream next s0) = unfold =<< s0
+  where
+    unfold !s = do
+        step <- next s
+        case step of
+         StepError e -> return $ Left e
+         Done        -> return $ Right []
+         Skip    s'  -> unfold s'
+         Yield x s'  -> (\y -> (x :) <$> y) <$> unfold s'
+{-# INLINE [0] toList #-}
+
 entrySlice :: (Applicative m, MonadIO m)
            => Iterator
            -> KeyRange
