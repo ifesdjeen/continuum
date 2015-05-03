@@ -57,6 +57,23 @@ map f (Stream next0 s0) = Stream next s0
     map f (map g s) = map (f . g) s
   #-}
 
+foldl :: Monad m => (b -> a -> b) -> b -> Stream m a -> m (Either StepError b)
+foldl f z0 (Stream next s0) = loop z0 =<< s0
+  where
+    loop z !s = do
+        step <- next s
+        case step of
+         StepError e -> return $ Left e
+         Done        -> return $ Right z
+         Skip    s'  -> loop z s'
+         Yield x s'  -> loop (f z x) s'
+{-# INLINE [0] foldl #-}
+{-# RULES
+"Stream foldl/map fusion" forall f g z s.
+    foldl f z (map g s)  = foldl (\ z' -> f z' . g) z s
+
+  #-}
+
 entrySlice :: (Applicative m, MonadIO m)
            => Iterator
            -> KeyRange
