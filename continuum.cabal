@@ -25,9 +25,9 @@ library
   exposed-modules:      Continuum.Types
                       , Continuum.Core
                       , Continuum.Serialization.Primitive
-                      , Continuum.Serialization.DbValue
-                      , Continuum.Serialization.DbRecord
-                      , Continuum.Serialization.Base
+                      , Continuum.Serialization.Value
+                      , Continuum.Serialization.Record
+                      , Continuum.Serialization.Schema
 
   other-modules:        Continuum.Schema
                         , Continuum.Record
@@ -47,7 +47,7 @@ test-suite tests
   hs-source-dirs:         tests
 
   other-modules:          Continuum.Serialization.PrimitiveSpec,
-                          Continuum.Serialization.DbRecordSpec
+                          Continuum.Serialization.RecordSpec
 
   build-depends:          base                   >= 4 && < 5
                         , continuum              >= 0.1.0.8
