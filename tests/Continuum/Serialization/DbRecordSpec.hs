@@ -3,9 +3,9 @@
 
 module Continuum.Serialization.DbRecordSpec where
 
-import           Data.ByteString                   ( ByteString )
-import           Data.ByteString.Char8                   ( pack )
-import Control.Applicative ( (<$>) )
+import           Data.ByteString       ( ByteString )
+import           Data.ByteString.Char8 ( pack )
+import           Control.Applicative   ( (<$>) )
 import Continuum.Serialization.DbRecord
 import Continuum.Types
 import Continuum.Core
@@ -21,16 +21,8 @@ testSchema = makeSchema [ ("a", DbtInt)
                         , ("b", DbtString)
                         , ("c", DbtString) ]
 
-
-testSchema2 :: DbSchema
-testSchema2 = makeSchema [ ("a", DbtLong)]
-
-
 instance Arbitrary DbType where
   arbitrary = elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]
-
--- instance Arbitrary DbType where
---   arbitrary = oneof.elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]
 
 data SchemaTestRow = TestRow ByteString DbType DbValue
                    deriving (Show)
@@ -38,8 +30,6 @@ data SchemaTestRow = TestRow ByteString DbType DbValue
 instance Arbitrary ByteString where
   arbitrary = pack <$> suchThat arbitrary (\str -> and [not $ any (\x -> '\NUL' == x) str,
                                                         not (length str == 0) ])
-
-
 instance Arbitrary SchemaTestRow where
   arbitrary = do
     name <- arbitrary
@@ -53,7 +43,6 @@ instance Arbitrary SchemaTestRow where
             DbtDouble -> DbDouble <$> suchThat arbitrary (\i -> i > 0)
             DbtString -> DbString <$> arbitrary
     return $ TestRow name tp val
-
 
 roundTrip :: [SchemaTestRow] ->
              Bool
@@ -74,15 +63,16 @@ spec = do
       property $ roundTrip
 
   -- One more bug: negative numbers are decoded wrong
-  -- describe "Serialization" $ do
+  describe "Serialization" $ do
 
-  --   let record  = makeRecord 123 [ ("a", (DbLong (0-2))) ]
-  --       encoded = encodeRecord testSchema2 record 1
-  --       indices = decodeIndexes testSchema2 (snd encoded)
+    let testSchema2 = makeSchema [ ("a", DbtLong)]
+        record      = makeRecord 123 [ ("a", (DbLong (-2))) ]
+        encoded     = encodeRecord testSchema2 record 1
+        indices     = decodeIndexes testSchema2 (snd encoded)
 
-  --   it "reads out indexes from serialized items" $ do
-  --     let decodeFn = \x -> decodeFieldByIndex testSchema indices x (snd encoded)
-  --     decodeFn 0 `shouldBe` (Right $ DbLong (-2))
+    it "reads out indexes from serialized items" $ do
+      let decodeFn = \x -> decodeFieldByIndex testSchema2 indices x (snd encoded)
+      decodeFn 0 `shouldBe` (Right $ DbLong (-2))
 
   describe "Serialization" $ do
 
