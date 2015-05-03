@@ -84,15 +84,15 @@ packDouble     = (packWord64 :: Word64 -> ByteString) . fromFloat
 -- |
 
 unpackWord8  :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord8 w = fromIntegral <$> Unsafe.unsafeHead <$> safeTake word8Size w
+unpackWord8 w = fixBound <$> Unsafe.unsafeHead <$> safeTake word8Size w
 {-# INLINE unpackWord8 #-}
 
 unpackWord16 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord16 w = fromIntegral <$> (readNBytes word16Size w :: DbErrorMonad Word16)
+unpackWord16 w = fixBound <$> (readNBytes word16Size w :: DbErrorMonad Word16)
 {-# INLINE unpackWord16 #-}
 
 unpackWord32 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord32 w = fromIntegral <$> (readNBytes word32Size w :: DbErrorMonad Word32)
+unpackWord32 w = fixBound <$> (readNBytes word32Size w :: DbErrorMonad Word32)
 {-# INLINE unpackWord32 #-}
 
 unpackWord64 :: (Num a) => ByteString -> DbErrorMonad a
