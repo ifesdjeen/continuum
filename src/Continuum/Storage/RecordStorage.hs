@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns              #-}
 {-# LANGUAGE ExistentialQuantification #-}
 
-module Continuum.Storage.RecordStorage () where
+module Continuum.Storage.RecordStorage where
 
 import Control.Applicative
 import Control.Monad       (Monad (..), void, (=<<), (>=>))
