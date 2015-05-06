@@ -1,6 +1,5 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
-
+{-# LANGUAGE DeriveGeneric             #-}
+{-# LANGUAGE FlexibleInstances         #-}
 module Continuum.Types where
 
 import           Data.ByteString                   ( ByteString )
@@ -49,7 +48,7 @@ data DbValue =
 -- |
 
 data DbRecord =
-  DbRecord Integer (Map.Map ByteString DbValue)
+  DbRecord Integer Integer (Map.Map ByteString DbValue)
   deriving(Generic, Show, Eq)
 
 -- |
@@ -63,6 +62,11 @@ data DbSchema = DbSchema
     , schemaMappings :: Map.Map ByteString DbType
     , schemaTypes    :: [DbType]
     } deriving (Generic, Show, Eq)
+
+-- |
+-- | Chunks
+-- |
+
 
 -- |
 -- | DB Error
@@ -98,6 +102,35 @@ data DbError =
   deriving (Show, Eq, Ord, Generic)
 
 type DbErrorMonad  = Either DbError
+
+-- |
+-- | Base Storage
+-- |
+
+data KeyRange
+    = KeyRange { start :: !ByteString
+               , end   :: ByteString -> Ordering
+               }
+    | AllKeys
+
+-- | Iteration Direction
+data Direction = Asc | Desc
+
+-- | Aliases
+type Key   = ByteString
+type Value = ByteString
+type Entry = (Key, Value)
+
+-- | Iteration Error
+data StepError = EmptyStepError
+                 deriving(Eq, Show)
+
+-- | Streaming Types
+data Step   a  s
+   = Yield  a !s
+   | Skip  !s
+   | StepError StepError
+   | Done
 
 -- |
 -- | Serialize Instances
