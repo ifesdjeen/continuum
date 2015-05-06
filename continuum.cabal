@@ -30,8 +30,8 @@ library
                       , Continuum.Serialization.Schema
                       , Continuum.Storage.RecordStorage
 
-  other-modules:        Continuum.Schema
-                        , Continuum.Record
+  -- other-modules:        Continuum.Schema
+  --                       , Continuum.Record
   build-depends:          base                   >= 4 && < 5
                         , process                >= 1.2.0.0
                         , bytestring             >= 0.10.6.0
