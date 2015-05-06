@@ -11,9 +11,11 @@ import           Continuum.Types
 import           Continuum.Serialization.Primitive
 
 import qualified Data.ByteString      as B
-
+import qualified Data.Map             as Map
+import           Data.ByteString      ( ByteString )
 import           Data.Serialize       ( encode, decode )
 import           Control.Monad.Except ( throwError )
+
 
 -- import Debug.Trace
 
@@ -45,3 +47,18 @@ decodeSchema (dbName, encodedSchema) =
 decodeChunkKey :: Decoder Integer
 decodeChunkKey (x, _) = unpackWord64 (B.take 8 x)
 {-# INLINE decodeChunkKey #-}
+
+-- | Creates a DbSchema out of Schema Definition (name/type pairs)
+--
+makeSchema :: [(ByteString, DbType)] -> DbSchema
+makeSchema stringTypeList =
+  DbSchema { fieldMappings  = fMappings
+           , fields         = fields'
+           , schemaMappings = Map.fromList stringTypeList
+           , indexMappings  = iMappings
+           , schemaTypes    = schemaTypes'}
+  where fields'      = fmap fst stringTypeList
+        schemaTypes' = fmap snd stringTypeList
+        fMappings    = Map.fromList $ zip fields' iterateFrom0
+        iMappings    = Map.fromList $ zip iterateFrom0 fields'
+        iterateFrom0 = (iterate (1+) 0)
