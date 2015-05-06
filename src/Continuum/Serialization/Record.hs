@@ -4,6 +4,7 @@ module Continuum.Serialization.Record where
 
 import qualified Data.ByteString      as B
 
+import Data.ByteString ( ByteString )
 import Continuum.Serialization.Primitive
 import Continuum.Serialization.Value
 
@@ -14,9 +15,9 @@ import           Data.Maybe           ( isJust, fromJust, catMaybes )
 import           Continuum.Types
 import qualified Data.Map             as Map
 
-encodeRecord :: DbSchema -> DbRecord -> Integer -> (B.ByteString, B.ByteString)
-encodeRecord schema (DbRecord timestamp vals) sid = (encodedKey, encodedValue)
-  where encodedKey = B.concat [(packWord64 timestamp), (packWord64 sid)]
+encodeRecord :: DbSchema -> DbRecord -> (B.ByteString, B.ByteString)
+encodeRecord schema (DbRecord timestamp sequenceId vals) = (encodedKey, encodedValue)
+  where encodedKey = B.concat [(packWord64 timestamp), (packWord64 sequenceId)]
         encodedParts = fmap encodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
         lengths = B.length <$> encodedParts
         encodedValue = runPut $ do
@@ -34,25 +35,25 @@ decodeRecord (Field field) schema !(k, bs) = do
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
                    else throwError FieldNotFoundError
-  return $! DbRecord timestamp (Map.fromList $ [(field, decodedVal)])
+  return $! DbRecord timestamp (-1) (Map.fromList $ [(field, decodedVal)])
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
 
 decodeRecord Record schema !(k, bs) = do
   timestamp      <- decodeKey k
   decodedVal     <- decodeValues schema bs
-  return $! DbRecord timestamp (Map.fromList $ zip (fields schema) decodedVal)
+  return $! DbRecord timestamp (-1) (Map.fromList $ zip (fields schema) decodedVal)
 
 decodeRecord Key _ !(k, _) = do
   timestamp      <- decodeKey k
-  return $! DbRecord timestamp (Map.fromList [])
+  return $! DbRecord timestamp (-1) (Map.fromList [])
 
 decodeRecord (Fields flds) schema (k, bs) = do
   timestamp     <- decodeKey k
   decodedVals   <- if isJust idxs
                    then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
                    else throwError FieldNotFoundError
-  return $! DbRecord timestamp (Map.fromList $ zip flds decodedVals)
+  return $! DbRecord timestamp (-1) (Map.fromList $ zip flds decodedVals)
   where
     {-# INLINE idxs #-}
     idxs         = mapM (`elemIndex` (fields schema)) flds
@@ -94,3 +95,15 @@ decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes sch
     bytestrings              = snd (foldl step (B.drop (length indices) bs, []) indices)
     step (remaining', acc) n = (B.drop n remaining', acc ++ [B.take n remaining'])
 {-# INLINE decodeValues #-}
+
+-- |
+-- | Construction
+-- |
+
+-- | Creates a DbRecord from Timestamp and Key/Value pairs
+--
+makeRecord :: Integer -> Integer -> [(ByteString, DbValue)] -> DbRecord
+makeRecord timestamp sequenceId vals = DbRecord timestamp sequenceId (Map.fromList vals)
+
+getValue :: FieldName -> DbRecord -> Maybe DbValue
+getValue fieldName (DbRecord _ _ recordFields) = Map.lookup fieldName recordFields
