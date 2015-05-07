@@ -48,7 +48,7 @@ data DbValue =
 -- |
 
 data DbRecord =
-  DbRecord Integer Integer (Map.Map ByteString DbValue)
+  DbRecord Integer (Map.Map ByteString DbValue)
   deriving(Generic, Show, Eq)
 
 -- |

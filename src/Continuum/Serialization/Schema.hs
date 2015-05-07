@@ -21,8 +21,6 @@ import           Control.Monad.Except ( throwError )
 
 data Success = Success
 
--- validate :: DbSchema -> DbRecord -> Either String Success
--- validate = error "Not Implemented"
 
 -- |
 -- | ENCODING
@@ -62,3 +60,16 @@ makeSchema stringTypeList =
         fMappings    = Map.fromList $ zip fields' iterateFrom0
         iMappings    = Map.fromList $ zip iterateFrom0 fields'
         iterateFrom0 = (iterate (1+) 0)
+
+validate :: DbSchema -> DbRecord -> Bool
+validate = error "Not Implemented"
+
+validateField :: DbType -> DbValue -> Bool
+validateField DbtLong   (DbLong   _ ) = True
+validateField DbtInt    (DbInt    _ ) = True
+validateField DbtByte   (DbByte   _ ) = True
+validateField DbtShort  (DbShort  _ ) = True
+validateField DbtFloat  (DbFloat  _ ) = True
+validateField DbtDouble (DbDouble _ ) = True
+validateField DbtString (DbString _ ) = True
+validateField                     _ _ = False
