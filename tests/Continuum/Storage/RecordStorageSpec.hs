@@ -2,8 +2,10 @@
 
 module Continuum.Storage.RecordStorageSpec where
 
+import Continuum.Serialization.Record
+import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Storage.RecordStorage
-import           Control.Applicative        hiding (empty)
+import Continuum.Types
 import           Control.Monad.Catch
 import qualified Data.ByteString            as BS
 import           Data.ByteString.Char8      (ByteString, singleton, unpack)
@@ -21,11 +23,12 @@ import Debug.Trace
 
 data Rs = Rs DB FilePath
 
+tupleToBatchOp (x,y) = Put x y
 spec :: Spec
 spec = do
 
-  describe "Primitive" $ do
-    it "passes Word8  Round Trip" $ do
+  describe "Recorg Storage" $ do
+    it "Can iterate over the items and append them to the array" $ do
       r <- bracket initDB destroyDB $ \(Rs db _) -> do
         write db def [ Put "a" "one"
                      , Put "b" "two"
@@ -34,6 +37,18 @@ spec = do
           toList $ entrySlice iter (KeyRange {start = "a", end = (\i -> i `compare` "c")}) Asc (\x -> Right x))
         return res
       r `shouldBe` (Right [("a","one"),("b","two"),("c","three")])
+
+    it "Can iterate over the decoded records" $ do
+      r <- bracket initDB destroyDB $ \(Rs db _) -> do
+        let schema = makeSchema [ ("a", DbtInt) ]
+        write db def [ tupleToBatchOp $ encodeRecord schema $ makeRecord 1 1 [ ("a", DbLong 1) ]
+                     , tupleToBatchOp $ encodeRecord schema $ makeRecord 2 2 [ ("a", DbLong 2) ]]
+        res <- withIter db def (\iter -> do
+          toList $ entrySlice iter (KeyRange {start = "a", end = (\i -> i `compare` "c")}) Asc (\x -> Right x))
+        return res
+      r `shouldBe` (Right [("a","one"),("b","two"),("c","three")])
+
+
   where
     initDB = do
         tmp <- getTemporaryDirectory
