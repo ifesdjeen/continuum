@@ -15,6 +15,12 @@ module Continuum.Serialization.Primitive
        , unpackWord64
        , unpackFloat
        , unpackDouble
+
+       , word8Size
+       , word16Size
+       , word32Size
+       , word64Size
+
        ) where
 
 import qualified Data.ByteString           as B
