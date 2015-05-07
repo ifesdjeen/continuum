@@ -5,101 +5,67 @@
 
 module Continuum.Serialization.RecordSpec where
 
-import           Data.ByteString       ( ByteString )
-import           Data.ByteString.Char8 ( pack )
 import Continuum.Serialization.Record
 import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Types
-import Continuum.Core
+
+import Continuum.Support.QuickCheck
 
 import Test.Hspec
-
 import Test.QuickCheck
 
--- import Debug.Trace
+sid :: Integer
+sid = 456
 
-testSchema :: DbSchema
-testSchema = makeSchema [ ("a", DbtInt)
-                        , ("b", DbtString)
-                        , ("c", DbtString) ]
-
-
-instance Arbitrary DbType where
-  arbitrary = elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]
-
-data SchemaTestRow = TestRow ByteString DbType DbValue
-                   deriving (Show)
-
-instance Arbitrary ByteString where
-  arbitrary = pack <$> suchThat arbitrary (\str -> and [not $ any (\x -> '\NUL' == x) str,
-                                                        not (length str == 0) ])
-instance Arbitrary SchemaTestRow where
-  arbitrary = do
-    name <- arbitrary
-    tp <- arbitrary
-    val <- case tp of
-            DbtLong   -> DbLong   <$> suchThat arbitrary (\i -> i > 0)
-            DbtInt    -> DbInt    <$> suchThat arbitrary (\i -> i > 0)
-            DbtByte   -> DbByte   <$> suchThat arbitrary (\i -> i > 0)
-            DbtShort  -> DbShort  <$> suchThat arbitrary (\i -> i > 0)
-            DbtFloat  -> DbFloat  <$> suchThat arbitrary (\i -> i > 0)
-            DbtDouble -> DbDouble <$> suchThat arbitrary (\i -> i > 0)
-            DbtString -> DbString <$> arbitrary
-    return $ TestRow name tp val
-
-roundTrip :: [SchemaTestRow] ->
-             Bool
+roundTrip :: [SchemaTestRow] -> Bool
 roundTrip testRows =
-  let schema = makeSchema $ fmap (\(TestRow name tp _) -> (name, tp)) testRows
-      record = makeRecord 123 456 $ fmap (\(TestRow name _ vl) -> (name, vl)) testRows
-      encoded = encodeRecord schema record
+  let schema  = makeSchema $ fmap (\(TestRow name tp _) -> (name, tp)) testRows
+      record  = makeRecord 123 $ fmap (\(TestRow name _ vl) -> (name, vl)) testRows
+      encoded = encodeRecord schema sid record
       decoder = decodeRecord Record schema
   in
    (Right record) == (decoder encoded)
 
-
 spec :: Spec
 spec = do
 
-  describe "QC" $ do
+  describe "Property Test" $ do
     it "passes Round Trip" $ do
       property $ roundTrip
 
-  -- One more bug: negative numbers are decoded wrong
-  describe "Serialization" $ do
+  describe "Value Serialization" $ do
 
-    let testSchema2 = makeSchema [ ("a", DbtLong)]
-        record      = makeRecord 123 456 [ ("a", (DbLong (-2))) ]
-        encoded     = encodeRecord testSchema2 record
-        indices     = decodeIndexes testSchema2 (snd encoded)
+    let schema              = makeSchema [ ("a", DbtInt)
+                                         , ("b", DbtString)
+                                         , ("c", DbtString) ]
+        record              = makeRecord 123 [ ("a", (DbInt 123))
+                                             , ("b", (DbString "STRINGIE"))
+                                             , ("c", (DbString "STRINGO"))]
+        encoded@(key,value) = encodeRecord schema sid record
+        indices             = decodeIndexes schema value
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex testSchema2 indices x (snd encoded)
-      decodeFn 0 `shouldBe` (Right $ DbLong (-2))
+      decodeKey key `shouldBe` (Right $ 123)
 
-  describe "Serialization" $ do
-
-    let record  = makeRecord 123 456 [ ("a", (DbInt 123))
-                                     , ("b", (DbString "STRINGIE"))
-                                     , ("c", (DbString "STRINGO"))]
-        encoded = encodeRecord testSchema record
-        indices = decodeIndexes testSchema (snd encoded)
+    it "reads out indexes from serialized items" $ do
+      let decodeFn = \x -> decodeFieldByIndex schema indices x value
+      decodeFn 0 `shouldBe` (Right $ DbInt 123)
 
     it "reads out indexes from serialized items" $
       indices `shouldBe` [4,8,7]
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex testSchema indices x (snd encoded)
+      let decodeFn = \x -> decodeFieldByIndex schema indices x value
       decodeFn 0 `shouldBe` (Right $ DbInt    123)
       decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
       decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
 
     it "decodes certain serialized values" $ do
-      let decodeFn = \x -> decodeRecord (Field x) testSchema encoded
-      decodeFn "a" `shouldBe` (Right $ makeRecord 123 456 [ ("a", (DbInt 123))])
+      let decodeFn = \x -> decodeRecord (Field x) schema encoded
+      decodeFn "a" `shouldBe` (Right $ makeRecord 123 [ ("a", (DbInt 123))])
 
     it "decodes a complete serialized value" $ do
-      let decodeFn = \_x -> decodeRecord Record testSchema encoded
+      let decodeFn = \_x -> decodeRecord Record schema encoded
       decodeFn ("a"::String) `shouldBe` (Right record)
 
   -- describe "Partial Serialization" $ do
