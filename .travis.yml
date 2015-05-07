@@ -11,5 +11,7 @@ before_install:
 install:
   - cabal update
   - cabal install -j --only-dependencies --enable-tests --enable-documentation
+  - cabal configure -v2
+  - cabal build -v2
 
-script: cabal configure --enable-tests && cabal build && cabal test
+script: cabal test
