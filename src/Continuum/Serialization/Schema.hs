@@ -62,7 +62,11 @@ makeSchema stringTypeList =
         iterateFrom0 = (iterate (1+) 0)
 
 validate :: DbSchema -> DbRecord -> Bool
-validate = error "Not Implemented"
+validate schema (DbRecord _ f) = Map.foldlWithKey step True f
+  where step res k v = maybe
+                       False
+                       (flip validateField v)
+                       (Map.lookup k (schemaMappings schema))
 
 validateField :: DbType -> DbValue -> Bool
 validateField DbtLong   (DbLong   _ ) = True
