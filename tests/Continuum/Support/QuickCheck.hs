@@ -46,16 +46,21 @@ instance Arbitrary DbValue where
 
 
 instance Arbitrary DbSchema where
-  arbitrary = arbitrary >>= return . makeSchema
+  arbitrary = do
+    defs <- suchThat arbitrary (not . null)
+    return $ makeSchema defs
 
 instance Arbitrary DbRecord where
   arbitrary = do
     timestamp <- arbitrary
-    vals <- arbitrary
+    vals <- suchThat arbitrary (not . null)
     return $ makeRecord timestamp vals
+
+instance CoArbitrary DbSchema where
+  coarbitrary schema = undefined
 
 instance Arbitrary (DbSchema, [DbRecord]) where
   arbitrary = do
-    schema <- arbitrary
-    records <- listOf $ suchThat arbitrary (validate schema)
+    schema  <- arbitrary
+    records <- suchThat (listOf $ suchThat arbitrary (validate schema)) (not . null)
     return (schema, records)
