@@ -7,7 +7,7 @@ import Continuum.Serialization.Schema ( makeSchema )
 import qualified Continuum.Storage.RecordStorage as Storage
 import Continuum.Types
 import           Control.Monad.Catch
-import           Database.LevelDB.Base
+import Database.LevelDB.Base ( BatchOp(..), DB, withIter, write, open, defaultOptions, createIfMissing, destroy )
 import           Database.LevelDB.Internal  (unsafeClose)
 import           Data.ByteString                   ( ByteString )
 import           System.Directory
@@ -16,6 +16,9 @@ import           Data.Default
 import Test.Hspec
 
 import Continuum.Support.QuickCheck
+import Test.QuickCheck.Monadic
+import Test.QuickCheck.Property ( Property(..) )
+import Test.QuickCheck
 
 -- import Debug.Trace
 
@@ -24,15 +27,14 @@ data Rs = Rs DB FilePath
 tupleToBatchOp :: (ByteString, ByteString) -> BatchOp
 tupleToBatchOp (x,y) = Put x y
 
-roundTrip :: [SchemaTestRow] -> Bool
-roundTrip testRows =
-  let schema  = makeSchema $ fmap (\(TestRow name tp _) -> (name, tp)) testRows
-      record  = makeRecord 123 $ fmap (\(TestRow name _ vl) -> (name, vl)) testRows
-      encoded = encodeRecord schema 123 record
-      decoder = decodeRecord Record schema
-  in
-   (Right record) == (decoder encoded)
-
+roundTrip :: (DbSchema, [DbRecord]) -> Property
+roundTrip (schema, records) = monadicIO $ do
+  r   <- run $ bracket initDB destroyDB $ \(Rs db _) -> do
+    _   <- write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
+    res <- withIter db def (\iter -> do
+                               Storage.toList $ Storage.entrySlice iter AllKeys Asc (decodeRecord Record schema))
+    return res
+  assert $ r == Right records
 
 spec :: Spec
 spec = do
@@ -61,15 +63,17 @@ spec = do
         return res
       r `shouldBe` (Right records)
 
+    it "Can iterate over the decoded records" $ do
+      property $ roundTrip
 
-  where
-    initDB = do
-        tmp <- getTemporaryDirectory
-        dir <- createTempDirectory tmp "leveldb-streaming-tests"
-        db  <- open dir defaultOptions { createIfMissing = True }
-        -- write db def
-        --   . map ( \ c -> let c' = singleton c in Put c' c')
-        --   $ ['A'..'Z']
-        return $ Rs db dir
 
-    destroyDB (Rs db dir) = unsafeClose db `finally` destroy dir defaultOptions
+--    it "Can iterate over the decoded records" $ do
+
+
+initDB = do
+  tmp <- getTemporaryDirectory
+  dir <- createTempDirectory tmp "leveldb-streaming-tests"
+  db  <- open dir defaultOptions { createIfMissing = True }
+  return $ Rs db dir
+
+destroyDB (Rs db dir) = unsafeClose db `finally` destroy dir defaultOptions
