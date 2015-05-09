@@ -113,6 +113,12 @@ data KeyRange
                }
     | AllKeys
 
+
+data TimeRange =
+  TimeBetween Integer Integer
+  | AllTime
+  deriving(Show, Generic)
+
 -- | Iteration Direction
 data Direction = Asc | Desc
 
@@ -123,6 +129,7 @@ type Entry = (Key, Value)
 
 -- | Iteration Error
 data StepError = EmptyStepError
+               | NoFieldPresent
                  deriving(Eq, Show)
 
 -- | Streaming Types
