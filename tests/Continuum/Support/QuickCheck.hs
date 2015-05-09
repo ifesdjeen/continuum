@@ -58,23 +58,33 @@ instance Arbitrary DbRecord where
     timestamp <- suchThat arbitrary (\i -> i > 0)
     vals      <- suchThat arbitrary (not . null)
     return $ makeRecord timestamp vals
+recordsBySchema :: DbSchema -> Gen [DbRecord]
+recordsBySchema schema = fmap (nubBy ts) <$> listOf $ recordBySchema schema
+  where ts (DbRecord ts1 _) (DbRecord ts2 _) = ts1 == ts2
 
-bySchema :: DbSchema -> Gen [DbRecord]
-bySchema schema = fmap (nubBy ts) <$> listOf $ do
+recordBySchema :: DbSchema -> Gen DbRecord
+recordBySchema schema = do
   i    <- suchThat arbitrary (\i -> i > 0)
   vals <- traverse valueGenerator (schemaTypes schema)  -- fmap valueGenerator (schemaTypes schema )
   return $ makeRecord i (zip (fields schema) vals)
-  where ts (DbRecord ts1 _) (DbRecord ts2 _) = ts1 == ts2
-        valueGenerator DbtLong   = DbLong   <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtInt    = DbInt    <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtByte   = DbByte   <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtShort  = DbShort  <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtFloat  = DbFloat  <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtDouble = DbDouble <$> suchThat arbitrary (\i -> i > 0)
-        valueGenerator DbtString = DbString <$> arbitrary
+
+valueGenerator :: DbType -> Gen DbValue
+valueGenerator DbtLong   = DbLong   <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtInt    = DbInt    <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtByte   = DbByte   <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtShort  = DbShort  <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtFloat  = DbFloat  <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtDouble = DbDouble <$> suchThat arbitrary (\i -> i > 0)
+valueGenerator DbtString = DbString <$> arbitrary
 
 instance Arbitrary (DbSchema, [DbRecord]) where
   arbitrary = do
     schema  <- arbitrary
-    records <- bySchema schema
+    records <- recordsBySchema schema
     return (schema, records)
+
+instance Arbitrary (DbSchema, DbRecord) where
+  arbitrary = do
+    schema <- arbitrary
+    record <- recordBySchema schema
+    return (schema, record)
