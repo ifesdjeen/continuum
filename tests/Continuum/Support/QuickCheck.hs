@@ -5,25 +5,33 @@
 
 module Continuum.Support.QuickCheck where
 
-import Data.List ( nubBy )
-import Data.ByteString       ( ByteString )
-import Data.ByteString.Char8 ( pack )
 import Continuum.Types
-import Continuum.Serialization.Schema ( makeSchema, validate )
+import Data.List                      ( nubBy )
+import Data.ByteString                ( ByteString )
+import Data.ByteString.Char8          ( pack )
+import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Serialization.Record ( makeRecord )
 
 import Test.QuickCheck
 -- import Test.QuickCheck.Gen ( Gen(..) )
 
 instance Arbitrary DbType where
-  arbitrary = elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]
+  arbitrary = elements [ DbtLong
+                       , DbtInt
+                       , DbtByte
+                       , DbtShort
+                       , DbtFloat
+                       , DbtDouble
+                       , DbtString]
 
 data SchemaTestRow = TestRow ByteString DbType DbValue
                    deriving (Show)
 
 instance Arbitrary ByteString where
-  arbitrary = pack <$> suchThat arbitrary (\str -> and [not $ any (\x -> '\NUL' == x) str,
-                                                        not (length str == 0) ])
+  arbitrary = pack <$> suchThat arbitrary notEmpty
+    where notEmpty str = and [not $ any (\x -> '\NUL' == x) str,
+                              not (length str == 0) ]
+
 instance Arbitrary SchemaTestRow where
   arbitrary = do
     name <- arbitrary
