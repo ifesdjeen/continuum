@@ -24,6 +24,7 @@ library
 
   exposed-modules:      Continuum.Types
                       , Continuum.Core
+                      , Continuum.Folds
                       , Continuum.Serialization.Primitive
                       , Continuum.Serialization.Value
                       , Continuum.Serialization.Record
