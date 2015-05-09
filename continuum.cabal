@@ -28,7 +28,7 @@ library
                       , Continuum.Serialization.Value
                       , Continuum.Serialization.Record
                       , Continuum.Serialization.Schema
-                      , Continuum.Storage.RecordStorage
+                      , Continuum.Storage.GenericStorage
 
   -- other-modules:        Continuum.Schema
   --                       , Continuum.Record
@@ -50,7 +50,7 @@ test-suite tests
 
   other-modules:          Continuum.Serialization.PrimitiveSpec
                         , Continuum.Serialization.RecordSpec
-                        , Continuum.Storage.RecordStorageSpec
+                        , Continuum.Storage.GenericStorageSpec
                         , Continuum.Support.QuickCheck
 
   build-depends:          base                   >= 4 && < 5

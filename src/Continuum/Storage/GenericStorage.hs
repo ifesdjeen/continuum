@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns              #-}
 {-# LANGUAGE ExistentialQuantification #-}
-module Continuum.Storage.RecordStorage where
+module Continuum.Storage.GenericStorage where
 
 import Control.Applicative
 import Continuum.Types

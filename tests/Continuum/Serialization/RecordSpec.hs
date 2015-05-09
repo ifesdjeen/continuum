@@ -17,8 +17,8 @@ import Test.QuickCheck
 sid :: Integer
 sid = 456
 
-roundTrip :: (DbSchema, DbRecord) -> Bool
-roundTrip (schema, record) =
+prop_roundTrip :: (DbSchema, DbRecord) -> Bool
+prop_roundTrip (schema, record) =
   let encoded = encodeRecord schema sid record
       decoder = decodeRecord Record schema
   in
@@ -29,7 +29,7 @@ spec = do
 
   describe "Property Test" $ do
     it "passes Round Trip" $ do
-      property $ roundTrip
+      property $ prop_roundTrip
 
   describe "Value Serialization" $ do
 

@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Continuum.Storage.RecordStorageSpec where
+module Continuum.Storage.GenericStorageSpec where
 
 import Continuum.Types
 import Continuum.Serialization.Record
 import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Support.QuickCheck
-import qualified Continuum.Storage.RecordStorage as Storage
+import qualified Continuum.Storage.GenericStorage as Storage
 
 import Control.Monad.Catch
 import System.Directory
