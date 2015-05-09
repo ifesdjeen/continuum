@@ -56,8 +56,10 @@ instance Arbitrary DbSchema where
 instance Arbitrary DbRecord where
   arbitrary = do
     timestamp <- suchThat arbitrary (\i -> i > 0)
-    vals      <- suchThat arbitrary (not . null)
+    vals      <- (nubBy name) <$> suchThat arbitrary (not . null)
     return $ makeRecord timestamp vals
+    where name (a,_) (b,_) = a == b
+
 recordsBySchema :: DbSchema -> Gen [DbRecord]
 recordsBySchema schema = fmap (nubBy ts) <$> listOf $ recordBySchema schema
   where ts (DbRecord ts1 _) (DbRecord ts2 _) = ts1 == ts2
