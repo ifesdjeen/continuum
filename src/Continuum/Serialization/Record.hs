@@ -107,3 +107,4 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 getValue :: FieldName -> DbRecord -> Maybe DbValue
 getValue fieldName (DbRecord _ recordFields) = Map.lookup fieldName recordFields
+

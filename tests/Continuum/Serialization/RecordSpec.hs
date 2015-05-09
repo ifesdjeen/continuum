@@ -17,11 +17,9 @@ import Test.QuickCheck
 sid :: Integer
 sid = 456
 
-roundTrip :: [SchemaTestRow] -> Bool
-roundTrip testRows =
-  let schema  = makeSchema $ fmap (\(TestRow name tp _) -> (name, tp)) testRows
-      record  = makeRecord 123 $ fmap (\(TestRow name _ vl) -> (name, vl)) testRows
-      encoded = encodeRecord schema sid record
+roundTrip :: (DbSchema, DbRecord) -> Bool
+roundTrip (schema, record) =
+  let encoded = encodeRecord schema sid record
       decoder = decodeRecord Record schema
   in
    (Right record) == (decoder encoded)
