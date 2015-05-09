@@ -5,12 +5,16 @@
 
 module Continuum.Support.QuickCheck where
 
+import Data.List ( nubBy )
 import Data.ByteString       ( ByteString )
 import Data.ByteString.Char8 ( pack )
 import Continuum.Types
-import Test.QuickCheck
 import Continuum.Serialization.Schema ( makeSchema, validate )
 import Continuum.Serialization.Record ( makeRecord )
+
+import Test.QuickCheck
+-- import Test.QuickCheck.Gen ( Gen(..) )
+
 instance Arbitrary DbType where
   arbitrary = elements [ DbtLong, DbtInt, DbtByte, DbtShort, DbtFloat, DbtDouble, DbtString]
 
@@ -44,7 +48,6 @@ instance Arbitrary DbValue where
           , DbDouble <$> arbitrary
           , DbString <$> arbitrary]
 
-
 instance Arbitrary DbSchema where
   arbitrary = do
     defs <- suchThat arbitrary (not . null)
@@ -52,15 +55,26 @@ instance Arbitrary DbSchema where
 
 instance Arbitrary DbRecord where
   arbitrary = do
-    timestamp <- arbitrary
-    vals <- suchThat arbitrary (not . null)
+    timestamp <- suchThat arbitrary (\i -> i > 0)
+    vals      <- suchThat arbitrary (not . null)
     return $ makeRecord timestamp vals
 
-instance CoArbitrary DbSchema where
-  coarbitrary schema = undefined
+bySchema :: DbSchema -> Gen [DbRecord]
+bySchema schema = fmap (nubBy ts) <$> listOf $ do
+  i    <- suchThat arbitrary (\i -> i > 0)
+  vals <- traverse valueGenerator (schemaTypes schema)  -- fmap valueGenerator (schemaTypes schema )
+  return $ makeRecord i (zip (fields schema) vals)
+  where ts (DbRecord ts1 _) (DbRecord ts2 _) = ts1 == ts2
+        valueGenerator DbtLong   = DbLong   <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtInt    = DbInt    <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtByte   = DbByte   <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtShort  = DbShort  <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtFloat  = DbFloat  <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtDouble = DbDouble <$> suchThat arbitrary (\i -> i > 0)
+        valueGenerator DbtString = DbString <$> arbitrary
 
 instance Arbitrary (DbSchema, [DbRecord]) where
   arbitrary = do
     schema  <- arbitrary
-    records <- suchThat (listOf $ suchThat arbitrary (validate schema)) (not . null)
+    records <- bySchema schema
     return (schema, records)
