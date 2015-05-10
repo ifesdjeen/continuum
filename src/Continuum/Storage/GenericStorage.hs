@@ -55,6 +55,14 @@ foldl f z0 (Stream next s0) = loop z0 =<< s0
 
   #-}
 
+fromList :: Monad m => [a] -> Stream m a
+fromList xs = Stream next (return xs)
+  where
+    {-# INLINE next #-}
+    next []      = return Done
+    next (x:xs') = return $ Yield x xs'
+{-# INLINE [0] fromList #-}
+
 toList :: (Functor m, Monad m) => Stream m a -> m (Either StepError [a])
 toList (Stream next s0) = unfold =<< s0
   where
