@@ -21,7 +21,8 @@ fold :: (Monoid b, Monad m) => Fold a b -> Stream m a -> m (Either StepError b)
 fold (Fold f z0 fin) stream = fmap fin <$> GS.foldl f z0 stream
 
 
-data Count = Count Integer
+data Count = Count Int
+             deriving (Show, Eq)
 
 instance Monoid Count where
   mempty = Count 0
