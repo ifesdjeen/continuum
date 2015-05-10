@@ -45,15 +45,14 @@ withField f (Stream next0 s0) = Stream next s0
                            (\x' -> Yield x' s')
                            (getValue f x)
 
-data Min i = None | Min i
-
+data Min i = MinNone
+           | Min i
+           deriving (Show, Eq)
 instance (Ord i) => Monoid (Min i) where
-  mempty = None
-  mappend (Min i1) (Min i2) = Min $ if i2 > i1
-                                    then i2
-                                    else i1
+  mempty = MinNone
+  mappend (Min i1) (Min i2) = Min $ min i1 i2
 
 op_min :: (Ord i) => Fold i (Min i)
-op_min = Fold step None id
-  where step None i = Min i
+op_min = Fold step MinNone id
+  where step MinNone i = Min i
         step m i2 = mappend m (Min i2)
