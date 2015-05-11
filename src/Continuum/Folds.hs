@@ -4,11 +4,13 @@
 
 module Continuum.Folds where
 
-import Data.Maybe ( fromMaybe )
 import Continuum.Types
 import Continuum.Serialization.Record
-import Continuum.Storage.GenericStorage ( Stream(..) )
-import qualified Continuum.Storage.GenericStorage as GS
+import Data.Maybe       ( fromMaybe )
+
+import qualified Continuum.Stream as S
+import Continuum.Stream ( Stream(..), StepError(..), Step(..) )
+--import Continuum.Stream  ( Stream(..), StepError(..) )
 
 data (Monoid b) => Fold a b
   -- | @Fold @ @ step @ @ initial @ @ extract@
@@ -18,7 +20,7 @@ class (Monoid intermediate) => Aggregate intermediate end where
   combine  :: intermediate -> end
 
 fold :: (Monoid b, Monad m) => Fold a b -> Stream m a -> m (Either StepError b)
-fold (Fold f z0 fin) stream = fmap fin <$> GS.foldl f z0 stream
+fold (Fold f z0 fin) stream = fmap fin <$> S.foldl f z0 stream
 
 
 data Count = Count Int

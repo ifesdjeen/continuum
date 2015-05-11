@@ -127,18 +127,6 @@ type Key   = ByteString
 type Value = ByteString
 type Entry = (Key, Value)
 
--- | Iteration Error
-data StepError = EmptyStepError
-               | NoFieldPresent
-                 deriving(Eq, Show)
-
--- | Streaming Types
-data Step   a  s
-   = Yield  a !s
-   | Skip  !s
-   | StepError StepError
-   | Done
-
 -- |
 -- | Serialize Instances
 -- |

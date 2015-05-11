@@ -6,7 +6,8 @@ import Continuum.Types
 import Continuum.Serialization.Record
 import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Support.QuickCheck
-import qualified Continuum.Storage.GenericStorage as Storage
+import Continuum.Storage.GenericStorage
+import qualified Continuum.Stream as S
 
 import Control.Monad.Catch
 import System.Directory
@@ -40,7 +41,7 @@ spec = do
                      , Put "b" "two"
                      , Put "c" "three"]
         res <- withIter db def (\iter -> do
-                                   Storage.toList $ Storage.entrySlice iter AllKeys Asc Right)
+                                   S.toList $ entrySlice iter AllKeys Asc Right)
         return res
       r `shouldBe` (Right [("a","one"),("b","two"),("c","three")])
 
@@ -53,7 +54,7 @@ spec = do
         write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
 
         res <- withIter db def (\iter -> do
-                                   Storage.toList $ Storage.entrySlice iter AllKeys Asc (decodeRecord Record schema))
+                                   S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
         return res
       r `shouldBe` (Right records)
 
@@ -65,7 +66,7 @@ spec = do
       r   <- bracket initDB destroyDB $ \(Rs db _) -> do
         _   <- write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
         res <- withIter db def (\iter -> do
-                                   Storage.toList $ Storage.entrySlice iter AllKeys Asc (decodeRecord Record schema))
+                                   S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
         return res
       (sortWith ts <$> r) `shouldBe` Right (sortWith ts records)
 
@@ -82,7 +83,7 @@ prop_RoundTrip (schema, records) = monadicIO $ do
   r   <- run $ bracket initDB destroyDB $ \(Rs db _) -> do
     _   <- write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
     res <- withIter db def (\iter -> do
-                               Storage.toList $ Storage.entrySlice iter AllKeys Asc (decodeRecord Record schema))
+                               S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
     return res
   assert $ (sortWith ts <$> r) == Right (sortWith ts records)
 
