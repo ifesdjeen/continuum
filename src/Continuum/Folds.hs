@@ -32,6 +32,17 @@ instance Monoid Count where
 
 op_count = Fold (\i _ -> i + 1) 0 Count
 
+map :: Monad m => (a -> b) -> Stream m a -> Stream m b
+map f (Stream next0 s0) = Stream next s0
+  where
+    {-# INLINE next #-}
+    next !s = do
+        step <- next0 s
+        return $ case step of
+            Done        -> Done
+            Skip    s'  -> Skip        s'
+            Yield x s'  -> Yield (f x) s'
+
 withField :: Monad m => FieldName -> Stream m DbRecord -> Stream m DbValue
 withField f (Stream next0 s0) = Stream next s0
   where
