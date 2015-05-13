@@ -26,11 +26,11 @@ library
                       , Continuum.Core
                       , Continuum.Folds
                       , Continuum.Stream
+                      , Continuum.Storage.GenericStorage
                       , Continuum.Serialization.Primitive
                       , Continuum.Serialization.Value
                       , Continuum.Serialization.Record
                       , Continuum.Serialization.Schema
-                      , Continuum.Storage.GenericStorage
 
   -- other-modules:        Continuum.Schema
   --                       , Continuum.Record
