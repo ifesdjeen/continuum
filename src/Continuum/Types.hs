@@ -1,12 +1,23 @@
 {-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE FlexibleInstances         #-}
-module Continuum.Types where
+module Continuum.Types ( module Continuum.Types
+                         , Stream(..)
+                         , Step(..)
+
+                         , KeyRange(..)
+                         , Direction(..)
+                         , Key
+                         , Value
+                         , Entry)where
 
 import           Data.ByteString                   ( ByteString )
 import           GHC.Generics                      ( Generic )
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
+
+import Data.Stream.Monadic ( Step(..), Stream(..) )
+import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Key, Value, Entry)
 
 -- |
 -- | ALIASES
@@ -107,25 +118,10 @@ type DbErrorMonad  = Either DbError
 -- | Base Storage
 -- |
 
-data KeyRange
-    = KeyRange { start :: !ByteString
-               , end   :: ByteString -> Ordering
-               }
-    | AllKeys
-
-
 data TimeRange =
   TimeBetween Integer Integer
   | AllTime
   deriving(Show, Generic)
-
--- | Iteration Direction
-data Direction = Asc | Desc
-
--- | Aliases
-type Key   = ByteString
-type Value = ByteString
-type Entry = (Key, Value)
 
 -- |
 -- | Serialize Instances

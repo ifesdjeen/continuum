@@ -6,7 +6,6 @@ import Continuum.Folds
 
 import Test.Hspec
 import Test.QuickCheck
--- import Continuum.Storage.GenericStorage ( fromList )
 
 runFold :: (Monoid b) => Fold a b -> [a] -> b
 runFold (Fold f z0 e) a = e $ foldl f z0 a
