@@ -7,28 +7,27 @@ import Continuum.Serialization.Record
 import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Support.QuickCheck
 import Continuum.Storage.GenericStorage
-import qualified Continuum.Stream as S
+import qualified Continuum.Stream as SM
 
 import Control.Monad.Catch
 import System.Directory
 import System.IO.Temp
 
+import Data.Default
+import GHC.Exts                  ( sortWith )
+import Database.LevelDB.Internal ( unsafeClose )
+import Database.LevelDB.Base     ( BatchOp(..), DB, withIter, write, open, defaultOptions, createIfMissing, destroy )
 
 import Test.Hspec
 import Test.QuickCheck.Monadic
 import Test.QuickCheck
 
-import Data.Default
-import Data.ByteString           ( ByteString )
-import Database.LevelDB.Internal (unsafeClose)
-import Database.LevelDB.Base     ( BatchOp(..), DB, withIter, write, open, defaultOptions, createIfMissing, destroy )
-import GHC.Exts                  ( sortWith )
 
 -- import Debug.Trace
 
 data Rs = Rs DB FilePath
 
-tupleToBatchOp :: (ByteString, ByteString) -> BatchOp
+tupleToBatchOp :: Entry -> BatchOp
 tupleToBatchOp (x,y) = Put x y
 
 spec :: Spec
@@ -41,9 +40,9 @@ spec = do
                      , Put "b" "two"
                      , Put "c" "three"]
         res <- withIter db def (\iter -> do
-                                   S.toList $ entrySlice iter AllKeys Asc Right)
+                                   SM.toList $ entrySlice iter AllKeys Asc)
         return res
-      r `shouldBe` (Right [("a","one"),("b","two"),("c","three")])
+      r `shouldBe` [("a","one"),("b","two"),("c","three")]
 
     it "Can iterate over the decoded records" $ do
       let schema  = makeSchema [ ("a", DbtLong) ]
@@ -53,8 +52,11 @@ spec = do
 
         write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
 
-        res <- withIter db def (\iter -> do
-                                   S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
+        res <- withIter db def (\iter ->
+                                 SM.collect
+                                 $ SM.toList
+                                 $ withDecoded Record schema
+                                 $ entrySlice iter AllKeys Asc)
         return res
       r `shouldBe` (Right records)
 
@@ -66,10 +68,12 @@ spec = do
       r   <- bracket initDB destroyDB $ \(Rs db _) -> do
         _   <- write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
         res <- withIter db def (\iter -> do
-                                   S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
+                                   SM.collect
+                                   $ SM.toList
+                                   $ withDecoded Record schema
+                                   $ entrySlice iter AllKeys Asc)
         return res
       (sortWith ts <$> r) `shouldBe` Right (sortWith ts records)
-
 
     it "Can iterate over the decoded records" $ do
       property $ prop_RoundTrip
@@ -82,8 +86,10 @@ prop_RoundTrip :: (DbSchema, [DbRecord]) -> Property
 prop_RoundTrip (schema, records) = monadicIO $ do
   r   <- run $ bracket initDB destroyDB $ \(Rs db _) -> do
     _   <- write db def (map (tupleToBatchOp . (encodeRecord schema 1)) records)
-    res <- withIter db def (\iter -> do
-                               S.toList $ entrySlice iter AllKeys Asc (decodeRecord Record schema))
+    res <- withIter db def (\iter -> SM.collect
+                                     $ SM.toList
+                                     $ withDecoded Record schema
+                                     $ entrySlice iter AllKeys Asc)
     return res
   assert $ (sortWith ts <$> r) == Right (sortWith ts records)
 
