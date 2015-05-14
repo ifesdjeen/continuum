@@ -5,11 +5,9 @@
 module Continuum.Folds where
 
 import Continuum.Types
-import Continuum.Serialization.Record
-import Data.Maybe       ( fromMaybe )
 
 import qualified Data.Stream.Monadic as M
-import Database.LevelDB.Streaming ( KeyRange(..) )
+-- import Database.LevelDB.Streaming ( KeyRange(..) )
 
 data (Monoid b) => Fold a b
   -- | @Fold @ @ step @ @ initial @ @ extract@
@@ -28,14 +26,17 @@ instance Monoid Count where
   mempty = Count 0
   mappend (Count a) (Count b) = Count $ a + b
 
+op_count :: forall a. Fold a Count
 op_count = Fold (\i _ -> i + 1) 0 Count
 
 data Min i = MinNone
            | Min i
            deriving (Show, Eq)
 instance (Ord i) => Monoid (Min i) where
-  mempty = MinNone
+  mempty                    = MinNone
   mappend (Min i1) (Min i2) = Min $ min i1 i2
+  mappend x        MinNone  = x
+  mappend MinNone  x        = x
 
 op_min :: (Ord i) => Fold i (Min i)
 op_min = Fold step MinNone id
