@@ -23,5 +23,9 @@ clean:
 prune: clean
 	cabal sandbox delete
 
+dash:
+	dash-haskell -c continuum.cabal -o docsets
+
 $(CONFIGURED): cabal.sandbox.config deps $(NAME).cabal
 	cabal configure --enable-test
+
