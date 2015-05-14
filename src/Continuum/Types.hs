@@ -6,9 +6,15 @@ module Continuum.Types ( module Continuum.Types
 
                          , KeyRange(..)
                          , Direction(..)
-                         , Key
                          , Value
-                         , Entry)where
+                         , Entry
+
+                         , BatchOp(..)
+                         , WriteBatch
+                         , DB
+                         , Iterator)where
+
+
 
 import           Data.ByteString                   ( ByteString )
 import           GHC.Generics                      ( Generic )
@@ -17,12 +23,15 @@ import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
 import Data.Stream.Monadic ( Step(..), Stream(..) )
-import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Key, Value, Entry)
-
+import Database.LevelDB.Base             ( WriteBatch, BatchOp(..), DB )
+import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Value, Entry)
+import Database.LevelDB.Iterator ( Iterator )
 -- |
 -- | ALIASES
 -- |
 
+type ChunkKey      = ByteString
+type DbKey         = ByteString
 type DbName        = ByteString
 type FieldName     = ByteString
 
