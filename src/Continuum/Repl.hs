@@ -14,6 +14,7 @@ import Database.LevelDB.Base
 
 import Data.ByteString.Char8 ( pack )
 import Continuum.Types
+import qualified Data.List as L
 import Continuum.Storage.ChunkStorage
 import Continuum.Storage.GenericStorage ( entrySlice )
 import qualified Continuum.Stream as S
@@ -45,7 +46,7 @@ populate db = write db def
 a = withTmpDb $ \(Rs db _) -> do
   let bounds = addBounds AllTime (take 10 $ [encodeChunkKey i | i <- [0, 10..]])
   populate db $ take 100 [Put (encodeChunkKey i) (pack $ show i) | i <- [1..]]
-  mapM (fetchPart db) bounds
+  L.concat <$> mapM (fetchPart db) bounds
 
 fetchPart db range = withIter db def (\iter ->
                                        S.toList $ S.map (\(_,y) -> y ) $ entrySlice iter range Asc)
