@@ -26,18 +26,18 @@ fetchChunks range db = withIter db def f
 addBounds :: TimeRange -> [DbKey] -> [KeyRange]
 addBounds a@AllTime (h1:h2:t) = KeyRange {start = h1,
                                           end   = (\x -> x << h2)} : (addBounds a ([h2] ++ t))
-addBounds a@AllTime [h1] = [KeyRange {start = h1,
-                                      end   = (\_ -> LT)}]
-addBounds a@AllTime [] = [AllKeys]
+addBounds a@AllTime [h1]      = [KeyRange {start = h1,
+                                           end   = (\_ -> LT)}]
+addBounds a@AllTime []        = [AllKeys]
 
 addBounds (TimeBetween b e) x =
   let startBytes = packWord64 b
-      endBytes = packWord64 e
-      ranges = [startBytes] ++ x ++ [endBytes]
+      endBytes   = packWord64 e
+      ranges     = [startBytes] ++ x ++ [endBytes]
   in toKeyRanges ranges
-  where makeRange h1 h2 = KeyRange {start = h1, end = (\x -> x << h2)}
-        toKeyRanges [] = []
-        toKeyRanges [h1, h2] = [(makeRange h1 h2)]
+  where makeRange h1 h2        = KeyRange {start = h1, end = (\x -> x << h2)}
+        toKeyRanges []         = []
+        toKeyRanges [h1, h2]   = [(makeRange h1 h2)]
         toKeyRanges (h1:h2:xs) = (makeRange h1 h2) : (toKeyRanges ([h2] ++ xs))
 
 encodeChunkKey :: Integer -> ChunkKey
