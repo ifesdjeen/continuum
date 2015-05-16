@@ -8,7 +8,6 @@ import qualified Continuum.Stream as S
 import Data.Default
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Catch    (MonadMask)
-import Database.LevelDB.Iterator ( withIter )
 
 fetchChunks :: (MonadMask m, MonadIO m) => TimeRange -> DB -> m [KeyRange]
 fetchChunks range db = withIter db def f
@@ -33,8 +32,8 @@ addBounds (TimeBetween b e) x =
       endBytes   = packWord64 e
       ranges     = [startBytes] ++ x ++ [endBytes]
   in toKeyRanges ranges
-  where butlast h1 h2          = KeyRange {start = h1, end = (\x -> x << h2)}
-        full h1 h2             = KeyRange {start = h1, end = (\x -> x `compare` h2)}
+  where butlast h1 h2          = KeyRange {start = h1, end = (\a -> a << h2)}
+        full h1 h2             = KeyRange {start = h1, end = (\a -> a `compare` h2)}
         toKeyRanges []         = []
         toKeyRanges [h1, h2]   = [full h1 h2]
         toKeyRanges (h1:h2:xs) = (butlast h1 h2) : (toKeyRanges ([h2] ++ xs))
