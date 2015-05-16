@@ -29,6 +29,8 @@ library
                       , Continuum.Stream
                       , Continuum.Storage.GenericStorage
                       , Continuum.Storage.ChunkStorage
+                      , Continuum.Storage.SystemStorage
+                      , Continuum.Storage.RecordStorage
                       , Continuum.Serialization.Primitive
                       , Continuum.Serialization.Value
                       , Continuum.Serialization.Record

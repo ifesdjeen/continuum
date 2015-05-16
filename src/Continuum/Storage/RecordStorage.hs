@@ -10,8 +10,6 @@ import Continuum.Storage.GenericStorage
 
 import qualified Continuum.Stream as S
 
-Stream m Entry
-
 runQuery :: (MonadMask m, MonadIO m, Monoid b) => DB -> KeyRange -> Fold Entry b -> m b
 runQuery db range (Fold f z0 e) = withIter db def (\iter -> e <$> S.foldl f z0 $ entrySlice iter range Asc)
 
