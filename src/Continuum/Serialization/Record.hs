@@ -4,7 +4,7 @@ module Continuum.Serialization.Record where
 
 import qualified Data.ByteString      as B
 
-import Data.ByteString ( ByteString )
+
 import Continuum.Serialization.Primitive
 import Continuum.Serialization.Value
 
@@ -15,7 +15,7 @@ import           Data.Maybe           ( isJust, fromJust, catMaybes )
 import           Continuum.Types
 import qualified Data.Map             as Map
 
-encodeRecord :: DbSchema -> Integer -> DbRecord -> (B.ByteString, B.ByteString)
+encodeRecord :: DbSchema -> Integer -> DbRecord -> Entry
 encodeRecord schema sequenceId (DbRecord timestamp vals) = (encodedKey, encodedValue)
   where encodedKey = B.concat [(packWord64 timestamp), (packWord64 sequenceId)]
         encodedParts = fmap encodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
@@ -26,10 +26,7 @@ encodeRecord schema sequenceId (DbRecord timestamp vals) = (encodedKey, encodedV
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeRecord :: Decoding
-             -> DbSchema
-             -> Decoder DbRecord
-
+decodeRecord :: Decoding -> DbSchema -> Decoder DbRecord
 decodeRecord (Field field) schema !(k, bs) = do
   timestamp     <- decodeKey k
   decodedVal    <- if isJust idx
@@ -65,11 +62,11 @@ decodeRecord (Fields flds) schema (k, bs) = do
 -- | Utility Functions
 -- |
 
-decodeKey :: B.ByteString -> DbErrorMonad Integer
+decodeKey :: DbKey -> DbErrorMonad Integer
 decodeKey = unpackWord64
 {-# INLINE decodeKey #-}
 
-decodeIndexes :: DbSchema -> B.ByteString -> [Int]
+decodeIndexes :: DbSchema -> EncodedValue -> [Int]
 decodeIndexes schema bs =
   map fromIntegral $ B.unpack $ B.take (length (fields schema)) bs
 {-# INLINE decodeIndexes #-}
@@ -78,7 +75,7 @@ decodeIndexes schema bs =
 decodeFieldByIndex :: DbSchema
                       -> [Int]
                       -> Int
-                      -> B.ByteString
+                      -> EncodedValue
                       -> DbErrorMonad DbValue
 decodeFieldByIndex schema indices idx bs = decodeValue ((schemaTypes schema) !! idx) bytestring
   where
@@ -88,7 +85,7 @@ decodeFieldByIndex schema indices idx bs = decodeValue ((schemaTypes schema) !! 
     startFrom = (length indices) + (sum $ take idx indices)
 {-# INLINE decodeFieldByIndex #-}
 
-decodeValues :: DbSchema -> B.ByteString -> DbErrorMonad [DbValue]
+decodeValues :: DbSchema -> EncodedValue -> DbErrorMonad [DbValue]
 decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
     indices                  = decodeIndexes schema bs
@@ -102,9 +99,8 @@ decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes sch
 
 -- | Creates a DbRecord from Timestamp and Key/Value pairs
 --
-makeRecord :: Integer -> [(ByteString, DbValue)] -> DbRecord
+makeRecord :: Integer -> [(FieldName, DbValue)] -> DbRecord
 makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 getValue :: FieldName -> DbRecord -> Maybe DbValue
 getValue fieldName (DbRecord _ recordFields) = Map.lookup fieldName recordFields
-

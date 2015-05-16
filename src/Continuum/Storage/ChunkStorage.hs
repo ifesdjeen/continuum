@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Continuum.Storage.ChunkStorage where
 
 import Continuum.Types

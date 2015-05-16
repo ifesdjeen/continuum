@@ -12,20 +12,18 @@ module Continuum.Types ( module Continuum.Types
                          , BatchOp(..)
                          , WriteBatch
                          , DB
-                         , Iterator)where
-
-
-
-import           Data.ByteString                   ( ByteString )
-import           GHC.Generics                      ( Generic )
+                         , Iterator) where
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
-import Data.Stream.Monadic ( Step(..), Stream(..) )
-import Database.LevelDB.Base             ( WriteBatch, BatchOp(..), DB )
+import Data.ByteString            ( ByteString )
+import GHC.Generics               ( Generic )
+import Data.Stream.Monadic        ( Step(..), Stream(..) )
+import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB )
 import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Value, Entry)
-import Database.LevelDB.Iterator ( Iterator )
+import Database.LevelDB.Iterator  ( Iterator )
+
 -- |
 -- | ALIASES
 -- |
@@ -34,7 +32,7 @@ type ChunkKey      = ByteString
 type DbKey         = ByteString
 type DbName        = ByteString
 type FieldName     = ByteString
-
+type EncodedValue  = ByteString
 type Decoder a     = (ByteString, ByteString) -> DbErrorMonad a
 
 -- |

@@ -5,7 +5,7 @@ module Continuum.Storage.GenericStorage ( keySlice
 import Control.Monad.IO.Class
 import Continuum.Serialization.Record ( decodeRecord )
 import Database.LevelDB.Streaming ( keySlice, entrySlice )
-import Database.LevelDB.Streaming as S
+import qualified Database.LevelDB.Streaming as S
 import Continuum.Types
 
 withDecoded :: (Applicative m, MonadIO m) => Decoding -> DbSchema -> Stream m Entry -> Stream m (DbErrorMonad DbRecord)
