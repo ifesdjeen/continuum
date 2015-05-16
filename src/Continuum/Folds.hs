@@ -43,5 +43,6 @@ op_min = Fold step MinNone id
   where step MinNone i = Min i
         step m i2 = mappend m (Min i2)
 
-withField :: Monad m => FieldName -> M.Stream m DbRecord -> M.Stream m DbValue
-withField = undefined
+-- | Runs the fold
+runFold :: (Monoid b) => Fold a b -> [a] -> b
+runFold (Fold f z0 e) a = e $ foldl f z0 a
