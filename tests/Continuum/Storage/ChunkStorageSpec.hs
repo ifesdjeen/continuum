@@ -2,18 +2,17 @@
 
 module Continuum.Storage.ChunkStorageSpec where
 
-import Data.ByteString.Char8 ( pack )
+
 import Continuum.Types
 import Continuum.Storage.ChunkStorage
-import Continuum.Storage.GenericStorage ( entrySlice )
-import Test.Hspec
-
 import Continuum.Support.TmpDb
-import Database.LevelDB.Base     ( withIter, write, open, defaultOptions, createIfMissing, destroy )
+import Continuum.Storage.GenericStorage
 
+import Test.Hspec
 import Data.Default
-import Control.Monad.IO.Class (MonadIO)
-import Control.Monad.Catch    (MonadMask)
+import Data.ByteString.Char8  ( pack )
+import Control.Monad.IO.Class ( MonadIO )
+import Control.Monad.Catch    ( MonadMask )
 import qualified Continuum.Stream as S
 import qualified Data.List as L
 
