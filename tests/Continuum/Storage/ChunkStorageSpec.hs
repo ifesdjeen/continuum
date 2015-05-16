@@ -36,7 +36,7 @@ spec = do
       r <- withTmpDb $ \(Rs db _) -> do
         populate db $ map (uncurry Put) input
         fetchParts db bounds
-      r `shouldBe` [pack $ show i | i <- [15..54]]
+      r `shouldBe` [pack $ show i | i <- [(15 :: Integer)..55]]
 
     it "Fetches just a range (given odd number of ranges)" $ do
       let bounds = addBounds (TimeBetween 15 45) ([encodeChunkKey i | i <- [20,30,40]])
@@ -45,7 +45,7 @@ spec = do
       r <- withTmpDb $ \(Rs db _) -> do
         populate db $ map (uncurry Put) input
         fetchParts db bounds
-      r `shouldBe` [pack $ show i | i <- [15..44]]
+      r `shouldBe` [pack $ show i | i <- [(15 :: Integer)..45]]
 
 
 fetchParts :: (MonadMask m, MonadIO m) => DB -> [KeyRange] -> m [Value]

@@ -35,10 +35,11 @@ addBounds (TimeBetween b e) x =
       endBytes   = packWord64 e
       ranges     = [startBytes] ++ x ++ [endBytes]
   in toKeyRanges ranges
-  where makeRange h1 h2        = KeyRange {start = h1, end = (\x -> x << h2)}
+  where butlast h1 h2          = KeyRange {start = h1, end = (\x -> x << h2)}
+        full h1 h2             = KeyRange {start = h1, end = (\x -> x `compare` h2)}
         toKeyRanges []         = []
-        toKeyRanges [h1, h2]   = [(makeRange h1 h2)]
-        toKeyRanges (h1:h2:xs) = (makeRange h1 h2) : (toKeyRanges ([h2] ++ xs))
+        toKeyRanges [h1, h2]   = [full h1 h2]
+        toKeyRanges (h1:h2:xs) = (butlast h1 h2) : (toKeyRanges ([h2] ++ xs))
 
 encodeChunkKey :: Integer -> ChunkKey
 encodeChunkKey = packWord64
