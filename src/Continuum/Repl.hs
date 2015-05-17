@@ -19,7 +19,7 @@ import Continuum.Serialization.Schema
 import qualified Data.List as L
 import Continuum.Storage.ChunkStorage
 import Data.ByteString.Char8 ( pack )
-import Continuum.Storage.GenericStorage ( entrySlice )
+import Continuum.Storage.GenericStorage --( entrySlice )
 import qualified Continuum.Stream as S
 
 data Rs = Rs DB FilePath
@@ -45,11 +45,20 @@ populate db = write db def
 
 
 
+-- a = withTmpDb $ \(Rs db _) -> do
+--   let schema      = makeSchema [ ("a", DbtInt) ]
+--       record ts i = encodeRecord schema i $ makeRecord ts [ ("a", DbInt i) ]
+--   populate db $ take 500 [uncurry Put (record i i) | i <- [345..]]
+--   runQuery db AllKeys (decoded Record schema $ withField "a" $ op_min)
+
+-- fetchPart db range = withIter db def (\iter ->
+--                                        S.toList $ S.map (\(_,y) -> y ) $ entrySlice iter range Asc)
+
+
+
 a = withTmpDb $ \(Rs db _) -> do
   let schema      = makeSchema [ ("a", DbtInt) ]
       record ts i = encodeRecord schema i $ makeRecord ts [ ("a", DbInt i) ]
   populate db $ take 500 [uncurry Put (record i i) | i <- [345..]]
-  runQuery db AllKeys (decoded Record schema $ withField "a" $ op_min)
-
--- fetchPart db range = withIter db def (\iter ->
---                                        S.toList $ S.map (\(_,y) -> y ) $ entrySlice iter range Asc)
+  runQuery db AllKeys Record schema "a" op_min
+  -- runQuery db AllKeys (decoded Record schema $ withField "a" $ op_min)
