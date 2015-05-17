@@ -7,6 +7,7 @@ import Continuum.Serialization.Record
 import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Support.QuickCheck
 import Continuum.Support.TmpDb
+import Continuum.Storage.RecordStorage ( withDecoded )
 import Continuum.Storage.GenericStorage
 import qualified Continuum.Stream as S
 
