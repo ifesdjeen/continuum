@@ -9,6 +9,9 @@ import Continuum.Types
 import qualified Data.Stream.Monadic as M
 -- import Database.LevelDB.Streaming ( KeyRange(..) )
 
+data (Monad m, Monoid b) => FoldM a m b
+  = forall x. FoldM (x -> a -> m x) x (x -> m b)
+
 data (Monoid b) => Fold a b
   -- | @Fold @ @ step @ @ initial @ @ extract@
   = forall x. Fold (x -> a -> x) x (x -> b)
