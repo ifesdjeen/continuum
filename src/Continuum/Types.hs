@@ -17,6 +17,7 @@ module Continuum.Types ( module Continuum.Types
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
 
+import GHC.Exception              ( Exception )
 import Data.ByteString            ( ByteString )
 import GHC.Generics               ( Generic )
 import Data.Stream.Monadic        ( Step(..), Stream(..) )
@@ -119,6 +120,7 @@ data DbError =
   | NotEnoughInput Int Int
   deriving (Show, Eq, Ord, Generic)
 
+instance Exception DbError
 type DbErrorMonad  = Either DbError
 
 -- |
