@@ -3,6 +3,7 @@
 module Continuum.Repl where
 
 import Continuum.Types
+import Continuum.Folds
 import Control.Monad.Catch
 import System.Directory
 import System.IO.Temp
@@ -11,11 +12,13 @@ import Data.Default
 import Database.LevelDB.Internal ( unsafeClose )
 import Database.LevelDB.Base
 
+import Continuum.Serialization.Record
+import Continuum.Storage.RecordStorage
+import Continuum.Serialization.Schema
 
-import Data.ByteString.Char8 ( pack )
-import Continuum.Types
 import qualified Data.List as L
 import Continuum.Storage.ChunkStorage
+import Data.ByteString.Char8 ( pack )
 import Continuum.Storage.GenericStorage ( entrySlice )
 import qualified Continuum.Stream as S
 
@@ -42,17 +45,11 @@ populate db = write db def
 
 
 
-
 a = withTmpDb $ \(Rs db _) -> do
-  let bounds = addBounds AllTime (take 10 $ [encodeChunkKey i | i <- [0, 10..]])
-  populate db $ take 100 [Put (encodeChunkKey i) (pack $ show i) | i <- [1..]]
-  L.concat <$> mapM (fetchPart db) bounds
+  let schema      = makeSchema [ ("a", DbtInt) ]
+      record ts i = encodeRecord schema i $ makeRecord ts [ ("a", DbInt i) ]
+  populate db $ take 500 [uncurry Put (record i i) | i <- [345..]]
+  runQuery db AllKeys (decoded Record schema $ withField "a" $ op_min)
 
-fetchPart db range = withIter db def (\iter ->
-                                       S.toList $ S.map (\(_,y) -> y ) $ entrySlice iter range Asc)
-
-
-b = withTmpDb $ \(Rs db _) -> do
-  let bounds = addBounds (TimeBetween 15 55) ([encodeChunkKey i | i <- [20,30,40, 50]])
-  populate db $ take 100 [Put (encodeChunkKey i) (pack $ show i) | i <- [1..]]
-  mapM (fetchPart db) bounds
+-- fetchPart db range = withIter db def (\iter ->
+--                                        S.toList $ S.map (\(_,y) -> y ) $ entrySlice iter range Asc)
