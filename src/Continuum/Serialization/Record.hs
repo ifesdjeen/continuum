@@ -8,6 +8,8 @@ import qualified Data.ByteString      as B
 import Continuum.Serialization.Primitive
 import Continuum.Serialization.Value
 
+import Control.Exception (throw)
+import Control.Monad.Catch    (MonadMask)
 import           Data.Serialize       ( runPut, putWord8, putByteString )
 import           Control.Monad.Except ( forM_, throwError )
 import           Data.List            ( elemIndex )
@@ -104,3 +106,9 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 getValue :: FieldName -> DbRecord -> Maybe DbValue
 getValue fieldName (DbRecord _ recordFields) = Map.lookup fieldName recordFields
+
+getValue' :: FieldName -> DbRecord -> DbErrorMonad DbValue
+getValue' fieldName (DbRecord _ recordFields) =
+  case (Map.lookup fieldName recordFields) of
+    (Just f) -> Right f
+    Nothing ->  Left FieldNotFoundError
