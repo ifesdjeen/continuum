@@ -61,6 +61,7 @@ test-suite tests
   other-modules:          Continuum.Serialization.PrimitiveSpec
                         , Continuum.Serialization.RecordSpec
                         , Continuum.Storage.GenericStorageSpec
+                        , Continuum.Storage.RecordStorageSpec
                         , Continuum.Storage.ChunkStorageSpec
                         , Continuum.FoldsSpec
                         , Continuum.Support.TmpDb
