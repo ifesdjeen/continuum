@@ -4,17 +4,14 @@ module Continuum.Storage.GenericStorageSpec where
 
 import Continuum.Types
 import Continuum.Serialization.Record
-import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Support.QuickCheck
 import Continuum.Support.TmpDb
+import Continuum.Serialization.Schema  ( makeSchema )
 import Continuum.Storage.RecordStorage ( withDecoded )
+import GHC.Exts                        ( sortWith )
 import Continuum.Storage.GenericStorage
 import qualified Continuum.Stream as S
 
-import Data.Default
-import GHC.Exts                  ( sortWith )
-import Database.LevelDB.Base     ( withIter, write )
-import Control.Exception         ( bracket )
 import Test.Hspec
 import Test.QuickCheck.Monadic
 import Test.QuickCheck
