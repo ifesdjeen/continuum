@@ -46,6 +46,9 @@ op_min = Fold step MinNone id
   where step MinNone i = Min i
         step m i2 = mappend m (Min i2)
 
+op_collect :: forall a. Fold a [a]
+op_collect = Fold (flip (:)) [] id
+
 -- | Runs the fold
 runFold :: (Monoid b) => Fold a b -> [a] -> b
 runFold (Fold f z0 e) a = e $ foldl f z0 a
