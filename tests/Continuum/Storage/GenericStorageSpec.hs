@@ -45,7 +45,7 @@ spec = do
         return res
       r `shouldBe` (Right records)
 
-    it "asd" $ do
+    it "Can iterate over larger records" $ do
       let schema  = makeSchema (zip ["a", "b", "c", "d"] [DbtShort, DbtShort, DbtDouble, DbtShort])
           records = [ makeRecord 1 [("c", DbDouble 9.93), ("b", DbShort 2), ("a", DbShort 2), ("d", DbShort 3)]
                     , makeRecord 2 [("c", DbDouble 2.27), ("b", DbShort 3), ("a", DbShort 4), ("d", DbShort 3)]
