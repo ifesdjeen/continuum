@@ -56,9 +56,9 @@ populate db = write db def
 
 
 
-a = withTmpDb $ \(Rs db _) -> do
-  let schema      = makeSchema [ ("a", DbtInt) ]
-      record ts i = encodeRecord schema i $ makeRecord ts [ ("a", DbInt i) ]
-  populate db $ take 500 [uncurry Put (record i i) | i <- [345..]]
-  runQuery db AllKeys Record schema "a" op_min
+-- a = withTmpDb $ \(Rs db _) -> do
+--   let schema      = makeSchema [ ("a", DbtInt) ]
+--       record ts i = encodeRecord schema i $ makeRecord ts [ ("a", DbInt i) ]
+--   populate db $ take 500 [uncurry Put (record i i) | i <- [345..]]
+--   runQuery db AllKeys Record schema "a" op_min
   -- runQuery db AllKeys (decoded Record schema $ withField "a" $ op_min)
