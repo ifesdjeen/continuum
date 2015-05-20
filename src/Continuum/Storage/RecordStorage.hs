@@ -17,14 +17,25 @@ withDecoded decoding schema = S.map (decodeRecord decoding schema)
 withField :: (Applicative m, MonadIO m) => FieldName -> Stream m (DbErrorMonad DbRecord) -> Stream m (DbErrorMonad DbValue)
 withField field = S.map (>>= \i -> getValue' field i)
 
-runQuery :: (MonadMask m, MonadIO m, Monoid b)
+fieldQuery :: (MonadMask m, MonadIO m, Monoid b)
          => DB -> KeyRange
          -> Decoding -> DbSchema
-         -> FieldName
-         -> Fold DbValue b -> m (DbErrorMonad b)
-runQuery db range decoding schema field (Fold f z0 e)=
+         -> FieldName -> Fold DbValue b
+         -> m (DbErrorMonad b)
+fieldQuery db range decoding schema field (Fold f z0 e) =
   withIter db def (\iter -> fmap (fmap e)
                             $ S.foldl (\z1 x -> f <$> z1 <*> x) (Right z0)
                             $ withField field
+                            $ withDecoded decoding schema
+                            $ entrySlice iter range Asc)
+
+recordQuery :: (MonadMask m, MonadIO m, Monoid b)
+               => DB -> KeyRange
+            -> Decoding -> DbSchema
+            -> Fold DbRecord b
+            -> m (DbErrorMonad b)
+recordQuery db range decoding schema (Fold f z0 e) =
+  withIter db def (\iter -> fmap (fmap e)
+                            $ S.foldl (\z1 x -> f <$> z1 <*> x) (Right z0)
                             $ withDecoded decoding schema
                             $ entrySlice iter range Asc)
