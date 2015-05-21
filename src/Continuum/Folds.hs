@@ -5,6 +5,7 @@
 module Continuum.Folds where
 
 import Continuum.Types
+import Continuum.Serialization.Record ( getValue )
 
 import qualified Data.Stream.Monadic as M
 -- import Database.LevelDB.Streaming ( KeyRange(..) )
@@ -52,3 +53,11 @@ op_collect = Fold (flip (:)) [] id
 -- | Runs the fold
 runFold :: (Monoid b) => Fold a b -> [a] -> b
 runFold (Fold f z0 e) a = e $ foldl f z0 a
+
+
+op_withField :: (Monoid b) => FieldName -> (Fold DbValue b) -> Fold DbRecord (Maybe b)
+op_withField fieldName (Fold f z0 e) =
+  let valueFn      = getValue fieldName
+      wrapped z1 x = f <$> z1 <*> (valueFn x)
+  in
+   Fold wrapped (Just z0) (fmap e)
