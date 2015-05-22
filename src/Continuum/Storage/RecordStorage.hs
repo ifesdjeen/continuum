@@ -21,6 +21,6 @@ fieldQuery :: (MonadMask m, MonadIO m, Monoid b)
          -> m (DbErrorMonad b)
 fieldQuery db range decoding schema (Fold f z0 e) =
   withIter db def (\iter -> fmap (fmap e)
-                            $ S.fold[<64;17;13Ml (\z1 x -> f <$> z1 <*> x) (Right z0)
+                            $ S.foldl (\z1 x -> f <$> z1 <*> x) (Right z0)
                             $ withDecoded decoding schema
                             $ entrySlice iter range Asc)
