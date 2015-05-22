@@ -7,6 +7,7 @@ module Continuum.Folds where
 import Continuum.Types
 import Continuum.Serialization.Record ( getValue )
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Stream.Monadic as M
 -- import Database.LevelDB.Streaming ( KeyRange(..) )
 
@@ -54,10 +55,18 @@ op_collect = Fold (flip (:)) [] id
 runFold :: (Monoid b) => Fold a b -> [a] -> b
 runFold (Fold f z0 e) a = e $ foldl f z0 a
 
-
 op_withField :: (Monoid b) => FieldName -> (Fold DbValue b) -> Fold DbRecord (Maybe b)
 op_withField fieldName (Fold f z0 e) =
   let valueFn      = getValue fieldName
       wrapped z1 x = f <$> z1 <*> (valueFn x)
   in
    Fold wrapped (Just z0) (fmap e)
+
+op_groupByField :: (Monoid b) => FieldName -> (Fold DbRecord b) -> Fold DbRecord (Map.Map (Maybe DbValue) b)
+op_groupByField fieldName (Fold f z0 e) =
+  let valueFn                   = getValue fieldName
+      wrappedSubStep n Nothing  = return $! (f z0 n) -- is <$>
+      wrappedSubStep n (Just a) = return $! (f a n)
+      localStep m record        = Map.alter (wrappedSubStep record) (valueFn record) m
+      done                      = Map.map e
+  in Fold localStep Map.empty done
