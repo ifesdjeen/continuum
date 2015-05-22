@@ -44,6 +44,15 @@ populate :: DB -> WriteBatch -> IO ()
 populate db = write db def
 
 
+a = withTmpDb $ \(Rs db _) -> do
+        let schema  = makeSchema [ ("g", DbtString), ("a", DbtLong) ]
+            records = [ makeRecord 1 [ ("g", DbString "a"), ("a", DbLong 5) ]
+                      , makeRecord 2 [ ("g", DbString "a"), ("a", DbLong 10) ]
+                      , makeRecord 3 [ ("g", DbString "a"), ("a", DbLong 15) ]
+                      , makeRecord 4 [ ("g", DbString "b"), ("a", DbLong 2) ]
+                      , makeRecord 5 [ ("g", DbString "b"), ("a", DbLong 30) ]]
+        populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
+        fieldQuery db AllKeys Record schema (op_groupByField "g" (op_withField "a" op_min))
 
 -- a = withTmpDb $ \(Rs db _) -> do
 --   let schema      = makeSchema [ ("a", DbtInt) ]
