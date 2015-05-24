@@ -29,7 +29,7 @@ spec = do
       r <- withTmpDb $ \(Rs db _) -> do
         populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
         fieldQuery db AllKeys Record schema (op_withField "a" op_min)
-      r `shouldBe` Right (Just $ Min $ DbLong 2)
+      r `shouldBe` (Right $ Min $ DbLong 2)
 
     it "Runs min query 2" $ do
       let schema  = makeSchema (zip ["a", "b", "c", "d"] [DbtShort, DbtShort, DbtDouble, DbtShort])
@@ -39,7 +39,7 @@ spec = do
       r   <- withTmpDb $ \(Rs db _) -> do
         _   <- populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
         fieldQuery db AllKeys Record schema (op_withField "a" op_min)
-      r `shouldBe` Right (Just $ Min $ DbShort 2)
+      r `shouldBe` (Right $ Min $ DbShort 2)
 
     it "Will run a collect fold" $ do
       property $ prop_CollectFold
