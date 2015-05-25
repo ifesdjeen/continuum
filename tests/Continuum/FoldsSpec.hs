@@ -57,3 +57,9 @@ spec = do
       property $ ((\a b -> Min (min a b) == mappend (Min a) (Min b)) :: Integer -> Integer -> Bool)
     it "combines two min with mempty" $ do
       property $ ((\a -> Min a == mappend (Min a) MinNone) :: Integer -> Bool)
+
+  describe "Map" $ do
+    it "combines two maps with mappend" $ do
+      MyMap (Map.fromList [("a",Min 2),("b",Min 1)])
+      `shouldBe`
+      (mappend (MyMap $ Map.fromList [("a", Min 100), ("b", Min 1)]) (MyMap $ Map.fromList [("a", Min 2), ("b", Min 200)]))
