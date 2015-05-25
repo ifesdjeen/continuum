@@ -24,10 +24,10 @@ prop_CollectFold a = reverse a == runFold op_collect a
 prop_GroupByFold :: [(Integer, [Integer])] -> Bool
 prop_GroupByFold a =
   let -- List has to be a non-empty list with unique "key" elements
-      a'        = nubBy (\a b -> fst a == fst b) $ filter null a
-      expected  = Map.fromList $ fmap (\(k,v) -> (k, runFold op_count v)) a'
-      plainList = concat $ fmap (\(k,v) -> fmap ((,) k) v) a'
-      result    = runFold (op_groupBy (\i -> Just $ fst i) op_count) plainList
+    a'        = nubBy (\a b -> fst a == fst b) $ filter null a
+    expected  = Map.fromList $ fmap (\(k,v) -> (k, runFold op_count v)) a'
+    plainList = concat $ fmap (\(k,v) -> fmap ((,) k) v) a'
+    result    = runFold (op_groupBy (\i -> Just $ fst i) op_count) plainList
   in expected == result
 
 spec :: Spec
@@ -45,3 +45,15 @@ spec = do
 
     it "passes Group Fold test" $ do
       property $ prop_GroupByFold
+
+  describe "Count" $ do
+    it "combines two counts with mappend" $ do
+      property $ \a b -> (Count $ a + b) == mappend (Count a) (Count b)
+    it "combines two empty with count" $ do
+      property $ \a -> Count a == mappend (Count a) mempty
+
+  describe "Min" $ do
+    it "combines two mins with mappend" $ do
+      property $ ((\a b -> Min (min a b) == mappend (Min a) (Min b)) :: Integer -> Integer -> Bool)
+    it "combines two min with mempty" $ do
+      property $ ((\a -> Min a == mappend (Min a) MinNone) :: Integer -> Bool)
