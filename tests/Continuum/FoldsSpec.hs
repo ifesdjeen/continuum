@@ -8,8 +8,6 @@ import Test.Hspec
 import Test.QuickCheck
 import Data.List (nubBy, groupBy)
 
-import Debug.Trace
-
 import qualified Data.Map as Map
 
 -- prop_MinFold :: (Ord a, Show a) => [a] -> Bool
