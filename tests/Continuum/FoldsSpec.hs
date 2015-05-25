@@ -8,6 +8,8 @@ import Test.Hspec
 import Test.QuickCheck
 import Data.List (nubBy, groupBy)
 
+import Debug.Trace
+
 import qualified Data.Map as Map
 
 -- prop_MinFold :: (Ord a, Show a) => [a] -> Bool
@@ -17,6 +19,9 @@ prop_MinFold a = (Min $ minimum a) == runFold op_min a
 
 prop_CountFold :: [Integer] -> Bool
 prop_CountFold a = (Count $ length a ) == runFold op_count a
+
+prop_CollectFold :: [Integer] -> Bool
+prop_CollectFold a = reverse a == runFold op_collect a
 
 prop_GroupByFold :: [(Integer, [Integer])] -> Bool
 prop_GroupByFold a =
@@ -36,6 +41,9 @@ spec = do
 
     it "passes Count Fold test" $ do
       property $ prop_CountFold
+
+    it "passes Collect Fold test" $ do
+      property $ prop_CollectFold
 
     it "passes Group Fold test" $ do
       property $ prop_GroupByFold
