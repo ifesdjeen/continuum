@@ -72,3 +72,11 @@ op_groupBy groupFn (Fold f z0 e) =
 
 op_groupByField :: (Monoid b) => FieldName -> (Fold DbRecord b) -> Fold DbRecord (Map.Map DbValue b)
 op_groupByField fieldName f = op_groupBy (getValue fieldName) f
+
+newtype MyMap a b = MyMap (Map.Map a b)
+                  deriving (Show, Ord, Eq)
+
+instance (Ord k, Monoid v) => Monoid (MyMap k v) where
+  mempty  = MyMap $ Map.empty
+  mappend (MyMap a) (MyMap b) = MyMap $ Map.unionWith mappend a b
+--  mconcat = MyMap $ Map.unionsWith mappend
