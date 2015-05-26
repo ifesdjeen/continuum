@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Continuum.FoldsSpec where
 
 import Continuum.Folds
@@ -26,7 +24,7 @@ prop_GroupByFold :: [(Integer, [Integer])] -> Bool
 prop_GroupByFold a =
   let -- List has to be a non-empty list with unique "key" elements
     a'        = nubBy (\a b -> fst a == fst b) $ filter null a
-    expected  = Map.fromList $ fmap (\(k,v) -> (k, runFold op_count v)) a'
+    expected  = MapResult $ Map.fromList $ fmap (\(k,v) -> (k, runFold op_count v)) a'
     plainList = concat $ fmap (\(k,v) -> fmap ((,) k) v) a'
     result    = runFold (op_groupBy (\i -> Just $ fst i) op_count) plainList
   in expected == result
