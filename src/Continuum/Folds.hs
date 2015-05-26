@@ -62,13 +62,13 @@ op_withField fieldName (Fold f z0 e) =
   in
    Fold wrapped z0 e
 
-op_groupBy :: (Ord a, Monoid b) => (r -> Maybe a) -> (Fold r b) -> Fold r (Map.Map a b)
+op_groupBy :: (Ord a, Monoid b) => (r -> Maybe a) -> (Fold r b) -> Fold r (MapResult a b)
 op_groupBy groupFn (Fold f z0 e) =
   let wrappedSubStep n Nothing  = return $! (f z0 n)
       wrappedSubStep n (Just a) = return $! (f a n)
       localStep m record        = maybe m (\r -> Map.alter (wrappedSubStep record) r m) (groupFn record)
-      done                      = Map.map e
+      done a                    = MapResult $ Map.map e a
   in Fold localStep Map.empty done
 
-op_groupByField :: (Monoid b) => FieldName -> (Fold DbRecord b) -> Fold DbRecord (Map.Map DbValue b)
+op_groupByField :: (Monoid b) => FieldName -> (Fold DbRecord b) -> Fold DbRecord (MapResult DbValue b)
 op_groupByField fieldName f = op_groupBy (getValue fieldName) f
