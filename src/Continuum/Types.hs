@@ -1,18 +1,19 @@
 {-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE FlexibleInstances         #-}
 module Continuum.Types ( module Continuum.Types
-                         , Stream(..)
-                         , Step(..)
+                       , MapResult(..)
+                       , Stream(..)
+                       , Step(..)
 
-                         , KeyRange(..)
-                         , Direction(..)
-                         , Value
-                         , Entry
+                       , KeyRange(..)
+                       , Direction(..)
+                       , Value
+                       , Entry
 
-                         , BatchOp(..)
-                         , WriteBatch
-                         , DB
-                         , Iterator) where
+                       , BatchOp(..)
+                       , WriteBatch
+                       , DB
+                       , Iterator) where
 
 import qualified Data.Serialize                 as S
 import qualified Data.Map                       as Map
@@ -61,6 +62,13 @@ data DbValue =
   | DbFloat                 Float
   | DbDouble                Double
   deriving (Eq, Show, Ord, Generic)
+
+newtype MapResult a b = MapResult (Map.Map a b)
+                      deriving (Show, Ord, Eq)
+
+instance (Ord k, Monoid v) => Monoid (MapResult k v) where
+  mempty  = MapResult $ Map.empty
+  mappend (MapResult a) (MapResult b) = MapResult $ Map.unionWith mappend a b
 
 -- |
 -- | DB SCHEMA
