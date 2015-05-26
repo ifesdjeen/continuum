@@ -3,10 +3,11 @@
 module Continuum.FoldsSpec where
 
 import Continuum.Folds
+import Continuum.Types
 
 import Test.Hspec
 import Test.QuickCheck
-import Data.List (nubBy, groupBy)
+import Data.List ( nubBy )
 
 import qualified Data.Map as Map
 
@@ -60,6 +61,11 @@ spec = do
 
   describe "Map" $ do
     it "combines two maps with mappend" $ do
-      MyMap (Map.fromList [("a",Min 2),("b",Min 1)])
+      MapResult (Map.fromList [("a",Min 2)
+                              ,("b",Min 1)])
       `shouldBe`
-      (mappend (MyMap $ Map.fromList [("a", Min 100), ("b", Min 1)]) (MyMap $ Map.fromList [("a", Min 2), ("b", Min 200)]))
+      mappend
+        (MapResult $ Map.fromList [("a", Min 100)
+                                 , ("b", Min 1)])
+        (MapResult $ Map.fromList [("a", Min 2)
+                                  , ("b", Min 200)])
