@@ -13,16 +13,17 @@ import Continuum.Support.QuickCheck
 
 import Test.Hspec
 import Test.QuickCheck
+import Test.QuickCheck.Monadic
 
 sid :: Integer
 sid = 456
 
-prop_roundTrip :: (DbSchema, DbRecord) -> Bool
-prop_roundTrip (schema, record) =
+prop_roundTrip :: (DbSchema, DbRecord) -> Property
+prop_roundTrip (schema, record) = monadicIO $ do
   let encoded = encodeRecord schema sid record
       decoder = decodeRecord Record schema
-  in
-   (Right record) == (decoder encoded)
+  result <- run $ decoder encoded
+  assert $ record == result
 
 spec :: Spec
 spec = do
@@ -43,28 +44,35 @@ spec = do
         indices             = decodeIndexes schema value
 
     it "reads out indexes from serialized items" $ do
-      decodeKey key `shouldBe` (Right $ 123)
+      r <- decodeKey key
+      r `shouldBe` 123
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex schema indices x value
-      decodeFn 0 `shouldBe` (Right $ DbInt 123)
+      let decodeFn x = decodeFieldByIndex schema indices x value
+      r <- decodeFn 0
+      r `shouldBe` (DbInt 123)
 
     it "reads out indexes from serialized items" $
       indices `shouldBe` [4,8,7]
 
     it "reads out indexes from serialized items" $ do
-      let decodeFn = \x -> decodeFieldByIndex schema indices x value
-      decodeFn 0 `shouldBe` (Right $ DbInt    123)
-      decodeFn 1 `shouldBe` (Right $ DbString "STRINGIE")
-      decodeFn 2 `shouldBe` (Right $ DbString "STRINGO")
+      let decodeFn x = decodeFieldByIndex schema indices x value
+      r0 <- decodeFn 0
+      r0 `shouldBe` (DbInt    123)
+      r1 <- decodeFn 1
+      r1 `shouldBe` (DbString "STRINGIE")
+      r2 <- decodeFn 2
+      r2 `shouldBe` (DbString "STRINGO")
 
     it "decodes certain serialized values" $ do
-      let decodeFn = \x -> decodeRecord (Field x) schema encoded
-      decodeFn "a" `shouldBe` (Right $ makeRecord 123 [ ("a", (DbInt 123))])
+      let decodeFn x = decodeRecord (Field x) schema encoded
+      r <- decodeFn "a"
+      r `shouldBe` (makeRecord 123 [ ("a", (DbInt 123))])
 
     it "decodes a complete serialized value" $ do
-      let decodeFn = \_x -> decodeRecord Record schema encoded
-      decodeFn ("a"::String) `shouldBe` (Right record)
+      let decodeFn _x = decodeRecord Record schema encoded
+      r <- decodeFn ("a"::String)
+      r `shouldBe` record
 
   -- describe "Partial Serialization" $ do
   --   -- OKAY HERES THE BUG

@@ -8,6 +8,7 @@ import qualified Data.ByteString      as B
 import Continuum.Serialization.Primitive
 import Continuum.Serialization.Value
 
+import Control.Monad.Catch    ( MonadMask(..), throwM )
 import Control.Exception (throw)
 import Control.Monad.Catch    (MonadMask)
 import           Data.Serialize       ( runPut, putWord8, putByteString )
@@ -28,12 +29,12 @@ encodeRecord schema sequenceId (DbRecord timestamp vals) = (encodedKey, encodedV
           forM_ encodedParts putByteString
           -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
 
-decodeRecord :: Decoding -> DbSchema -> Decoder DbRecord
+decodeRecord :: (MonadMask m) => Decoding -> DbSchema -> Entry -> m DbRecord
 decodeRecord (Field field) schema !(k, bs) = do
   timestamp     <- decodeKey k
   decodedVal    <- if isJust idx
                    then decodeFieldByIndex schema indices (fromJust idx) bs
-                   else throwError FieldNotFoundError
+                   else throwM FieldNotFoundError
   return $! DbRecord timestamp (Map.fromList $ [(field, decodedVal)])
   where idx     = elemIndex field (fields schema)
         indices = decodeIndexes schema bs
@@ -51,7 +52,7 @@ decodeRecord (Fields flds) schema (k, bs) = do
   timestamp     <- decodeKey k
   decodedVals   <- if isJust idxs
                    then mapM (\idx -> decodeFieldByIndex schema (decodeIndexes schema bs) idx bs) (fromJust idxs)
-                   else throwError FieldNotFoundError
+                   else throwM FieldNotFoundError
   return $! DbRecord timestamp (Map.fromList $ zip flds decodedVals)
   where
     {-# INLINE idxs #-}
@@ -64,7 +65,7 @@ decodeRecord (Fields flds) schema (k, bs) = do
 -- | Utility Functions
 -- |
 
-decodeKey :: DbKey -> DbErrorMonad Integer
+decodeKey :: (MonadMask m) => DbKey -> m Integer
 decodeKey = unpackWord64
 {-# INLINE decodeKey #-}
 
@@ -74,11 +75,12 @@ decodeIndexes schema bs =
 {-# INLINE decodeIndexes #-}
 
 -- | Decodes field by index
-decodeFieldByIndex :: DbSchema
+decodeFieldByIndex :: (MonadMask m) =>
+                      DbSchema
                       -> [Int]
                       -> Int
                       -> EncodedValue
-                      -> DbErrorMonad DbValue
+                      -> m DbValue
 decodeFieldByIndex schema indices idx bs = decodeValue ((schemaTypes schema) !! idx) bytestring
   where
     {-# INLINE bytestring #-}
@@ -87,7 +89,7 @@ decodeFieldByIndex schema indices idx bs = decodeValue ((schemaTypes schema) !! 
     startFrom = (length indices) + (sum $ take idx indices)
 {-# INLINE decodeFieldByIndex #-}
 
-decodeValues :: DbSchema -> EncodedValue -> DbErrorMonad [DbValue]
+decodeValues :: (MonadMask m) => DbSchema -> EncodedValue -> m [DbValue]
 decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes schema) bytestrings)
   where
     indices                  = decodeIndexes schema bs
@@ -107,8 +109,8 @@ makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 getValue :: FieldName -> DbRecord -> Maybe DbValue
 getValue fieldName (DbRecord _ recordFields) = Map.lookup fieldName recordFields
 
-getValue' :: FieldName -> DbRecord -> DbErrorMonad DbValue
-getValue' fieldName (DbRecord _ recordFields) =
-  case (Map.lookup fieldName recordFields) of
-    (Just f) -> Right f
-    Nothing ->  Left FieldNotFoundError
+-- getValue :: (MonadMask m) => FieldName -> DbRecord -> m DbValue
+-- getValue fieldName (DbRecord _ recordFields) =
+--   case (Map.lookup fieldName recordFields) of
+--     (Just f) -> return f
+--     Nothing ->  throwM FieldNotFoundError
