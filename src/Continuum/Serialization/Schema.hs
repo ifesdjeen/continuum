@@ -16,6 +16,7 @@ import           Data.ByteString      ( ByteString )
 import           Data.Serialize       ( encode, decode )
 import           Control.Monad.Except ( throwError )
 
+import Control.Monad.Catch    ( MonadMask(..), throwM )
 
 -- import Debug.Trace
 
@@ -29,20 +30,17 @@ data Success = Success
 encodeSchema :: DbSchema -> B.ByteString
 encodeSchema = encode
 
-decodeSchema :: Decoder (DbName, DbSchema)
+decodeSchema :: (MonadMask m) => Entry -> m (DbName, DbSchema)
 decodeSchema (dbName, encodedSchema) =
   case (decode encodedSchema) of
-    (Left err)     -> throwError $ SchemaDecodingError err
-    (Right schema) -> return $! (dbName, schema)
+   (Left err)     -> throwM $ SchemaDecodingError err
+   (Right schema) -> return $! (dbName, schema)
 
 -- |
 -- | DECODING
 -- |
 
-
-
-
-decodeChunkKey :: Decoder Integer
+decodeChunkKey :: (MonadMask m) => Entry -> m Integer
 decodeChunkKey (x, _) = unpackWord64 (B.take 8 x)
 {-# INLINE decodeChunkKey #-}
 

@@ -8,6 +8,7 @@ import Data.ByteString        ( ByteString )
 import Continuum.Types        ( DbValue(..),
                                 DbType(..),
                                 DbErrorMonad )
+import Control.Monad.Catch  ( MonadMask(..), throwM )
 import Continuum.Serialization.Primitive
 
 
@@ -20,7 +21,7 @@ encodeValue (DbFloat  value) = packFloat value
 encodeValue (DbDouble value) = packDouble value
 encodeValue (DbString value) = value
 
-decodeValue :: DbType -> ByteString -> DbErrorMonad DbValue
+decodeValue :: (MonadMask m) => DbType -> ByteString -> m DbValue
 decodeValue DbtLong    bs  = DbLong   <$> (unpackWord64 bs)
 decodeValue DbtInt     bs  = DbInt    <$> (unpackWord32 bs)
 decodeValue DbtShort   bs  = DbShort  <$> (unpackWord16 bs)

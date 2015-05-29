@@ -37,12 +37,9 @@ spec = do
       r <- withTmpDb $ \(Rs db _) -> do
         populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
 
-        res <- withIter db def (\iter ->
-                                 -- S.collect
-                                 -- $
-                                 S.toList
-                                 $ withDecoded Record schema
-                                 $ entrySlice iter AllKeys Asc)
+        res <- withIter db def (\iter -> S.toList
+                                         $ withDecoded Record schema
+                                         $ entrySlice iter AllKeys Asc)
         return res
       r `shouldBe` records
 
