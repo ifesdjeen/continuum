@@ -38,12 +38,13 @@ spec = do
         populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
 
         res <- withIter db def (\iter ->
-                                 S.collect
-                                 $ S.toList
+                                 -- S.collect
+                                 -- $
+                                 S.toList
                                  $ withDecoded Record schema
                                  $ entrySlice iter AllKeys Asc)
         return res
-      r `shouldBe` (Right records)
+      r `shouldBe` records
 
     it "Can iterate over larger records" $ do
       let schema  = makeSchema (zip ["a", "b", "c", "d"] [DbtShort, DbtShort, DbtDouble, DbtShort])
@@ -52,13 +53,11 @@ spec = do
                     , makeRecord 4 [("c", DbDouble 7.14), ("b", DbShort 4), ("a", DbShort 3), ("d", DbShort 3)]]
       r   <- withTmpDb $ \(Rs db _) -> do
         _   <- populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
-        res <- withIter db def (\iter -> do
-                                   S.collect
-                                   $ S.toList
-                                   $ withDecoded Record schema
-                                   $ entrySlice iter AllKeys Asc)
+        res <- withIter db def (\iter -> S.toList
+                                         $ withDecoded Record schema
+                                         $ entrySlice iter AllKeys Asc)
         return res
-      (sortWith ts <$> r) `shouldBe` Right (sortWith ts records)
+      (sortWith ts r) `shouldBe` (sortWith ts records)
 
     it "Can iterate over the decoded records" $ do
       property $ prop_RoundTrip
@@ -71,12 +70,11 @@ prop_RoundTrip :: (DbSchema, [DbRecord]) -> Property
 prop_RoundTrip (schema, records) = monadicIO $ do
   r   <- run $ withTmpDb $ \(Rs db _) -> do
     _   <- populate db (map (tupleToBatchOp . (encodeRecord schema 1)) records)
-    res <- withIter db def (\iter -> S.collect
-                                     $ S.toList
+    res <- withIter db def (\iter -> S.toList
                                      $ withDecoded Record schema
                                      $ entrySlice iter AllKeys Asc)
     return res
-  assert $ (sortWith ts <$> r) == Right (sortWith ts records)
+  assert $ (sortWith ts r) == (sortWith ts records)
 
 ts :: DbRecord -> Integer
 ts (DbRecord i _) = i
