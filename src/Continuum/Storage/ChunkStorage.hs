@@ -11,14 +11,14 @@ import Control.Monad.Catch    (MonadMask)
 
 fetchChunks :: (MonadMask m, MonadIO m) => TimeRange -> DB -> m [KeyRange]
 fetchChunks range db = withIter db def f
-  where f iter = do
-          fmap (addBounds range) $ S.toList $ keySlice iter (toKeyRange range) Asc
+  where f iter = fmap (addBounds range)
+                 $ S.toList
+                 $ keySlice iter (toKeyRange range) Asc
 
 (<<) :: (Ord a) => a -> a -> Ordering
 (<<) a b
   | a < b = LT
   | otherwise = GT
-
 
 addBounds :: TimeRange -> [DbKey] -> [KeyRange]
 addBounds a@AllTime (h1:h2:t) = KeyRange {start = h1,
@@ -42,7 +42,7 @@ encodeChunkKey :: Integer -> ChunkKey
 encodeChunkKey = packWord64
 {-# INLINE encodeChunkKey #-}
 
-decodeChunkKey :: Decoder Integer
+decodeChunkKey :: (MonadMask m) => Entry -> m Integer
 decodeChunkKey (x, _) = unpackWord64 x
 {-# INLINE decodeChunkKey #-}
 
