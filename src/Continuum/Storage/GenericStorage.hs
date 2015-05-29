@@ -12,7 +12,7 @@ module Continuum.Storage.GenericStorage ( keySlice
                                         , def) where
 
 import Control.Monad.IO.Class
-import Continuum.Serialization.Record ( decodeRecord, getValue' )
+import Continuum.Serialization.Record ( decodeRecord, getValue )
 import Database.LevelDB.Streaming     ( keySlice, entrySlice )
 import Database.LevelDB.Base          ( withIter, write, open, defaultOptions, createIfMissing, destroy )
 import Data.Default                   ( def )
