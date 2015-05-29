@@ -34,6 +34,7 @@ import           Control.Monad.Except   ( throwError )
 import           Foreign                ( Storable, sizeOf, poke, peek, castPtr, plusPtr, shiftR, alloca )
 import           Foreign.ForeignPtr     ( withForeignPtr )
 import           System.IO.Unsafe       ( unsafePerformIO )
+import           Control.Monad.Catch    ( MonadMask(..), throwM )
 
 -- |
 -- | SIZES
@@ -89,27 +90,27 @@ packDouble     = (packWord64 :: Word64 -> ByteString) . fromFloat
 -- | UNPACKING
 -- |
 
-unpackWord8  :: (Num a) => ByteString -> DbErrorMonad a
+unpackWord8  :: (MonadMask m, Num a) => ByteString -> m a
 unpackWord8 w = fixBound <$> Unsafe.unsafeHead <$> safeTake word8Size w
 {-# INLINE unpackWord8 #-}
 
-unpackWord16 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord16 w = fixBound <$> (readNBytes word16Size w :: DbErrorMonad Word16)
+unpackWord16 :: (MonadMask m, Num a) => ByteString -> m a
+unpackWord16 w = fixBound <$> (readNBytes word16Size w :: MonadMask m => m Word16)
 {-# INLINE unpackWord16 #-}
 
-unpackWord32 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord32 w = fixBound <$> (readNBytes word32Size w :: DbErrorMonad Word32)
+unpackWord32 :: (MonadMask m, Num a) => ByteString -> m a
+unpackWord32 w = fixBound <$> (readNBytes word32Size w :: MonadMask m => m Word32)
 {-# INLINE unpackWord32 #-}
 
-unpackWord64 :: (Num a) => ByteString -> DbErrorMonad a
-unpackWord64 w = fixBound <$> (readNBytes word64Size w :: DbErrorMonad Word64)
+unpackWord64 :: (MonadMask m, Num a) => ByteString -> m a
+unpackWord64 w = fixBound <$> (readNBytes word64Size w :: MonadMask m => m Word64)
 {-# INLINE unpackWord64 #-}
 
-unpackFloat :: ByteString -> DbErrorMonad Float
+unpackFloat :: (MonadMask m) => ByteString -> m Float
 unpackFloat  = readNBytes word32Size
 {-# INLINE unpackFloat #-}
 
-unpackDouble :: ByteString -> DbErrorMonad Double
+unpackDouble :: (MonadMask m) => ByteString -> m Double
 unpackDouble  = readNBytes word64Size
 {-# INLINE unpackDouble #-}
 
@@ -117,11 +118,11 @@ unpackDouble  = readNBytes word64Size
 -- | Helper Functions
 -- |
 
-safeTake :: Int -> ByteString -> DbErrorMonad ByteString
+safeTake :: (MonadMask m) => Int -> ByteString -> m ByteString
 safeTake i bs =
   if (B.length bs) >= i
   then return $ Unsafe.unsafeTake i bs
-  else throwError $ NotEnoughInput (B.length bs) i
+  else throwM $ NotEnoughInput (B.length bs) i
 {-# INLINE safeTake #-}
 
 -- |Allocate and Write @n@ bytes in Native host order
@@ -135,7 +136,7 @@ writeNBytes total op = S.unsafeCreate total $ (\p -> writeOne p 0 ((total - 1) *
 {-# INLINE writeNBytes #-}
 
 -- |Read N Bytes in Native host order
-readNBytes :: Storable a => Int -> ByteString -> DbErrorMonad a
+readNBytes :: (MonadMask m, Storable a) => Int -> ByteString -> m a
 readNBytes n bs = do
   (fp,o,_) <- S.toForeignPtr `fmap` B.reverse `fmap` (safeTake n bs)
   let k p = peek (castPtr (p `plusPtr` o))
