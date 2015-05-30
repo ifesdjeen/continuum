@@ -14,7 +14,6 @@ import qualified Data.ByteString      as B
 import qualified Data.Map             as Map
 import           Data.ByteString      ( ByteString )
 import           Data.Serialize       ( encode, decode )
-import           Control.Monad.Except ( throwError )
 
 import Control.Monad.Catch    ( MonadMask(..), throwM )
 

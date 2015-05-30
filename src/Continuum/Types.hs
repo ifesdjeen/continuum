@@ -35,7 +35,6 @@ type DbKey         = ByteString
 type DbName        = ByteString
 type FieldName     = ByteString
 type EncodedValue  = ByteString
-type Decoder a     = (ByteString, ByteString) -> DbErrorMonad a
 
 -- |
 -- | INTERNAL DB TYPES
@@ -129,7 +128,6 @@ data DbError =
   deriving (Show, Eq, Ord, Generic)
 
 instance Exception DbError
-type DbErrorMonad  = Either DbError
 
 -- |
 -- | Base Storage

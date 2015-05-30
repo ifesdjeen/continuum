@@ -27,7 +27,7 @@ import qualified Data.ByteString           as B
 import qualified Data.ByteString.Internal  as S
 import qualified Data.ByteString.Unsafe    as Unsafe
 
-import           Continuum.Types        ( DbErrorMonad, DbError(..) )
+import           Continuum.Types        ( DbError(..) )
 import           Data.Word              ( Word8, Word16, Word32, Word64 )
 import           Data.ByteString        ( ByteString )
 import           Control.Monad.Except   ( throwError )

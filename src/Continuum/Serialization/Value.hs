@@ -6,8 +6,7 @@ module Continuum.Serialization.Value
 
 import Data.ByteString        ( ByteString )
 import Continuum.Types        ( DbValue(..),
-                                DbType(..),
-                                DbErrorMonad )
+                                DbType(..) )
 import Control.Monad.Catch  ( MonadMask(..), throwM )
 import Continuum.Serialization.Primitive
 
