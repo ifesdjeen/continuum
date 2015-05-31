@@ -7,7 +7,6 @@ import Continuum.Storage.GenericStorage
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Catch    (MonadMask)
 
-import qualified Data.ByteString.Char8  as C8
 import qualified Continuum.Stream       as S
 import qualified Database.LevelDB.Base  as LDB
 
@@ -17,11 +16,13 @@ fetchDbs db =
                             $ S.mapM decodeSchema
                             $ entrySlice iter AllKeys Asc)
 
--- |Initialize (open) an instance of an _existing_ database.
+-- |Create a database if it does not yet exist.
+-- Database is returned in an open state, ready for writes.
 --
-initializeDb :: String
-                -> (DbName, DbSchema)
-                -> IO (DbName, (DbSchema, LDB.DB))
-initializeDb path (dbName, sch) = do
-  ldb <- LDB.open (path ++ "/" ++ (C8.unpack dbName)) def
-  return (dbName, (sch, ldb))
+-- createDatabase :: DbName
+--                   -> DbSchema
+--                   -> DbState DbResult
+createDatabase :: (MonadMask m, MonadIO m) => DB -> DbName -> DbSchema -> m DbResult
+createDatabase sysDb dbName sch = do
+  _    <- LDB.put sysDb def dbName (encodeSchema sch)
+  return OK
