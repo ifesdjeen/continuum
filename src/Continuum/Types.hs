@@ -144,3 +144,11 @@ data TimeRange =
 
 instance S.Serialize DbType
 instance S.Serialize DbSchema
+
+-- |
+-- | DbResult
+-- |
+
+data DbResult =
+  OK
+  deriving (Show)
