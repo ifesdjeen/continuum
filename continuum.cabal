@@ -27,6 +27,7 @@ library
                       , Continuum.Repl
                       , Continuum.Folds
                       , Continuum.Stream
+                      , Continuum.Service.StorageService
                       , Continuum.Storage.GenericStorage
                       , Continuum.Storage.ChunkStorage
                       , Continuum.Storage.SystemStorage
