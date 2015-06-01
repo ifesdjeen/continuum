@@ -2,32 +2,25 @@
 
 module Continuum.Serialization.Record where
 
-import qualified Data.ByteString      as B
-
-
 import Continuum.Serialization.Primitive
 import Continuum.Serialization.Value
 
-import Control.Monad.Catch    ( MonadMask(..), throwM )
-import Control.Exception (throw)
-import Control.Monad.Catch    (MonadMask)
-import           Data.Serialize       ( runPut, putWord8, putByteString )
-import           Control.Monad.Except ( forM_, throwError )
-import           Data.List            ( elemIndex )
-import           Data.Maybe           ( isJust, fromJust, catMaybes )
-import           Continuum.Types
-import qualified Data.Map             as Map
+import Control.Monad.Catch  ( MonadMask(..), throwM )
+import Data.Serialize       ( runPut, putWord8, putByteString )
+import Control.Monad.Except ( forM_ )
+import Data.List            ( elemIndex, sort )
+import Data.Maybe           ( isJust, fromJust, catMaybes )
+import Continuum.Types
+
+import qualified Data.ByteString      as B
+import qualified Data.Map.Strict      as Map
 
 encodeRecord :: DbSchema -> Integer -> DbRecord -> Entry
 encodeRecord schema sequenceId (DbRecord timestamp vals) = (encodedKey, encodedValue)
-  where encodedKey = B.concat [(packWord64 timestamp), (packWord64 sequenceId)]
+  where encodedKey   = B.concat $ fmap packWord64 [timestamp, sequenceId]
         encodedParts = fmap encodeValue $ catMaybes $ (\x -> Map.lookup x vals) <$> (fields schema)
-        lengths = B.length <$> encodedParts
-        encodedValue = runPut $ do
-          -- Change to B.Pack
-          forM_ lengths (putWord8 . fromIntegral)
-          forM_ encodedParts putByteString
-          -- encode . catMaybes $ fmap (\x -> Map.lookup x vals) (fields schema)
+        lengths      = fmap (\i -> fromIntegral $ B.length i) encodedParts
+        encodedValue = B.concat $ (B.pack lengths) : encodedParts
 
 decodeRecord :: (MonadMask m) => Decoding -> DbSchema -> Entry -> m DbRecord
 decodeRecord (Field field) schema !(k, bs) = do
