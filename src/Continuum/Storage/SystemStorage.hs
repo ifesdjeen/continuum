@@ -18,10 +18,6 @@ fetchDbs db =
 
 -- |Create a database if it does not yet exist.
 -- Database is returned in an open state, ready for writes.
---
--- createDatabase :: DbName
---                   -> DbSchema
---                   -> DbState DbResult
 createDatabase :: (MonadMask m, MonadIO m) => DB -> DbName -> DbSchema -> m DbResult
 createDatabase sysDb dbName sch = do
   _    <- LDB.put sysDb def dbName (encodeSchema sch)
