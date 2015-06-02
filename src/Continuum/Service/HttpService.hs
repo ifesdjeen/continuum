@@ -24,7 +24,7 @@ runWebServer ctxTVar = do
 
     -- TODO
     Scotty.get "/" $ do
-      Scotty.json []
+      Scotty.json (123 :: Integer)
 
   return ()
   where
