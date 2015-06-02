@@ -28,6 +28,7 @@ library
                       , Continuum.Folds
                       , Continuum.Stream
                       , Continuum.Service.StorageService
+                      , Continuum.Service.HttpService
                       , Continuum.Storage.GenericStorage
                       , Continuum.Storage.ChunkStorage
                       , Continuum.Storage.SystemStorage
@@ -48,6 +49,8 @@ library
                         , cereal                 >= 0.4.1.1
                         , leveldb-haskell        >= 0.6.2
                         , exceptions             >= 0.6
+                        , scotty                 >= 0.9.0
+                        , stm                    >=2.4.3
                         , data-default
 
                         , directory
