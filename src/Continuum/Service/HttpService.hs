@@ -15,7 +15,6 @@ import           Data.ByteString.Char8          ( split )
 
 data DbContext = DbContext
     { ctxSystemDb    :: DB
-    , ctxDbs         :: ContextDbsMap
     , ctxChunksDb    :: DB
     }
 
