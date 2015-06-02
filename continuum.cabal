@@ -1,7 +1,7 @@
 name:                   continuum
 stability:              experimental
 description:            Continuum Database
-version:                0.1.0.8
+version:                0.1.0.10
 license:                MIT
 license-file:           LICENSE
 author:                 Alex Petrov
@@ -73,7 +73,7 @@ test-suite tests
                         , Continuum.Support.QuickCheck
 
   build-depends:          base                   >= 4 && < 5
-                        , continuum              >= 0.1.0.8
+                        , continuum              >= 0.1.0.10
                         , bytestring             >= 0.10.4.0
                         , QuickCheck             >= 2.8.1
                         , hspec-expectations     >= 0.6.1.1
