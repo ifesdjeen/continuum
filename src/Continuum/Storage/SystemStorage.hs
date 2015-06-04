@@ -3,10 +3,11 @@ module Continuum.Storage.SystemStorage where
 import Continuum.Types
 import Continuum.Serialization.Schema
 import Continuum.Storage.GenericStorage
-
+-- import Data.ByteString
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Catch    (MonadMask)
-
+import System.Process         ( system )
+import qualified Data.ByteString.Char8  as BS
 import qualified Continuum.Stream       as S
 import qualified Database.LevelDB.Base  as LDB
 
@@ -22,3 +23,9 @@ createDatabase :: (MonadMask m, MonadIO m) => DB -> DbName -> DbSchema -> m DbRe
 createDatabase sysDb dbName sch = do
   _    <- LDB.put sysDb def dbName (encodeSchema sch)
   return OK
+
+openDb :: String -> DbName -> IO DB
+openDb path dbName = do
+  _  <- system ("mkdir " ++ path)
+  db <- LDB.open (path ++ "/" ++ (BS.unpack dbName)) def
+  return db
