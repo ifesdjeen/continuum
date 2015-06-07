@@ -18,6 +18,7 @@ import           Continuum.Storage.SystemStorage as SysStorage
 
 import           Data.ByteString                ( ByteString )
 import           Data.ByteString.Char8          ( split )
+import           Network.HTTP.Types             ( status404 )
 
 data DbContext = DbContext
     { ctxSystemDb    :: DB
@@ -33,13 +34,12 @@ runWebServer ctxTVar = do
        withDb path "chunks" $ \chunksDb ->
        Scotty.scotty 3000 $ do
 
-
          Scotty.get "/" $ do
            Scotty.json (123 :: Integer)
 
   return ()
-  where
 
+--- TODO: "Just OR 404"
 registerDbHandlers :: String -> DbName -> DbSchema -> IO (ScottyM ())
 registerDbHandlers path dbName schema = do
   db <- openDb path dbName
