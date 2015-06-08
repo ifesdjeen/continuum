@@ -15,8 +15,11 @@ module Continuum.Types ( module Continuum.Types
                        , DB
                        , Iterator) where
 
-import qualified Data.Serialize                 as S
-import qualified Data.Map                       as Map
+import qualified Data.Serialize  as S
+import qualified Data.ByteString as BS
+import qualified Data.Map        as Map
+import qualified Data.Aeson      as Json
+import qualified Data.Vector     as V
 
 import GHC.Exception              ( Exception )
 import Data.ByteString            ( ByteString )
@@ -82,12 +85,29 @@ data DbRecord =
 -- |
 
 data DbSchema = DbSchema
-    { fieldMappings  :: Map.Map ByteString Int
-    , fields         :: [ByteString]
-    , indexMappings  :: Map.Map Int ByteString
-    , schemaMappings :: Map.Map ByteString DbType
+    { fieldMappings  :: Map.Map FieldName Int
+    , fields         :: [FieldName]
+    , indexMappings  :: Map.Map Int FieldName
+    , schemaMappings :: Map.Map FieldName DbType
+    , nameTypeList   :: [(FieldName, DbType)]
     , schemaTypes    :: [DbType]
     } deriving (Generic, Show, Eq)
+
+-- | Creates a DbSchema out of Schema Definition (name/type pairs)
+--
+makeSchema :: [(ByteString, DbType)] -> DbSchema
+makeSchema stringTypeList =
+  DbSchema { fieldMappings  = fMappings
+           , fields         = fields'
+           , schemaMappings = Map.fromList stringTypeList
+           , nameTypeList   = stringTypeList
+           , indexMappings  = iMappings
+           , schemaTypes    = schemaTypes'}
+  where fields'      = fmap fst stringTypeList
+        schemaTypes' = fmap snd stringTypeList
+        fMappings    = Map.fromList $ zip fields' iterateFrom0
+        iMappings    = Map.fromList $ zip iterateFrom0 fields'
+        iterateFrom0 = (iterate (1+) 0)
 
 -- |
 -- | Chunks
