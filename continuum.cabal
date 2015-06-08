@@ -54,7 +54,8 @@ library
                         , http-types             >=0.8.6
                         , aeson                  >= 0.9.0.1
                         , data-default
-
+                        , text                   >=1.2.0.0
+                        , vector                 >=0.10.0.1
                         , directory
                         , temporary
 test-suite tests
