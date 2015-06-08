@@ -6,7 +6,6 @@
 module Continuum.Serialization.RecordSpec where
 
 import Continuum.Serialization.Record
-import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Types
 
 import Continuum.Support.QuickCheck

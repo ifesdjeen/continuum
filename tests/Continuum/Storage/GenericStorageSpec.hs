@@ -6,7 +6,6 @@ import Continuum.Types
 import Continuum.Serialization.Record
 import Continuum.Support.QuickCheck
 import Continuum.Support.TmpDb
-import Continuum.Serialization.Schema  ( makeSchema )
 import Continuum.Storage.RecordStorage ( withDecoded )
 import GHC.Exts                        ( sortWith )
 import Continuum.Storage.GenericStorage

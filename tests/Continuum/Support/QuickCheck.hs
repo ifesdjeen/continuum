@@ -9,7 +9,6 @@ import Continuum.Types
 import Data.List                      ( nubBy )
 import Data.ByteString                ( ByteString )
 import Data.ByteString.Char8          ( pack )
-import Continuum.Serialization.Schema ( makeSchema )
 import Continuum.Serialization.Record ( makeRecord )
 
 import Test.QuickCheck
