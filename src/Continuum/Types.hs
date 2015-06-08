@@ -29,6 +29,12 @@ import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB )
 import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Value, Entry)
 import Database.LevelDB.Iterator  ( Iterator )
 
+
+import Data.Aeson                 ( ToJSON, FromJSON, toJSON, fromJSON )
+
+import Data.Text                  ( Text(), pack )
+import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
+
 -- |
 -- | ALIASES
 -- |
@@ -172,3 +178,31 @@ instance S.Serialize DbSchema
 data DbResult =
   OK
   deriving (Show)
+
+
+-- |
+-- | HTTP Encoding
+-- |
+
+instance ToJSON DbType
+instance FromJSON DbType
+
+-- instance Json.ToJSON ByteString where
+--   toJSON ()
+
+instance Json.FromJSON ByteString where
+  parseJSON (Json.String t) = pure . encodeUtf8 $ t
+  parseJSON _               = mempty
+
+instance Json.ToJSON DbValue where
+  toJSON (DbInt v)    = toJSON v
+  toJSON (DbByte v)   = toJSON v
+  toJSON (DbLong v)   = toJSON v
+  toJSON (DbShort v)  = toJSON v
+  toJSON (DbString v) = toJSON $ decodeUtf8 v
+  toJSON (DbFloat v)  = toJSON v
+  toJSON (DbDouble v) = toJSON v
+
+instance Json.FromJSON DbSchema where
+  parseJSON (Json.Array v) = makeSchema <$> (sequence (fmap Json.parseJSON (V.toList v)))
+  parseJSON _ = mempty
