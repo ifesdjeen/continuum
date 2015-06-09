@@ -194,6 +194,9 @@ instance Json.FromJSON ByteString where
   parseJSON (Json.String t) = pure . encodeUtf8 $ t
   parseJSON _               = mempty
 
+instance ToJSON ByteString where
+  toJSON = toJSON . decodeUtf8
+
 instance Json.ToJSON DbValue where
   toJSON (DbInt v)    = toJSON v
   toJSON (DbByte v)   = toJSON v
@@ -206,3 +209,6 @@ instance Json.ToJSON DbValue where
 instance Json.FromJSON DbSchema where
   parseJSON (Json.Array v) = makeSchema <$> (sequence (fmap Json.parseJSON (V.toList v)))
   parseJSON _ = mempty
+
+instance Json.ToJSON DbSchema where
+  toJSON schema = toJSON (nameTypeList schema)
