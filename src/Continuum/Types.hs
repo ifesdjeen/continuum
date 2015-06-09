@@ -16,7 +16,6 @@ module Continuum.Types ( module Continuum.Types
                        , Iterator) where
 
 import qualified Data.Serialize  as S
-import qualified Data.ByteString as BS
 import qualified Data.Map        as Map
 import qualified Data.Aeson      as Json
 import qualified Data.Vector     as V
@@ -25,15 +24,13 @@ import GHC.Exception              ( Exception )
 import Data.ByteString            ( ByteString )
 import GHC.Generics               ( Generic )
 import Data.Stream.Monadic        ( Step(..), Stream(..) )
+import Data.Aeson                 ( ToJSON, FromJSON, toJSON )
+import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
+
 import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB )
 import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Value, Entry)
 import Database.LevelDB.Iterator  ( Iterator )
 
-
-import Data.Aeson                 ( ToJSON, FromJSON, toJSON, fromJSON )
-
-import Data.Text                  ( Text(), pack )
-import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
 
 -- |
 -- | ALIASES
