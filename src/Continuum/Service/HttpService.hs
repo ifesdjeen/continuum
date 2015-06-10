@@ -33,8 +33,12 @@ runWebServer :: (TVar DbContext) -> IO ()
 runWebServer ctxTVar = do
   let path = "/tmp/continuum-test-db"
   _ <- forkIO $
+
        withDb path "system" $ \systemDb -> do
-         dbs <- atomInit <$> Map.fromList <$> (fetchDbs systemDb)
+         schemas     <- fetchDbs systemDb
+         let dbNames = map fst schemas
+         dbInstances <- mapM (openDb path) $ dbNames
+         dbState <- atomInit $ Map.fromList $ zip dbNames (zip dbInstances (map snd schemas))
 
          withDb path "chunks" $ \chunksDb ->
            Scotty.scotty 3000 $ do
@@ -44,7 +48,13 @@ runWebServer ctxTVar = do
                Scotty.json (123 :: Integer)
 
              Scotty.post "/dbs" $ do
-               Scotty.json (123 :: Integer)
+               dbName <- (Scotty.param "name") :: ActionM ByteString
+               schema <- (Scotty.param "schema") :: ActionM Text
+
+
+
+               Scotty.json ("ok" :: Text)
+
 
              Scotty.post "/dbs/:dbName" $ do
                Scotty.json (123 :: Integer)
