@@ -48,13 +48,17 @@ runWebServer ctxTVar = do
                Scotty.json (123 :: Integer)
 
              Scotty.post "/dbs" $ do
-               dbName <- (Scotty.param "name") :: ActionM ByteString
-               schema <- (Scotty.param "schema") :: ActionM Text
+               dbName    <- Scotty.param "name"
+               schemaStr <- Scotty.param "schema"
 
+               case (Json.decode schemaStr) of
+                (Just schema) -> do
+                  _  <- liftIO $ createDatabase systemDb dbName schema
+                  db <- liftIO $ openDb path dbName
+                  _  <- liftIO $ atomSwap (Map.insert dbName (db, schema)) dbState
 
-
-               Scotty.json ("ok" :: Text)
-
+                  Scotty.json ("ok" :: Text)
+                (Nothing)     -> Scotty.json ("ok" :: Text)
 
              Scotty.post "/dbs/:dbName" $ do
                Scotty.json (123 :: Integer)
