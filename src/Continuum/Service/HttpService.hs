@@ -61,7 +61,8 @@ runWebServer ctxTVar = do
                 (Nothing)     -> Scotty.json ("ok" :: Text)
 
              Scotty.post "/dbs/:dbName" $ do
-               Scotty.json (123 :: Integer)
+               dbs <- liftIO $ atomRead dbState
+               Scotty.json $ map (\(a, (_,b)) -> (a,b)) (Map.toList dbs)
 
              Scotty.get "/dbs/:dbName/:timestamp" $ do
                Scotty.json (123 :: Integer)
