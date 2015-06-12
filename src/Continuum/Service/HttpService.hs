@@ -12,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.ByteString.Char8  as BS
 import qualified Web.Scotty as Scotty
 import qualified Control.Exception as ControlException
+import qualified Data.Aeson as Json
 import           Web.Scotty ( ActionM(..), ScottyM(..) )
 import           Web.Scotty.Internal.Types ( ScottyT )
 import           Control.Monad.IO.Class         ( liftIO )
