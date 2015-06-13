@@ -1,8 +1,12 @@
-import httplib, urllib
+import json, requests
 
-params = urllib.urlencode({'@number': 12524, '@type': 'issue', '@action': 'show'})
-headers = {"Content-type": "application/x-www-form-urlencoded",
-           "Accept": "text/plain"}
-conn = httplib.HTTPConnection("bugs.python.org")
-conn.request("POST", "", params, headers)
-response = conn.getresponse()
+url = 'http://localhost:3000/dbs'
+
+params = dict(
+    name='dbname',
+    schema='[[\"a\",\"DbtLong\"]]'
+)
+
+resp = requests.post(url=url, params=params)
+
+print resp.text
