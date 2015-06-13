@@ -27,10 +27,10 @@ createDatabase sysDb dbName sch = do
 withDb :: (MonadMask m, MonadIO m) => String -> DbName -> (DB -> m a) -> m a
 withDb path dbName action = do
   _  <- liftIO $ system ("mkdir " ++ path)
-  LDB.withDB (path ++ "/" ++ (BS.unpack dbName)) def action
+  LDB.withDB (path ++ "/" ++ (BS.unpack dbName)) defaultOpts action
 
 -- (MonadIO m) =>
 openDb :: String -> DbName -> IO DB
 openDb path dbName = do
   _  <- liftIO $ system ("mkdir " ++ path)
-  LDB.open (path ++ "/" ++ (BS.unpack dbName)) def
+  LDB.open (path ++ "/" ++ (BS.unpack dbName)) defaultOpts
