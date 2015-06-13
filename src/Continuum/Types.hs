@@ -27,7 +27,7 @@ import Data.Stream.Monadic        ( Step(..), Stream(..) )
 import Data.Aeson                 ( ToJSON, FromJSON, toJSON )
 import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
 
-import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB )
+import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB, Options(..), defaultOptions )
 import Database.LevelDB.Streaming ( KeyRange(..), Direction(..), Value, Entry)
 import Database.LevelDB.Iterator  ( Iterator )
 
@@ -209,3 +209,16 @@ instance Json.FromJSON DbSchema where
 
 instance Json.ToJSON DbSchema where
   toJSON schema = toJSON (nameTypeList schema)
+
+-- |
+-- | Default Options
+-- |
+
+defaultOpts :: Options
+defaultOpts = defaultOptions{ createIfMissing = True
+                            , cacheSize= 512 * 1048576
+                                         -- , blockSize= 2048
+                                         -- , compression = NoCompression
+                                         -- , compression = NoCompressionNoCompression
+                                         -- , comparator = Just customComparator
+                        }
