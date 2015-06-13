@@ -30,46 +30,43 @@ data DbContext = DbContext
     }
 
 
-runWebServer :: (TVar DbContext) -> IO ()
-runWebServer ctxTVar = do
+runWebServer :: IO ()
+runWebServer = do
   let path = "/tmp/continuum-test-db"
-  _ <- forkIO $
+  withDb path "system" $ \systemDb -> do
+    schemas     <- fetchDbs systemDb
+    let dbNames = map fst schemas
+    dbInstances <- mapM (openDb path) $ dbNames
+    dbState <- atomInit $ Map.fromList $ zip dbNames (zip dbInstances (map snd schemas))
+    withDb path "chunks" $ \chunksDb ->
+      Scotty.scotty 3000 $ do
 
-       withDb path "system" $ \systemDb -> do
-         schemas     <- fetchDbs systemDb
-         let dbNames = map fst schemas
-         dbInstances <- mapM (openDb path) $ dbNames
-         dbState <- atomInit $ Map.fromList $ zip dbNames (zip dbInstances (map snd schemas))
+        Scotty.get "/dbs" $ do
+          dbs <- liftIO $ atomRead dbState
+          Scotty.json $ map (\(a, (_,b)) -> (a,b)) (Map.toList dbs)
 
-         withDb path "chunks" $ \chunksDb ->
-           Scotty.scotty 3000 $ do
+        Scotty.post "/dbs" $ do
+          dbName    <- Scotty.param "name"
+          schemaStr <- Scotty.param "schema"
 
-             Scotty.get "/dbs" $ do
-               liftIO $ print $ "asd"
-               Scotty.json (123 :: Integer)
+          case (Json.decode schemaStr) of
+           (Just schema) -> do
+             _  <- liftIO $ createDatabase systemDb dbName schema
+             db <- liftIO $ openDb path dbName
+             _  <- liftIO $ atomSwap (Map.insert dbName (db, schema)) dbState
 
-             Scotty.post "/dbs" $ do
-               dbName    <- Scotty.param "name"
-               schemaStr <- Scotty.param "schema"
+             Scotty.json ("ok" :: Text)
+           Nothing     -> Scotty.json ("ok" :: Text)
 
-               case (Json.decode schemaStr) of
-                (Just schema) -> do
-                  _  <- liftIO $ createDatabase systemDb dbName schema
-                  db <- liftIO $ openDb path dbName
-                  _  <- liftIO $ atomSwap (Map.insert dbName (db, schema)) dbState
+        Scotty.post "/dbs/:dbName" $ do
+          liftIO $ print $ "asd"
+          Scotty.json (123 :: Integer)
 
-                  Scotty.json ("ok" :: Text)
-                (Nothing)     -> Scotty.json ("ok" :: Text)
+        Scotty.get "/dbs/:dbName/:timestamp" $ do
+          Scotty.json (123 :: Integer)
 
-             Scotty.post "/dbs/:dbName" $ do
-               dbs <- liftIO $ atomRead dbState
-               Scotty.json $ map (\(a, (_,b)) -> (a,b)) (Map.toList dbs)
-
-             Scotty.get "/dbs/:dbName/:timestamp" $ do
-               Scotty.json (123 :: Integer)
-
-             Scotty.get "/" $ do
-               Scotty.json (123 :: Integer)
+        Scotty.get "/" $ do
+          Scotty.json (123 :: Integer)
 
   return ()
 
