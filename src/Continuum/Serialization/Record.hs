@@ -90,15 +90,6 @@ decodeValues schema bs = mapM (\(t, s) -> decodeValue t s) (zip (schemaTypes sch
     step (remaining', acc) n = (B.drop n remaining', acc ++ [B.take n remaining'])
 {-# INLINE decodeValues #-}
 
--- |
--- | Construction
--- |
-
--- | Creates a DbRecord from Timestamp and Key/Value pairs
---
-makeRecord :: Integer -> [(FieldName, DbValue)] -> DbRecord
-makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
-
 getValue :: FieldName -> DbRecord -> Maybe DbValue
 getValue fieldName (DbRecord _ recordFields) = Map.lookup fieldName recordFields
 
