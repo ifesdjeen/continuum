@@ -1,5 +1,7 @@
-{-# LANGUAGE DeriveGeneric             #-}
-{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Continuum.Types ( module Continuum.Types
                        , MapResult(..)
                        , Stream(..)
@@ -24,7 +26,8 @@ import GHC.Exception              ( Exception )
 import Data.ByteString            ( ByteString )
 import GHC.Generics               ( Generic )
 import Data.Stream.Monadic        ( Step(..), Stream(..) )
-import Data.Aeson                 ( ToJSON, FromJSON, toJSON )
+import Control.Applicative        ( (<*>) )
+import Data.Aeson                 ( ToJSON, FromJSON, toJSON, (.=), (.:) )
 import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
 
 import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB, Options(..), defaultOptions )
@@ -82,6 +85,11 @@ instance (Ord k, Monoid v) => Monoid (MapResult k v) where
 data DbRecord =
   DbRecord Integer (Map.Map ByteString DbValue)
   deriving(Generic, Show, Eq)
+
+-- | Creates a DbRecord from Timestamp and Key/Value pairs
+--
+makeRecord :: Integer -> [(FieldName, DbValue)] -> DbRecord
+makeRecord timestamp vals = DbRecord timestamp (Map.fromList vals)
 
 -- |
 -- | DB SCHEMA
@@ -194,18 +202,19 @@ instance Json.FromJSON ByteString where
 instance ToJSON ByteString where
   toJSON = toJSON . decodeUtf8
 
-instance Json.ToJSON DbValue where
-  toJSON (DbInt v)    = toJSON v
-  toJSON (DbByte v)   = toJSON v
-  toJSON (DbLong v)   = toJSON v
-  toJSON (DbShort v)  = toJSON v
-  toJSON (DbString v) = toJSON $ decodeUtf8 v
-  toJSON (DbFloat v)  = toJSON v
-  toJSON (DbDouble v) = toJSON v
-
 instance Json.FromJSON DbSchema where
   parseJSON (Json.Array v) = makeSchema <$> (sequence (fmap Json.parseJSON (V.toList v)))
   parseJSON _ = mempty
+
+-- instance Json.FromJSON DbRecord where
+--   parseJSON (Json.Object v) = makeRecord <$>
+--                               v .: "timestamp" <*>
+--                               v .: "data"
+--   parseJSON _ = mempty
+
+instance Json.ToJSON DbRecord where
+  toJSON (DbRecord i m) = Json.object ["timestamp" .= i,
+                                       "data"      .= Map.toList m]
 
 instance Json.ToJSON DbSchema where
   toJSON schema = toJSON (nameTypeList schema)
