@@ -28,6 +28,7 @@ import GHC.Generics               ( Generic )
 import Data.Stream.Monadic        ( Step(..), Stream(..) )
 import Control.Applicative        ( (<*>) )
 import Data.Aeson                 ( ToJSON, FromJSON, toJSON, (.=), (.:) )
+import Data.Aeson.Types           ( Parser )
 import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
 
 import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB, Options(..), defaultOptions )
