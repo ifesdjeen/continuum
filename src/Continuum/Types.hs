@@ -212,6 +212,14 @@ instance Json.FromJSON DbSchema where
 --                               v .: "data"
 --   parseJSON _ = mempty
 
+instance ToJSON DbValue where
+  toJSON (DbInt v)    = toJSON v
+  toJSON (DbLong v)   = toJSON v
+  toJSON (DbShort v)  = toJSON v
+  toJSON (DbString v) = toJSON $ decodeUtf8 v
+  toJSON (DbFloat v)  = toJSON v
+  toJSON (DbDouble v) = toJSON v
+
 instance Json.ToJSON DbRecord where
   toJSON (DbRecord i m) = Json.object ["timestamp" .= i,
                                        "data"      .= Map.toList m]
