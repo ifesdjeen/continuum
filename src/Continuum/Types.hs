@@ -212,6 +212,9 @@ instance Json.FromJSON DbSchema where
 --                               v .: "data"
 --   parseJSON _ = mempty
 
+decodeDbtFromJson :: DbType -> Json.Value -> Parser DbValue
+decodeDbtFromJson DbtInt (Json.Number a) = return $ DbInt 1
+decodeDbtFromJson _ _ = mempty
 instance ToJSON DbValue where
   toJSON (DbInt v)    = toJSON v
   toJSON (DbLong v)   = toJSON v
