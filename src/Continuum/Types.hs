@@ -215,6 +215,17 @@ instance Json.FromJSON DbSchema where
 decodeDbtFromJson :: DbType -> Json.Value -> Parser DbValue
 decodeDbtFromJson DbtInt (Json.Number a) = return $ DbInt 1
 decodeDbtFromJson _ _ = mempty
+
+recordFromJson :: DbSchema -> Json.Value -> Parser DbRecord
+recordFromJson schema (Json.Object value) = do
+  ts    <- value .: "timestsamp"
+  d     <- value .: "data"
+  types <- mapM (\(n, tp) -> ((,) tp) <$> d .: (decodeUtf8 n)) (nameTypeList schema)
+  r     <- mapM (uncurry decodeDbtFromJson) types
+  return $ makeRecord ts (zip (fields schema) r)
+
+
+
 instance ToJSON DbValue where
   toJSON (DbInt v)    = toJSON v
   toJSON (DbLong v)   = toJSON v
