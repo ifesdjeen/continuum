@@ -28,7 +28,7 @@ import GHC.Generics               ( Generic )
 import Data.Stream.Monadic        ( Step(..), Stream(..) )
 import Control.Applicative        ( (<*>) )
 import Data.Aeson                 ( ToJSON, FromJSON, toJSON, (.=), (.:) )
-import Data.Aeson.Types           ( Parser )
+import Data.Aeson.Types           ( Parser, parseMaybe )
 import Data.Text.Encoding         ( decodeUtf8, encodeUtf8 )
 
 import Database.LevelDB.Base      ( WriteBatch, BatchOp(..), DB, Options(..), defaultOptions )
@@ -215,17 +215,17 @@ instance Json.FromJSON DbSchema where
 
 decodeDbtFromJson :: DbType -> Json.Value -> Parser DbValue
 decodeDbtFromJson DbtInt (Json.Number a) = return $ DbInt 1
+decodeDbtFromJson DbtLong (Json.Number a) = return $ DbLong 1
 decodeDbtFromJson _ _ = mempty
 
-recordFromJson :: DbSchema -> Json.Value -> Parser DbRecord
-recordFromJson schema (Json.Object value) = do
+recordFromJson :: DbSchema -> Json.Object -> Parser DbRecord
+recordFromJson schema value = do
   ts    <- value .: "timestsamp"
   d     <- value .: "data"
+  -- types <- mapM (\(n, tp) -> ((,) tp) <$> d .: (decodeUtf8 n)) (nameTypeList schema)
   types <- mapM (\(n, tp) -> ((,) tp) <$> d .: (decodeUtf8 n)) (nameTypeList schema)
   r     <- mapM (uncurry decodeDbtFromJson) types
   return $ makeRecord ts (zip (fields schema) r)
-
-
 
 instance ToJSON DbValue where
   toJSON (DbInt v)    = toJSON v
@@ -254,3 +254,8 @@ defaultOpts = defaultOptions{ createIfMissing = True
                                          -- , compression = NoCompressionNoCompression
                                          -- , comparator = Just customComparator
                         }
+
+sch = makeSchema [("a", DbtLong) ]
+rec = makeRecord 1 [("a", DbLong 1)]
+
+a = (\i -> parseMaybe (recordFromJson sch) i) <$> (Json.decode (Json.encode rec) :: Maybe Json.Object)
