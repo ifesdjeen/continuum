@@ -257,4 +257,16 @@ defaultOpts = defaultOptions{ createIfMissing = True
 sch = makeSchema [("a", DbtLong) ]
 rec = makeRecord 1 [("a", DbLong 1)]
 
-a = (\i -> parseMaybe (recordFromJson sch) i) <$> (Json.decode (Json.encode rec) :: Maybe Json.Object)
+a = do
+  i <- Json.decode $ Json.encode rec
+  flip parseMaybe i (recordFromJson sch)
+
+b :: Maybe Json.Object
+b = Json.decode (Json.encode rec)
+
+e = do
+  result <- Json.decode "{\"name\":\"Dave\",\"age\":2}"
+  flip parseMaybe result $ \obj -> do
+    age <- obj .: "age"
+    name <- obj .: "name"
+    return ((name :: String)  ++ ": " ++ show ((age :: Integer) *2))
