@@ -220,9 +220,8 @@ decodeDbtFromJson _ _ = mempty
 
 recordFromJson :: DbSchema -> Json.Object -> Parser DbRecord
 recordFromJson schema value = do
-  ts    <- value .: "timestsamp"
+  ts    <- value .: "timestamp"
   d     <- value .: "data"
-  -- types <- mapM (\(n, tp) -> ((,) tp) <$> d .: (decodeUtf8 n)) (nameTypeList schema)
   types <- mapM (\(n, tp) -> ((,) tp) <$> d .: (decodeUtf8 n)) (nameTypeList schema)
   r     <- mapM (uncurry decodeDbtFromJson) types
   return $ makeRecord ts (zip (fields schema) r)
