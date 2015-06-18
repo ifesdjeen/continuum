@@ -236,7 +236,7 @@ instance ToJSON DbValue where
 
 instance Json.ToJSON DbRecord where
   toJSON (DbRecord i m) = Json.object ["timestamp" .= i,
-                                       "data"      .= Map.toList m]
+                                       "data"      .= Map.mapKeys decodeUtf8 m]
 
 instance Json.ToJSON DbSchema where
   toJSON schema = toJSON (nameTypeList schema)
