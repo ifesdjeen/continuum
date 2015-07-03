@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns  #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Continuum.Folds where
 
@@ -31,12 +32,16 @@ instance Monoid Count where
   mempty = Count 0
   mappend (Count a) (Count b) = Count $ a + b
 
+instance Aggregate Count Int where
+  combine (Count a) = a
+
 op_count :: forall a. Fold a Count
 op_count = Fold (\i _ -> i + 1) 0 Count
 
-data Min i = MinNone
-           | Min i
+data (Ord i) => Min i = MinNone
+              | Min i
            deriving (Show, Eq)
+
 instance (Ord i) => Monoid (Min i) where
   mempty                    = MinNone
   mappend (Min i1) (Min i2) = Min $ min i1 i2
@@ -47,6 +52,9 @@ op_min :: (Ord i) => Fold i (Min i)
 op_min = Fold step MinNone id
   where step MinNone i = Min i
         step m i2 = mappend m (Min i2)
+
+instance (Ord i) => Aggregate (Min i) i where
+  combine (Min a) = a
 
 op_collect :: forall a. Fold a [a]
 op_collect = Fold (flip (:)) [] id
