@@ -72,11 +72,34 @@ op_withField fieldName (Fold f z0 e) =
 
 op_groupBy :: (Ord a, Monoid b) => (r -> Maybe a) -> (Fold r b) -> Fold r (MapResult a b)
 op_groupBy groupFn (Fold f z0 e) =
-  let wrappedSubStep n Nothing  = return $! (f z0 n)
-      wrappedSubStep n (Just a) = return $! (f a n)
-      localStep m record        = maybe m (\r -> Map.alter (wrappedSubStep record) r m) (groupFn record)
-      done a                    = MapResult $ Map.map e a
+  let subStep n Nothing  = return $! (f z0 n)
+      subStep n (Just a) = return $! (f a n)
+      localStep m record = maybe m (\r -> Map.alter (subStep record) r m) (groupFn record)
+      done a             = MapResult $ Map.map e a
   in Fold localStep Map.empty done
 
 op_groupByField :: (Monoid b) => FieldName -> (Fold DbRecord b) -> Fold DbRecord (MapResult DbValue b)
 op_groupByField fieldName f = op_groupBy (getValue fieldName) f
+
+data (Integral a) => Mean a = Mean [a]
+            deriving (Show, Eq)
+
+op_mean :: (Integral a) => Fold a (Mean a)
+op_mean = Fold (flip (:)) [] Mean
+
+instance (Integral a) => Monoid (Mean a) where
+  mempty = Mean []
+  mappend (Mean a) (Mean b) = Mean $ a ++ b
+
+instance (Integral a) => Aggregate (Mean a) Double where
+  combine (Mean []) = 0
+  combine (Mean a) = s / l
+    where s = fromIntegral $ sum a
+          l = fromIntegral $ length a
+
+-- class (Monoid intermediate) => Aggregate intermediate end where
+--   combine  :: intermediate -> end
+
+
+-- data Median = Mean [Number]
+--           deriving (Show, Eq)
