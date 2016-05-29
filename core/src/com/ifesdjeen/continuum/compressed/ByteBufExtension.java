@@ -3,7 +3,8 @@ package com.ifesdjeen.continuum.compressed;
 import io.netty.buffer.ByteBuf;
 
 /**
- * This class is completely thread-unsafe.
+ * This class is completely thread-unsafe. It is possilbe however to produce
+ * the version of it that'd allow reading concurrent with writing.
  *
  * Unflushed byte and/or all of it's bits will never be read from this buffer.
  *
@@ -48,9 +49,33 @@ public class ByteBufExtension {
         }
     }
 
+    public void writeBits(long b, int bits)
+    {
+        for (int i = bits - 1; i >= 0; i--)
+        {
+            writeBit((b & (1L << i)) != 0x00);
+        }
+    }
+
     public int readInt()
     {
         return readBits(32);
+    }
+
+    public long readBitsAsLong(int bits)
+    {
+        assert bits > 0 && bits <= 63;
+
+        if (bits == 52)
+            System.out.println("WAAT");
+        long result = 0;
+        for (int i = bits - 1; i >= 0; i--)
+        {
+            if (readBit()) {
+                result |= (1L << i);
+            }
+        }
+        return result;
     }
 
     public int readBits(int bits)
@@ -122,7 +147,7 @@ public class ByteBufExtension {
     }
 
     /**
-     * Fushes the last partially written bitstring / byte
+     * Flushes the last partially written bitstring / byte
      */
     public void flushUnwritten()
     {
@@ -141,17 +166,41 @@ public class ByteBufExtension {
         String s = "";
         for (int i = 31; i >= 0; i--)
         {
-            if ((number & (1 << i)) == 0x00) {
-                s += 0;
+            if ((number & (1 << i)) != 0x00) {
+                s += 1;
             }
             else
             {
-                s += 1;
+                s += 0;
             }
 
             if (i % 4 == 0 && i > 0)
                 s += " ";
         }
         return s;
+    }
+
+    public static String toPrettyBinaryString(long num)
+    {
+        String s = "";
+        for (int i = 63; i >= 0; i--)
+        {
+            if ((num & (1L << i)) != 0) {
+                s += 1;
+            }
+            else
+            {
+                s += 0;
+            }
+
+            if (i % 4 == 0 && i > 0)
+                s += " ";
+        }
+        return s;
+    }
+
+    public ByteBuf delegate()
+    {
+        return buffer;
     }
 }
