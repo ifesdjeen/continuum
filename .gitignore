@@ -1,18 +1,14 @@
-cabal-dev
-dist
-tags
-*.o
-*.swp
-*.a
-*.hi
-.cabal-sandbox
-cabal.sandbox.config
-*~
-#*
-*.json
-*_flymake.hs
-.*
-docsets
-*.js
-last_bench_results
-/src/Continuum/Storage/Parallel.hs
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+*.iml
+
+target
+.idea
