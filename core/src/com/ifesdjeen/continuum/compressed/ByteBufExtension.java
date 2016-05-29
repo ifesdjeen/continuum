@@ -66,8 +66,6 @@ public class ByteBufExtension {
     {
         assert bits > 0 && bits <= 63;
 
-        if (bits == 52)
-            System.out.println("WAAT");
         long result = 0;
         for (int i = bits - 1; i >= 0; i--)
         {

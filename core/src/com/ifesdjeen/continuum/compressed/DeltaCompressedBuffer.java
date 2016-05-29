@@ -2,35 +2,32 @@ package com.ifesdjeen.continuum.compressed;
 
 import io.netty.buffer.ByteBuf;
 
-import java.util.Iterator;
-
 /**
- * Delta compression algorithm.
- *
+ * Implementation of Gorilla compression algorithm.
  */
 public class DeltaCompressedBuffer
 {
-    private final ByteBufExtension buffer;
     private final int LEADING_ZEROS_SIZE = 5;
     private final int MEANINGFUL_BITS_SIZE = 6;
+
+    private final ByteBufExtension buffer;
     private long lastTimestamp;
     private long lastValue;
     private int lastLeadingZeroes = -1;
     private int lastTrailingZeroes = -1;
-    private int values;
+    private int valuesCount;
 
-    public DeltaCompressedBuffer(ByteBuf buffer, long timestamp, double firstValue)
+    public DeltaCompressedBuffer(ByteBuf buffer)
     {
         this.buffer = new ByteBufExtension(buffer);
-        writeHeader(buffer, timestamp, firstValue);
     }
 
-    private void writeHeader(ByteBuf buf, long timestamp, double firstValue)
+    public void writeHeader(long timestamp, double firstValue)
     {
         lastTimestamp = timestamp;
         lastValue = Double.doubleToLongBits(firstValue);
-        buf.writeLong(timestamp);
-        buf.writeLong(lastValue);
+        buffer.delegate().writeLong(timestamp);
+        buffer.delegate().writeLong(lastValue);
     }
 
     public void append(long timestamp, double value)
@@ -46,11 +43,10 @@ public class DeltaCompressedBuffer
 
         if (xOrValue == 0x00)
         {
-            System.out.println("ABSOLUTELY SAME VALUE");
-            buffer.writeBit(0);
+            buffer.writeBit(0); // valuesCount are absolutely same
         }
         else {
-            buffer.writeBit(1);
+            buffer.writeBit(1); // valuesCount are not the same
 
             final int leadingZeros = Long.numberOfLeadingZeros(xOrValue);
             final int trailingZeros = Long.numberOfTrailingZeros(xOrValue);
@@ -61,24 +57,17 @@ public class DeltaCompressedBuffer
             } else {
                 buffer.writeBit(0); // amount of meaningful bits is different
                 buffer.writeBits(leadingZeros, LEADING_ZEROS_SIZE);
-                buffer.writeBits(meaningfulBits, MEANINGFUL_BITS_SIZE); // meaningful bits
+                buffer.writeBits(meaningfulBits, MEANINGFUL_BITS_SIZE);
             }
 
             long valueToWrite = xOrValue >>> trailingZeros;
-            System.out.println("LAST VALUE    " + ByteBufExtension.toPrettyBinaryString(lastValue));
-            System.out.println("CURRENT VALUE " + ByteBufExtension.toPrettyBinaryString(currentValue));
-            System.out.println("XOR VALUE " + xOrValue);
-            System.out.println("XOR VALUE " + ByteBufExtension.toPrettyBinaryString(xOrValue));
-            System.out.println("SHIFTED   " + ByteBufExtension.toPrettyBinaryString(valueToWrite));
-            System.out.println("LEADING ZEROS " + leadingZeros + " TRAILING ZEROS " + trailingZeros + " MEANINGFUL " + meaningfulBits);
-            buffer.writeBits(valueToWrite, meaningfulBits); // store meaningful bits
+            buffer.writeBits(valueToWrite, meaningfulBits);
 
-            // TODO REMOVE
             this.lastLeadingZeroes = leadingZeros;
             this.lastTrailingZeroes = trailingZeros;
         }
 
-        values++;
+        valuesCount++;
         this.lastTimestamp = timestamp;
         this.lastValue = currentValue;
     }
@@ -90,11 +79,15 @@ public class DeltaCompressedBuffer
 
     public DeltaCompressedIterator iterator()
     {
-        return new DeltaCompressedIterator(values, buffer);
+        return new DeltaCompressedIterator(valuesCount, buffer);
     }
 
+    /**
+     * Figure out which timestamp writer to use
+     */
     public TimestampWriter getTimestampWriter(long value)
     {
+        // No difference, single bit
         if (value == 0)
             return TimestampWriter.ZERO;
 

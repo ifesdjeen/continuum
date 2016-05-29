@@ -26,7 +26,7 @@ public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator
 
     @Override
     public boolean hasNext() {
-        return valuesLeft >= 0; // ?? off by one
+        return valuesLeft >= 0;
     }
 
     @Override
@@ -50,51 +50,40 @@ public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator
                         boolean b4 = buffer.readBit();
                         if (b4)
                         {
-                            System.out.println("BITS 32");
                             lastTimestamp += TimestampWriter.BITS_32.readDiff(buffer);
                         }
                         else
                         {
-                            System.out.println("BITS 12");
                             lastTimestamp += TimestampWriter.BITS_12.readDiff(buffer);
                         }
                     }
                     else
                     {
-                        System.out.println("BITS 9");
                         lastTimestamp += TimestampWriter.BITS_9.readDiff(buffer);
                     }
                 }
                 else
                 {
                     long diff = TimestampWriter.BITS_7.readDiff(buffer);
-                    System.out.println("BITS 7: " + diff + " " + (lastTimestamp + diff ));
                     lastTimestamp += diff;
                 }
             }
             else
             {
-                System.out.println("NO CHANGE");
                 // ZERO, do nothing
             }
 
             boolean isDifferentValue = buffer.readBit();
             if (isDifferentValue)
             {
-                //System.out.println("DIFFERENT VALUE");
                 boolean isSameMeaningfulBits = buffer.readBit();
                 if (!isSameMeaningfulBits)
                 {
                     lastLeadingZeros = buffer.readBits(LEADING_ZEROS_SIZE);
                     lastMeaningfulBits = buffer.readBits(MEANINGFUL_BITS_SIZE);
-                    System.out.println("LEADING ZEROS " + lastLeadingZeros + " MEANINGFUL BITS " + lastMeaningfulBits);
                 }
 
                 long xOrValue = buffer.readBitsAsLong(lastMeaningfulBits);
-                System.out.println("LAST VALUE " + ByteBufExtension.toPrettyBinaryString(lastValue) + " " + Double.longBitsToDouble(lastValue));
-                System.out.println("XOR  VALUE " + ByteBufExtension.toPrettyBinaryString(xOrValue << (64 - lastMeaningfulBits - lastLeadingZeros)));
-                System.out.println("NEW  VALUE " + ByteBufExtension.toPrettyBinaryString(lastValue ^ (xOrValue << (64 - lastMeaningfulBits - lastLeadingZeros))));
-                System.out.println("TAILING ZEROS " + (64 - lastMeaningfulBits - lastLeadingZeros));
                 lastValue ^= xOrValue << (64 - lastMeaningfulBits - lastLeadingZeros);
             }
 
