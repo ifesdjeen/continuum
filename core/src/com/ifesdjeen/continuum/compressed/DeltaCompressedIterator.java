@@ -2,9 +2,6 @@ package com.ifesdjeen.continuum.compressed;
 
 import java.util.Iterator;
 
-/**
- * Created by ifesdjeen on 29/05/16.
- */
 public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator.Ts> {
 
     private final int LEADING_ZEROS_SIZE = 5;
