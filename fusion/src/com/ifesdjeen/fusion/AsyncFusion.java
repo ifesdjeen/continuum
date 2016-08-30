@@ -55,7 +55,7 @@ public class AsyncFusion<INIT, FROM> extends Fusion<INIT, FROM> {
 
   @Override
   @SuppressWarnings("unchecked")
-  protected <TO> AsyncFusion<INIT, TO> downstream(Function<Consumer<TO>, Consumer<FROM>> constructor) {
+  protected <TO> AsyncFusion<INIT, TO> next(Function<Consumer<TO>, Consumer<FROM>> constructor) {
     suppliers.add((Function<Consumer, Consumer>) (Function) constructor);
     return new AsyncFusion<INIT, TO>(suppliers, consumers);
   }

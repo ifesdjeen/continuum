@@ -2,11 +2,12 @@ package com.ifesdjeen.fusion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-class ListFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
+class ListFusion<INIT, FROM> extends Fusion<INIT, FROM> {
 
   private final List<INIT> list;
 
@@ -22,17 +23,16 @@ class ListFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
 
   @Override
   @SuppressWarnings("unchecked")
-  protected <TO> Fusion<INIT, TO> downstream(Function<Consumer<TO>, Consumer<FROM>> constructor) {
+  protected <TO> Fusion<INIT, TO> next(Function<Consumer<TO>, Consumer<FROM>> constructor) {
     suppliers.add((Function<Consumer, Consumer>) (Function) constructor);
     return new ListFusion<INIT, TO>(suppliers, list);
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public <ACC> ACC fold(ACC init,
-                        BiFunction<ACC, FROM, ACC> fold) {
-    FusionFinaliser<FROM, ACC> finalizer = new FusionFinaliser<>(init,
-                                                                 fold);
+  public <ACC> Future<ACC> fold(ACC init,
+                                BiFunction<ACC, FROM, ACC> fold) {
+    FusionFinaliser<FROM, ACC> finalizer = new FusionFinaliser<>(init, fold);
     Consumer stack = finalizer;
     for (int i = suppliers.size() - 1; i >= 0; i--) {
       stack = suppliers.get(i).apply(stack);
@@ -44,7 +44,7 @@ class ListFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
       finalized.accept(list.get(i));
     }
 
-    return finalizer.get();
+    return finalizer;
   }
 
 }

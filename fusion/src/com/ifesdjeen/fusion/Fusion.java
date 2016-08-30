@@ -2,6 +2,8 @@ package com.ifesdjeen.fusion;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -11,15 +13,15 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
 
   protected final List<Function<Consumer, Consumer>> suppliers;
 
-  public static <T> SyncFusion<T, T> from(List<T> s) {
+  public static <T> Fusion<T, T> from(List<T> s) {
     return new ListFusion<>(s);
   }
 
-  public static <T> SyncFusion<T, T> from(Iterator<T> s) {
+  public static <T> Fusion<T, T> from(Iterator<T> s) {
     return new IteratorFusion<>(s);
   }
 
-  public static <T> AsyncFusion<T, T> async() {
+  public static <T> Fusion<T, T> async() {
     return new AsyncFusion<>();
   }
 
@@ -28,7 +30,7 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
   }
 
   public <TO> Fusion<INIT, TO> map(Function<FROM, TO> fn) {
-    return downstream(new Function<Consumer<TO>, Consumer<FROM>>() {
+    return next(new Function<Consumer<TO>, Consumer<FROM>>() {
       @Override
       public Consumer<FROM> apply(Consumer<TO> downstream) {
         return (FROM i) -> {
@@ -39,7 +41,7 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
   }
 
   public Fusion<INIT, FROM> filter(Predicate<FROM> pred) {
-    return downstream((Consumer<FROM> downstream) -> {
+    return next((Consumer<FROM> downstream) -> {
       return (FROM i) -> {
         if (pred.test(i)) {
           downstream.accept(i);
@@ -47,6 +49,18 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
       };
     });
   }
+
+  public Fusion<INIT, FROM> take(int items) {
+    AtomicInteger counter = new AtomicInteger(items);
+    return next((Consumer<FROM> downstream) -> {
+      return (FROM i) -> {
+        if (counter.decrementAndGet() >= 0)
+          downstream.accept(i);
+      };
+    });
+  }
+
+  public abstract <ACC> Future<ACC> fold(ACC init, BiFunction<ACC, FROM, ACC> fold);
 
   // allMatch(Predicate<? super T> predicate)
   // anyMatch(Predicate<? super T> predicate)
@@ -72,10 +86,10 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
 
   // TODO: implemen take in terms of shortened fusion
   //   {
-  //    return downstream((downstream) -> {
+  //    return next((next) -> {
   //      AtomicInteger countdown = new AtomicInteger(howMany);
   //      return (i) -> {
-  //        downstream.accept(i);
+  //        next.accept(i);
   //        int more = countdown.decrementAndGet();
   //        if (more == 0) {
   //          doBreak.set(true);
@@ -85,7 +99,10 @@ public abstract class Fusion<INIT, FROM> { // TODO: COVARIANT extends Fusion
   //    });
   //  }
 
+  /**
+   * Calls the next step of the pipeline
+   **/
   @SuppressWarnings("unchecked")
-  protected abstract <TO> Fusion<INIT, TO> downstream(Function<Consumer<TO>, Consumer<FROM>> constructor);
+  protected abstract <TO> Fusion<INIT, TO> next(Function<Consumer<TO>, Consumer<FROM>> constructor);
 
 }

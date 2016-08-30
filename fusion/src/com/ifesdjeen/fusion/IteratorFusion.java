@@ -3,11 +3,12 @@ package com.ifesdjeen.fusion;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Future;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-class IteratorFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
+class IteratorFusion<INIT, FROM> extends Fusion<INIT, FROM> {
 
   private final Iterator<INIT> iterator;
 
@@ -23,15 +24,15 @@ class IteratorFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
 
   @Override
   @SuppressWarnings("unchecked")
-  protected <TO> Fusion<INIT, TO> downstream(Function<Consumer<TO>, Consumer<FROM>> constructor) {
+  protected <TO> Fusion<INIT, TO> next(Function<Consumer<TO>, Consumer<FROM>> constructor) {
     suppliers.add((Function<Consumer, Consumer>) (Function) constructor);
     return new IteratorFusion<INIT, TO>(suppliers, iterator);
   }
 
   @Override
   @SuppressWarnings("unchecked")
-  public <ACC> ACC fold(ACC init,
-                        BiFunction<ACC, FROM, ACC> fold) {
+  public <ACC> Future<ACC> fold(ACC init,
+                                BiFunction<ACC, FROM, ACC> fold) {
     FusionFinaliser<FROM, ACC> finalizer = new FusionFinaliser<>(init,
                                                                  fold);
     Consumer stack = finalizer;
@@ -44,7 +45,7 @@ class IteratorFusion<INIT, FROM> extends SyncFusion<INIT, FROM> {
       finalized.accept(iterator.next());
     }
 
-    return finalizer.get();
+    return finalizer;
   }
 
 }
