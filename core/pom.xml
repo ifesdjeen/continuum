@@ -21,9 +21,19 @@
       <version>1.2</version>
     </dependency>
     <dependency>
+      <groupId>com.boundary</groupId>
+      <artifactId>high-scale-lib</artifactId>
+      <version>1.0.6</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>${guava.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${commons.version}</version>
     </dependency>
     <dependency>
       <groupId>net.openhft</groupId>
