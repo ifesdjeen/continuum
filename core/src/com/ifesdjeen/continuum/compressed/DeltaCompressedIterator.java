@@ -14,8 +14,8 @@ public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator
     private int lastLeadingZeros = -1;
     private int lastMeaningfulBits = -1;
     private final ByteBufExtension buffer;
-    public DeltaCompressedIterator(int values, ByteBufExtension buffer)
-    {
+
+    public DeltaCompressedIterator(int values, ByteBufExtension buffer) {
         valuesLeft = values;
         this.values = values;
         this.buffer = buffer;
@@ -28,54 +28,39 @@ public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator
 
     @Override
     public Ts next() {
-        if (valuesLeft == values)
-        {
+        if (valuesLeft == values) {
             lastTimestamp = buffer.delegate().readLong();
             lastValue = buffer.delegate().readLong();
             valuesLeft--;
             return new Ts(lastTimestamp, Double.longBitsToDouble(lastValue));
-        }
-        else
-        {
+        } else {
             boolean b1 = buffer.readBit();
             if (b1) {
                 boolean b2 = buffer.readBit();
                 if (b2) {
                     boolean b3 = buffer.readBit();
-                    if (b3)
-                    {
+                    if (b3) {
                         boolean b4 = buffer.readBit();
-                        if (b4)
-                        {
+                        if (b4) {
                             lastTimestamp += TimestampWriter.BITS_32.readDiff(buffer);
-                        }
-                        else
-                        {
+                        } else {
                             lastTimestamp += TimestampWriter.BITS_12.readDiff(buffer);
                         }
-                    }
-                    else
-                    {
+                    } else {
                         lastTimestamp += TimestampWriter.BITS_9.readDiff(buffer);
                     }
-                }
-                else
-                {
+                } else {
                     long diff = TimestampWriter.BITS_7.readDiff(buffer);
                     lastTimestamp += diff;
                 }
-            }
-            else
-            {
+            } else {
                 // ZERO, do nothing
             }
 
             boolean isDifferentValue = buffer.readBit();
-            if (isDifferentValue)
-            {
+            if (isDifferentValue) {
                 boolean isSameMeaningfulBits = buffer.readBit();
-                if (!isSameMeaningfulBits)
-                {
+                if (!isSameMeaningfulBits) {
                     lastLeadingZeros = buffer.readBits(LEADING_ZEROS_SIZE);
                     lastMeaningfulBits = buffer.readBits(MEANINGFUL_BITS_SIZE);
                 }
@@ -89,13 +74,11 @@ public class DeltaCompressedIterator implements Iterator<DeltaCompressedIterator
         }
     }
 
-    public class Ts
-    {
+    public class Ts {
         public final long timestamp;
         public final double value;
 
-        public Ts(long timestamp, double value)
-        {
+        public Ts(long timestamp, double value) {
             this.timestamp = timestamp;
             this.value = value;
         }
