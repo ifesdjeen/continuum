@@ -20,6 +20,7 @@
     <javac.target>1.8</javac.target>
     <jmh.version>1.11.3</jmh.version>
     <guava.version>14.0.1</guava.version>
+    <commons.version>3.4</commons.version>
     <argLine.common>
       -server
       -dsa -da
@@ -84,6 +85,11 @@
       <groupId>org.jctools</groupId>
       <artifactId>jctools-core</artifactId>
       <version>1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.boundary</groupId>
+      <artifactId>high-scale-lib</artifactId>
+      <version>1.0.6</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

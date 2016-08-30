@@ -5,25 +5,35 @@ import io.netty.buffer.ByteBuf;
 /**
  * Implementation of Gorilla compression algorithm.
  */
+// TODO: rename to bucket
+// TODO: possibly on-disk buckets, too?
+// TODO: memory-mapped buffers?
 public class DeltaCompressedBuffer
 {
     private final int LEADING_ZEROS_SIZE = 5;
     private final int MEANINGFUL_BITS_SIZE = 6;
 
     private final ByteBufExtension buffer;
-    private long lastTimestamp;
+
+    // TODO: move to contructor
+    private volatile long firstTimestamp;
+    private volatile long lastTimestamp;
+    private volatile int valuesCount;
+
     private long lastValue;
     private int lastLeadingZeroes = -1;
     private int lastTrailingZeroes = -1;
-    private int valuesCount;
+
 
     public DeltaCompressedBuffer(ByteBuf buffer)
     {
+        // TODO: align size to power of 2
         this.buffer = new ByteBufExtension(buffer);
     }
 
     public void writeHeader(long timestamp, double firstValue)
     {
+        firstTimestamp = timestamp;
         lastTimestamp = timestamp;
         lastValue = Double.doubleToLongBits(firstValue);
         buffer.delegate().writeLong(timestamp);
@@ -43,14 +53,14 @@ public class DeltaCompressedBuffer
 
         if (xOrValue == 0x00)
         {
+            // TODO: add proper boundary checks
             buffer.writeBit(0); // valuesCount are absolutely same
         }
         else {
-            buffer.writeBit(1); // valuesCount are not the same
-
             final int leadingZeros = Long.numberOfLeadingZeros(xOrValue);
             final int trailingZeros = Long.numberOfTrailingZeros(xOrValue);
             final int meaningfulBits = 64 - leadingZeros - trailingZeros;
+            buffer.writeBit(1); // valuesCount are not the same
 
             if (leadingZeros == lastLeadingZeroes && trailingZeros == lastTrailingZeroes) {
                 buffer.writeBit(1); // amount of meaningful bits is same
@@ -70,6 +80,18 @@ public class DeltaCompressedBuffer
         valuesCount++;
         this.lastTimestamp = timestamp;
         this.lastValue = currentValue;
+    }
+
+    public int size() {
+        return valuesCount;
+    }
+
+    public long firstTimestamp() {
+        return firstTimestamp;
+    }
+
+    public long lastTimestamp() {
+        return lastTimestamp;
     }
 
     public void close()
